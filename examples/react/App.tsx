@@ -1,7 +1,7 @@
-import { WalletManager, createBrowserWalletStorage } from "@xrpname/wallet-core";
-import { createGemWalletAdapter } from "@xrpname/wallet-adapter-gemwallet";
-import { createCrossmarkAdapter } from "@xrpname/wallet-adapter-crossmark";
-import { XrplWalletProvider, useXrplWallet } from "@xrpname/wallet-react";
+import { WalletManager, createBrowserWalletStorage } from "@xrpl-wallet-kit/core";
+import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
+import { createCrossmarkAdapter } from "@xrpl-wallet-kit/adapter-crossmark";
+import { XrplWalletProvider, useXrplWallet } from "@xrpl-wallet-kit/react";
 
 const manager = new WalletManager({
   appName: "XRPL React dApp",

@@ -1,0 +1,1 @@
+{"extends":"../core/tsconfig.json","compilerOptions":{"rootDir":"src","outDir":"dist"},"references":[{"path":"../core"},{"path":"../adapters/crossmark"},{"path":"../adapters/dropfi"},{"path":"../adapters/gemwallet"},{"path":"../adapters/ledger"},{"path":"../adapters/walletconnect"},{"path":"../adapters/xaman"},{"path":"../adapters/xrpl-snap"},{"path":"../ui"}],"include":["src"]}

@@ -1,7 +1,7 @@
-import { WalletManager, createBrowserWalletStorage } from "../../../packages/wallet-core/src";
+import { WalletManager, createBrowserWalletStorage } from "../../../packages/core/src";
 import { Buffer } from "buffer";
-import type { WalletAdapter } from "../../../packages/wallet-core/src";
-import type { WalletUiLayout, WalletUiPresentation, WalletUiThemeMode } from "../../../packages/wallet-ui/src";
+import type { WalletAdapter } from "../../../packages/core/src";
+import type { WalletUiLayout, WalletUiPresentation, WalletUiThemeMode } from "../../../packages/ui/src";
 
 import "./styles.css";
 
@@ -75,12 +75,12 @@ async function bootstrap(run = bootstrapRun) {
     { createXamanAdapter },
     { createXrplSnapAdapter }
   ] = await Promise.all([
-    import("../../../packages/wallet-adapters/wallet-adapter-crossmark/src"),
-    import("../../../packages/wallet-adapters/wallet-adapter-dropfi/src"),
-    import("../../../packages/wallet-adapters/wallet-adapter-gemwallet/src"),
-    import("../../../packages/wallet-adapters/wallet-adapter-walletconnect/src"),
-    import("../../../packages/wallet-adapters/wallet-adapter-xaman/src"),
-    import("../../../packages/wallet-adapters/wallet-adapter-xrpl-snap/src")
+    import("../../../packages/adapters/crossmark/src"),
+    import("../../../packages/adapters/dropfi/src"),
+    import("../../../packages/adapters/gemwallet/src"),
+    import("../../../packages/adapters/walletconnect/src"),
+    import("../../../packages/adapters/xaman/src"),
+    import("../../../packages/adapters/xrpl-snap/src")
   ]);
 
   const WALLETCONNECT_METADATA = createWalletConnectMetadata(PREVIEW_CONFIG.metadata);
@@ -125,7 +125,7 @@ async function bootstrap(run = bootstrapRun) {
     log("config_warning", { message: "VITE_WALLETCONNECT_PROJECT_ID is not set; WalletConnect preview adapters are disabled." });
   }
 
-  const { createWalletModal } = await import("../../../packages/wallet-ui/src");
+  const { createWalletModal } = await import("../../../packages/ui/src");
   if (run !== bootstrapRun) return;
   modal = createWalletModal({
     manager,

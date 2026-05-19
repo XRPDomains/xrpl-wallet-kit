@@ -1,123 +1,149 @@
-# XRPL Wallet Adapter / XRPL Wallet Kit
+# XRPL Wallet Kit
 
-Framework-agnostic wallet adapter architecture for XRPL dApps. The core package is headless and can be used from Vanilla JS, React, Next.js, identity flows, NFT domain flows, payments, and transaction signing flows.
+Framework-agnostic wallet adapter toolkit for XRPL apps.
 
-This project extracts the wallet flow lessons from XRPDomains `appv5.html` into clean packages. It does not copy the legacy HTML/jQuery/Bootbox implementation.
+XRPL Wallet Kit provides a headless core, wallet adapters, and optional prebuilt UI for browser-based XRPL dApps. It is designed to work with plain HTML, React, Next.js, and custom application shells while keeping wallet logic separate from product-specific business logic.
 
 ## Packages
 
-- `@xrpname/wallet-core`: headless manager, interfaces, events, storage, sessions, network registry.
-- `@xrpname/wallet-adapter-xaman`: Xaman auth and payload signing adapter.
-- `@xrpname/wallet-adapter-gemwallet`: GemWallet browser extension adapter.
-- `@xrpname/wallet-adapter-crossmark`: Crossmark extension adapter.
-- `@xrpname/wallet-adapter-walletconnect`: XRPL WalletConnect v2 adapter.
-- `@xrpname/wallet-adapter-dropfi`: DropFi XRPL injection adapter.
-- `@xrpname/wallet-adapter-xrpl-snap`: XRPL Snap adapter for MetaMask Snap flows.
-- `@xrpname/wallet-adapter-ledger`: Ledger adapter wrapper for injected Ledger transport implementations.
-- `@xrpname/wallet-ui`: optional prebuilt modal UI.
-- `@xrpname/wallet-react`: React provider and hook.
-- `@xrpname/wallet-next`: client-safe Next.js exports.
-- `@xrpname/wallet-kit`: aggregate package that re-exports core, adapters, and UI.
+Core packages:
 
-Folder structure is documented in [docs/FOLDER_STRUCTURE.md](docs/FOLDER_STRUCTURE.md).
+- `@xrpl-wallet-kit/core`
+- `@xrpl-wallet-kit/ui`
+- `@xrpl-wallet-kit/react`
+- `@xrpl-wallet-kit/next`
+- `@xrpl-wallet-kit/client`
 
-## Architecture
+Wallet adapters:
 
-```mermaid
-flowchart LR
-  App["dApp / HTML / React / Next.js"] --> UI["Optional UI package"]
-  App --> Core["wallet-core WalletManager"]
-  UI --> Core
-  Core --> Events["Event system"]
-  Core --> Storage["Storage/session layer"]
-  Core --> Networks["XRPL network registry"]
-  Core --> Adapters["WalletAdapter interface"]
-  Adapters --> Xaman["Xaman"]
-  Adapters --> Gem["GemWallet"]
-  Adapters --> Crossmark["Crossmark"]
-  Adapters --> WC["WalletConnect wallets"]
-  Adapters --> Other["DropFi / Snap / Ledger"]
-```
+- `@xrpl-wallet-kit/adapter-xaman`
+- `@xrpl-wallet-kit/adapter-gemwallet`
+- `@xrpl-wallet-kit/adapter-crossmark`
+- `@xrpl-wallet-kit/adapter-walletconnect`
+- `@xrpl-wallet-kit/adapter-dropfi`
+- `@xrpl-wallet-kit/adapter-xrpl-snap`
+- `@xrpl-wallet-kit/adapter-ledger`
 
-## Design Rules
+`@xrpl-wallet-kit/client` is the convenience package for apps that want one import surface. Apps that care about bundle size can install only the core, UI, and adapters they need.
 
-- Core has no UI dependency.
-- UI has no business app dependency.
-- Adapters do not call DOM APIs directly.
-- WalletConnect `projectId` is injected by app config.
-- No private keys, seeds, or secrets belong in this SDK.
-- New wallets implement the `WalletAdapter` contract and register with `WalletManager`.
+## Design Goals
+
+- Headless core with no UI or application dependency.
+- Adapter-based architecture for wallet-specific behavior.
+- Optional prebuilt UI with list, icon, and card layouts.
+- WalletConnect support with default, list, and grouped UX strategies.
+- Event-driven connection, QR, signing, rejection, and error flows.
+- Session and storage management with optional auto-reconnect.
+- Mainnet, testnet, devnet, and custom XRPL network support.
+- No private keys, seeds, or application secrets in SDK code.
 
 ## Quick Start
 
 ```ts
-import { WalletManager, createBrowserWalletStorage } from "@xrpname/wallet-core";
-import { createGemWalletAdapter } from "@xrpname/wallet-adapter-gemwallet";
-import { createCrossmarkAdapter } from "@xrpname/wallet-adapter-crossmark";
+import {
+  WalletManager,
+  createBrowserWalletStorage,
+  createWalletModal,
+  createGemWalletAdapter,
+  createCrossmarkAdapter,
+  createWalletConnectAdapters
+} from "@xrpl-wallet-kit/client";
 
 const manager = new WalletManager({
-  appName: "My XRPL dApp",
+  appName: "My XRPL App",
   network: "mainnet",
   autoReconnect: true,
-  storage: createBrowserWalletStorage(),
-  adapters: [createGemWalletAdapter(), createCrossmarkAdapter()]
+  storage: createBrowserWalletStorage("my-app.wallet."),
+  adapters: [
+    createGemWalletAdapter(),
+    createCrossmarkAdapter(),
+    ...createWalletConnectAdapters({
+      projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
+      mode: "details",
+      wallets: "all"
+    })
+  ]
 });
 
-manager.on("connected", ({ account }) => console.log(account.address));
-await manager.connect("gemwallet");
+const modal = createWalletModal({
+  manager,
+  layout: "list",
+  themeMode: "light"
+});
+
+document.querySelector("#connect")?.addEventListener("click", () => {
+  modal.open();
+});
 ```
 
-## Events
+## WalletConnect UX
 
-Supported events:
+WalletConnect can be integrated in three common ways:
 
-`connecting`, `connected`, `disconnected`, `error`, `qr`, `signing`, `signed`, `rejected`, `session_restored`, `session_expired`.
+- `default`: show one WalletConnect item and let the official WalletConnect modal handle wallet selection and QR rendering.
+- `list`: show supported WalletConnect wallets as normal wallet items.
+- `group`: show one WalletConnect item, then drill into the supported WalletConnect wallets.
 
-WalletConnect QR rendering is event-driven:
+Adapter creation is controlled by `createWalletConnectAdapters()`:
 
 ```ts
-manager.on("qr", ({ uri, deeplink }) => {
-  renderQr(uri);
-  showCopyUri(uri);
-  showOpenWallet(deeplink);
+createWalletConnectAdapters({
+  projectId,
+  mode: "default"
+});
+
+createWalletConnectAdapters({
+  projectId,
+  mode: "details",
+  wallets: "all"
 });
 ```
 
-## WalletConnect
+The preview app maps this into `WalletConnect mode`: `default`, `list`, and `group`.
 
-WalletConnect wallets are configured per wallet ID, but share the XRPL request model:
+## Session Data
 
-- `xrpl_signTransaction`
-- mainnet chain: `xrpl:0`
-- testnet chain: `xrpl:1`
-- devnet chain: `xrpl:2`
-
-The app must pass a `projectId`:
+Connected sessions include both account data and wallet display metadata:
 
 ```ts
-createWalletConnectAdapter({
-  id: "bitget",
-  name: "Bitget",
-  projectId: process.env.WALLETCONNECT_PROJECT_ID!,
-  signClient,
-  metadata: {
-    name: "My XRPL dApp",
-    url: "https://example.com",
-    icons: ["https://example.com/icon.png"]
-  }
-});
+const session = manager.getSession();
+
+console.log(session?.account.address);
+console.log(session?.wallet?.name);
+console.log(session?.wallet?.icon);
 ```
 
-## Message Signing
+The `session.metadata` field is reserved for adapter/session technical data such as WalletConnect topics.
 
-The core exposes generic `signMessage()` support for wallets that provide message signing. Domain-default, profile, identity, or backend verification policies belong in the integrating application, not in the wallet adapter SDK.
+## Local Preview
 
-## Commercial Roadmap
+Copy `.env.example` to `.env.local` and set:
 
-1. Publish alpha packages under `@xrpname/*`.
-2. Add Vitest unit tests for manager/events/result normalization.
-3. Add Playwright examples for HTML and React wallet modal states.
-4. Add QR renderer plugin using `qr-code-styling` or canvas, kept outside core.
-5. Add adapter conformance test suite for third-party wallet maintainers.
-6. Add docs site with integration recipes for payment, NFT offer, and identity proof flows.
-7. Add paid support tiers: integration support, custom adapter certification, hosted WalletConnect analytics, enterprise wallet allowlist policy.
+```env
+VITE_WALLETCONNECT_PROJECT_ID=
+VITE_XAMAN_CLIENT_ID=
+```
+
+Run:
+
+```powershell
+npm.cmd install
+npm.cmd run dev:vanilla
+```
+
+Open:
+
+```text
+http://127.0.0.1:5173/
+```
+
+## Development
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run build
+```
+
+## Status
+
+This repository is in early development. Package names and APIs may change before the first public npm release.

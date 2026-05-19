@@ -2,6 +2,7 @@ node_modules/
 dist/
 .npm-cache/
 tmp/
+PROJECT_MEMORY.md
 
 .env
 .env.*

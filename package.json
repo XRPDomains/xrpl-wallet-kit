@@ -6,7 +6,7 @@
   "type": "module",
   "workspaces": [
     "packages/*",
-    "packages/wallet-adapters/*",
+    "packages/adapters/*",
     "examples/*"
   ],
   "scripts": {

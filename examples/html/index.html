@@ -5,10 +5,10 @@
     <button id="connect">Connect Wallet</button>
     <pre id="log"></pre>
     <script type="module">
-      import { WalletManager, createBrowserWalletStorage } from "../../packages/wallet-core/src/index.ts";
-      import { createGemWalletAdapter } from "../../packages/wallet-adapters/wallet-adapter-gemwallet/src/index.ts";
-      import { createCrossmarkAdapter } from "../../packages/wallet-adapters/wallet-adapter-crossmark/src/index.ts";
-      import { createWalletModal } from "../../packages/wallet-ui/src/index.ts";
+      import { WalletManager, createBrowserWalletStorage } from "../../packages/core/src/index.ts";
+      import { createGemWalletAdapter } from "../../packages/adapters/gemwallet/src/index.ts";
+      import { createCrossmarkAdapter } from "../../packages/adapters/crossmark/src/index.ts";
+      import { createWalletModal } from "../../packages/ui/src/index.ts";
       const log = (value) => (document.querySelector("#log").textContent += `${value}\n`);
       const manager = new WalletManager({ appName: "XRPL Wallet Kit HTML Example", network: "mainnet", autoReconnect: true, storage: createBrowserWalletStorage(), adapters: [createGemWalletAdapter(), createCrossmarkAdapter()] });
       manager.on("connected", ({ account }) => log(`connected: ${account.address}`));
