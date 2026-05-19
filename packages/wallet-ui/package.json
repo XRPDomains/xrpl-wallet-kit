@@ -1,0 +1,1 @@
+{"name":"@xrpname/wallet-ui","version":"0.1.0","type":"module","main":"./dist/index.js","types":"./dist/index.d.ts","exports":{".":{"types":"./dist/index.d.ts","import":"./dist/index.js"}},"dependencies":{"@xrpname/wallet-core":"0.1.0","qrcode":"^1.5.4"},"devDependencies":{"@types/qrcode":"^1.5.5"},"scripts":{"build":"tsc -p tsconfig.json"}}

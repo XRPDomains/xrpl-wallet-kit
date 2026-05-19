@@ -1,0 +1,17 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/wallet-core" },
+    { "path": "./packages/wallet-adapters/wallet-adapter-xaman" },
+    { "path": "./packages/wallet-adapters/wallet-adapter-gemwallet" },
+    { "path": "./packages/wallet-adapters/wallet-adapter-crossmark" },
+    { "path": "./packages/wallet-adapters/wallet-adapter-walletconnect" },
+    { "path": "./packages/wallet-adapters/wallet-adapter-dropfi" },
+    { "path": "./packages/wallet-adapters/wallet-adapter-xrpl-snap" },
+    { "path": "./packages/wallet-adapters/wallet-adapter-ledger" },
+    { "path": "./packages/wallet-ui" },
+    { "path": "./packages/wallet-react" },
+    { "path": "./packages/wallet-next" },
+    { "path": "./packages/wallet-kit" }
+  ]
+}

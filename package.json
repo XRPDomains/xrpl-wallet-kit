@@ -1,0 +1,29 @@
+{
+  "name": "xrpl-wallet-kit-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Framework-agnostic XRPL Wallet Adapter / Wallet Kit monorepo.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "packages/wallet-adapters/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false",
+    "dev:vanilla": "node scripts/serve-vanilla.mjs"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.28",
+    "@walletconnect/modal": "^2.7.0",
+    "@walletconnect/sign-client": "^2.23.9",
+    "@walletconnect/types": "^2.23.9",
+    "@walletconnect/utils": "^2.23.9",
+    "buffer": "^6.0.3",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0",
+    "xumm": "^1.8.0",
+    "xumm-oauth2-pkce": "^2.8.7"
+  }
+}

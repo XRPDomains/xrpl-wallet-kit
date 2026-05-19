@@ -1,0 +1,23 @@
+{
+  "name": "@xrpname/wallet-adapter-walletconnect",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@xrpname/wallet-core": "0.1.0",
+    "@walletconnect/modal": "^2.7.0",
+    "@walletconnect/sign-client": "^2.23.9",
+    "@walletconnect/types": "^2.23.9",
+    "@walletconnect/utils": "^2.23.9"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}

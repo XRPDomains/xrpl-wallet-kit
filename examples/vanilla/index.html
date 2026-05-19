@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>XRPL Wallet Kit Preview</title>
+  </head>
+  <body>
+    <main class="app">
+      <section class="toolbar">
+        <div>
+          <h1>XRPL Wallet Kit</h1>
+          <p>Framework-agnostic wallet adapter preview.</p>
+        </div>
+        <button id="connect">Connect Wallet</button>
+      </section>
+
+      <section class="panel controls-panel">
+        <h2>UI Preview</h2>
+        <div class="controls">
+          <label>
+            <span>Layout</span>
+            <select id="ui-layout">
+              <option value="list">List</option>
+              <option value="grid">Card grid</option>
+              <option value="icon">Icon grid</option>
+            </select>
+          </label>
+          <label>
+            <span>WalletConnect mode</span>
+            <select id="walletconnect-mode">
+              <option value="default">Default</option>
+              <option value="list">List</option>
+              <option value="group">Group</option>
+            </select>
+          </label>
+          <label>
+            <span>Theme</span>
+            <select id="ui-theme">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="auto">Auto</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Wallets</h2>
+        <div id="wallets" class="wallet-list"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Session</h2>
+        <pre id="session">No wallet connected.</pre>
+      </section>
+
+      <section class="panel">
+        <h2>Events</h2>
+        <pre id="events"></pre>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

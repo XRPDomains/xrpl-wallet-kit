@@ -1,0 +1,1 @@
+{"extends":"../wallet-core/tsconfig.json","compilerOptions":{"rootDir":"src","outDir":"dist","lib":["ES2020","DOM"]},"references":[{"path":"../wallet-core"}],"include":["src"]}
