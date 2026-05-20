@@ -1,4 +1,5 @@
 import { createServer, loadEnv } from "vite";
+import react from "@vitejs/plugin-react";
 
 const env = loadEnv("development", process.cwd(), "VITE_");
 const defineEnv = Object.fromEntries(
@@ -6,12 +7,13 @@ const defineEnv = Object.fromEntries(
 );
 
 const server = await createServer({
-  root: "examples/vanilla",
+  root: "examples/react",
   envDir: process.cwd(),
   define: defineEnv,
+  plugins: [react()],
   server: {
     host: "0.0.0.0",
-    port: 5173,
+    port: 5174,
     strictPort: true
   },
   clearScreen: false
@@ -24,5 +26,3 @@ process.on("SIGINT", async () => {
   await server.close();
   process.exit(0);
 });
-
-setInterval(() => {}, 1 << 30);

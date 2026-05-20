@@ -1,7 +1,8 @@
 import { WalletManager, createBrowserWalletStorage } from "../../../packages/core/src";
 import { Buffer } from "buffer";
+import { createDefaultWalletButtonConfig, createDefaultWalletUiConfig } from "../../../packages/ui/src";
 import type { WalletAdapter } from "../../../packages/core/src";
-import type { WalletUiLayout, WalletUiPresentation, WalletUiThemeMode } from "../../../packages/ui/src";
+import type { WalletAccountPanelMode, WalletUiLayout, WalletUiPresentation, WalletUiThemeMode } from "../../../packages/ui/src";
 
 import "./styles.css";
 
@@ -22,38 +23,29 @@ const PREVIEW_CONFIG = {
 
 const events = document.querySelector<HTMLPreElement>("#events")!;
 const session = document.querySelector<HTMLPreElement>("#session")!;
-const connectButton = document.querySelector<HTMLButtonElement>("#connect")!;
 const walletsList = document.querySelector<HTMLDivElement>("#wallets")!;
 const uiLayout = document.querySelector<HTMLSelectElement>("#ui-layout")!;
 const walletConnectMode = document.querySelector<HTMLSelectElement>("#walletconnect-mode")!;
 const uiTheme = document.querySelector<HTMLSelectElement>("#ui-theme")!;
+const accountPanelMode = document.querySelector<HTMLSelectElement>("#account-panel-mode")!;
 
 type WalletConnectMode = "default" | "list" | "group";
 
 let manager: WalletManager;
 let modal: { open(): void; updateOptions(options: Record<string, unknown>): void } | undefined;
+let walletButton: { updateOptions(options: Record<string, unknown>): void } | undefined;
 let bootstrapRun = 0;
 
-connectButton.disabled = false;
-connectButton.addEventListener("click", () => {
-  if (modal) {
-    modal.updateOptions(getWalletUiOptions());
-    modal.open();
-    return;
-  }
-  log("loading", { message: "Wallet UI is still initializing." });
-});
-
-[uiLayout, uiTheme].forEach((control) => {
+[uiLayout, uiTheme, accountPanelMode].forEach((control) => {
   control.addEventListener("change", () => {
     modal?.updateOptions(getWalletUiOptions());
+    walletButton?.updateOptions(getWalletButtonOptions());
     log("ui_config", getWalletUiOptions());
   });
 });
 
 walletConnectMode.addEventListener("change", () => {
   resetPreview().catch((error) => {
-    connectButton.disabled = false;
     log("bootstrap_error", { message: error instanceof Error ? error.message : String(error) });
   });
 });
@@ -61,7 +53,7 @@ walletConnectMode.addEventListener("change", () => {
 async function resetPreview() {
   bootstrapRun += 1;
   modal = undefined;
-  connectButton.disabled = true;
+  walletButton = undefined;
   document.querySelectorAll(".xwk-overlay").forEach((node) => node.remove());
   await bootstrap(bootstrapRun);
 }
@@ -125,14 +117,19 @@ async function bootstrap(run = bootstrapRun) {
     log("config_warning", { message: "VITE_WALLETCONNECT_PROJECT_ID is not set; WalletConnect preview adapters are disabled." });
   }
 
-  const { createWalletModal } = await import("../../../packages/ui/src");
+  const { createWalletButton, createWalletModal } = await import("../../../packages/ui/src");
   if (run !== bootstrapRun) return;
   modal = createWalletModal({
     manager,
     ...getWalletUiOptions()
   });
+  walletButton = createWalletButton({
+    manager,
+    modal,
+    target: "#wallet-button",
+    ...getWalletButtonOptions()
+  });
 
-  connectButton.disabled = false;
   renderWallets();
 
   manager.on("connecting", (event) => log("connecting", event));
@@ -155,14 +152,12 @@ async function bootstrap(run = bootstrapRun) {
 }
 
 bootstrap().catch((error) => {
-  connectButton.disabled = false;
   log("bootstrap_error", { message: error instanceof Error ? error.message : String(error) });
 });
 
 function renderSession() {
   const current = manager.getSession();
   session.textContent = current ? JSON.stringify(current, null, 2) : "No wallet connected.";
-  connectButton.textContent = current ? "Connected" : "Connect Wallet";
 }
 
 function renderWallets() {
@@ -182,21 +177,18 @@ function renderWallets() {
 }
 
 function getWalletUiOptions() {
-  return {
+  return createDefaultWalletUiConfig({
     layout: uiLayout.value as WalletUiLayout,
     presentation: getWalletUiPresentation(),
+    themeMode: uiTheme.value as WalletUiThemeMode
+  });
+}
+
+function getWalletButtonOptions() {
+  return createDefaultWalletButtonConfig({
     themeMode: uiTheme.value as WalletUiThemeMode,
-    size: "default" as const,
-    textSize: "sm" as const,
-    showWalletGroup: true,
-    theme: {
-      accent: "#0078ae",
-      radius: "14px",
-      walletRadius: "10px",
-      fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      shadow: "none"
-    }
-  };
+    accountPanelMode: accountPanelMode.value as WalletAccountPanelMode
+  });
 }
 
 function getWalletConnectMode(): WalletConnectMode {

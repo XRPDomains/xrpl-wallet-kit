@@ -12,7 +12,7 @@
           <h1>XRPL Wallet Kit</h1>
           <p>Framework-agnostic wallet adapter preview.</p>
         </div>
-        <button id="connect">Connect Wallet</button>
+        <div id="wallet-button"></div>
       </section>
 
       <section class="panel controls-panel">
@@ -22,7 +22,7 @@
             <span>Layout</span>
             <select id="ui-layout">
               <option value="list">List</option>
-              <option value="grid">Card grid</option>
+              <option value="card">Card</option>
               <option value="icon">Icon grid</option>
             </select>
           </label>
@@ -40,6 +40,13 @@
               <option value="light">Light</option>
               <option value="dark">Dark</option>
               <option value="auto">Auto</option>
+            </select>
+          </label>
+          <label>
+            <span>Account panel</span>
+            <select id="account-panel-mode">
+              <option value="dropdown">Dropdown</option>
+              <option value="modal">Modal</option>
             </select>
           </label>
         </div>

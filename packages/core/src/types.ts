@@ -1,7 +1,7 @@
-export type XrplNetworkId = "mainnet" | "testnet" | "devnet" | (string & {});
+export type WalletNetworkId = "mainnet" | "testnet" | "devnet" | (string & {});
 
-export interface XrplNetwork {
-  id: XrplNetworkId;
+export interface WalletNetwork {
+  id: WalletNetworkId;
   name: string;
   networkType: "MAINNET" | "TESTNET" | "DEVNET" | "CUSTOM";
   rpcUrl: string;
@@ -41,7 +41,7 @@ export type WalletAvailabilityMap = Record<string, boolean>;
 export interface WalletAccount {
   address: string;
   publicKey?: string;
-  network?: XrplNetwork;
+  network?: WalletNetwork;
   networkType?: string;
 }
 
@@ -54,7 +54,7 @@ export interface WalletSession {
   metadata?: Record<string, unknown>;
 }
 
-export type XrplTxJson = Record<string, unknown>;
+export type TransactionPayload = Record<string, unknown>;
 
 export interface SignMessageRequest {
   message: string;
@@ -68,7 +68,7 @@ export interface SignMessageResult {
 }
 
 export interface SignAndSubmitRequest {
-  txJson: XrplTxJson;
+  txJson: TransactionPayload;
   methodHint?: "payment" | "createNFTOffer" | "acceptNFTOffer" | "cancelNFTOffer" | "generic";
   walletPayload?: unknown;
   submit?: boolean;
@@ -83,7 +83,7 @@ export interface TxResult {
 }
 
 export interface ConnectOptions {
-  network?: XrplNetwork;
+  network?: WalletNetwork;
   walletId?: string;
   signal?: AbortSignal;
 }
@@ -143,9 +143,13 @@ export interface WalletManagerConfig {
   appDescription?: string;
   appUrl?: string;
   appIcons?: string[];
-  network?: XrplNetworkId;
-  networks?: XrplNetwork[];
+  network?: WalletNetworkId;
+  networks?: WalletNetwork[];
   adapters?: WalletAdapter[];
   storage?: WalletStorage;
   autoReconnect?: boolean;
 }
+
+export type XrplNetworkId = WalletNetworkId;
+export type XrplNetwork = WalletNetwork;
+export type XrplTxJson = TransactionPayload;

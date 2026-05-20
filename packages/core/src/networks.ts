@@ -1,6 +1,6 @@
-import type { XrplNetwork } from "./types";
+import type { WalletNetwork } from "./types";
 
-export const XRPL_MAINNET: XrplNetwork = {
+export const XRPL_MAINNET: WalletNetwork = {
   id: "mainnet",
   name: "XRPL Mainnet",
   networkType: "MAINNET",
@@ -9,7 +9,7 @@ export const XRPL_MAINNET: XrplNetwork = {
   explorerTxUrl: "https://livenet.xrpl.org/transactions/{hash}"
 };
 
-export const XRPL_TESTNET: XrplNetwork = {
+export const XRPL_TESTNET: WalletNetwork = {
   id: "testnet",
   name: "XRPL Testnet",
   networkType: "TESTNET",
@@ -18,7 +18,7 @@ export const XRPL_TESTNET: XrplNetwork = {
   explorerTxUrl: "https://testnet.xrpl.org/transactions/{hash}"
 };
 
-export const XRPL_DEVNET: XrplNetwork = {
+export const XRPL_DEVNET: WalletNetwork = {
   id: "devnet",
   name: "XRPL Devnet",
   networkType: "DEVNET",
@@ -29,7 +29,7 @@ export const XRPL_DEVNET: XrplNetwork = {
 
 export const DEFAULT_XRPL_NETWORKS = [XRPL_MAINNET, XRPL_TESTNET, XRPL_DEVNET] as const;
 
-export function resolveNetwork(networks: readonly XrplNetwork[], id = "mainnet"): XrplNetwork {
+export function resolveNetwork(networks: readonly WalletNetwork[], id = "mainnet"): WalletNetwork {
   const network = networks.find((item) => item.id === id);
   if (!network) throw new Error(`XRPL network is not registered: ${id}`);
   return network;

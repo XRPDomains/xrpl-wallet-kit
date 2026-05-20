@@ -12,9 +12,11 @@
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false",
-    "dev:vanilla": "node scripts/serve-vanilla.mjs"
+    "dev:vanilla": "node scripts/serve-vanilla.mjs",
+    "dev:react": "node scripts/serve-react.mjs"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
     "@types/react": "^18.3.28",
     "@walletconnect/modal": "^2.7.0",
     "@walletconnect/sign-client": "^2.23.9",

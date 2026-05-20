@@ -2,13 +2,13 @@ import { WalletEventEmitter } from "./events";
 import { DEFAULT_XRPL_NETWORKS, resolveNetwork } from "./networks";
 import { normalizeTxResult } from "./result";
 import { MemoryWalletStorage } from "./storage";
-import type { ConnectOptions, SignAndSubmitRequest, SignMessageRequest, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletManagerConfig, WalletSession, WalletStorage, XrplNetwork } from "./types";
+import type { ConnectOptions, SignAndSubmitRequest, SignMessageRequest, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletManagerConfig, WalletNetwork, WalletSession, WalletStorage } from "./types";
 
 const SESSION_KEY = "session";
 
 export class WalletManager extends WalletEventEmitter {
   readonly adapters = new Map<string, WalletAdapter>();
-  readonly networks: XrplNetwork[];
+  readonly networks: WalletNetwork[];
   readonly storage: WalletStorage;
   private activeSession: WalletSession | null = null;
   private activeAdapterId: string | null = null;
@@ -54,7 +54,7 @@ export class WalletManager extends WalletEventEmitter {
     return this.activeSession;
   }
 
-  getNetwork(id = this.config.network ?? "mainnet"): XrplNetwork {
+  getNetwork(id = this.config.network ?? "mainnet"): WalletNetwork {
     return resolveNetwork(this.networks, id);
   }
 

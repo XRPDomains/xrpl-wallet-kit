@@ -4,13 +4,25 @@ export const DROPFI_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABAAAAA
 
 
 export interface DropFiProvider {
+  isDropFi?: boolean;
   selectedAddress?: string;
+  connectedAccounts?: string[];
+  network?: string | { network?: string; networkId?: string; id?: string };
+  endpoint?: string;
   isConnected(): boolean;
-  connect(): Promise<boolean>;
-  disconnect?(): Promise<void>;
-  getAddress(): string | null;
+  connect(data?: unknown): Promise<boolean | string>;
+  disconnect?(address?: string): Promise<void>;
+  initialize?(): Promise<DropFiState | null>;
+  getAddress?: () => string | null | Promise<string | null>;
   signMessage(message: string): Promise<string>;
   sendTransaction(tx: unknown): Promise<string>;
+}
+
+export interface DropFiState {
+  selectedAddress?: string;
+  connectedAccounts?: string[];
+  network?: string | { network?: string; networkId?: string; id?: string };
+  endpoint?: string;
 }
 
 export interface DropFiAdapterOptions {
@@ -21,6 +33,7 @@ export interface DropFiAdapterOptions {
 export class DropFiAdapter extends BaseWalletAdapter {
   metadata: WalletMetadata;
   capabilities: WalletCapabilities = { connect: true, disconnect: true, signMessage: true, signAndSubmit: true, payments: true, nftOffers: true };
+  private activeAddress?: string;
 
   constructor(private options: DropFiAdapterOptions = {}) {
     super();
@@ -37,17 +50,30 @@ export class DropFiAdapter extends BaseWalletAdapter {
 
   async connect(options: ConnectOptions) {
     const provider = this.provider();
-    const connected = provider.isConnected() || await provider.connect();
+    const state = await this.initialize(provider);
+    const connected = provider.isConnected() || Boolean(state?.selectedAddress) || await provider.connect();
     if (!connected) throw new Error("DropFi connection was rejected");
 
-    const address = provider.getAddress() ?? provider.selectedAddress;
+    const address = await this.resolveAddress(provider, connected, state);
     if (!address) throw new Error("DropFi did not return an XRPL address");
+    this.activeAddress = address;
 
     return { account: { address, network: options.network, networkType: options.network?.networkType }, raw: { connected, address } };
   }
 
   async disconnect(): Promise<void> {
-    await this.provider(false)?.disconnect?.();
+    const provider = this.provider(false);
+    if (!provider?.disconnect) {
+      this.activeAddress = undefined;
+      return;
+    }
+
+    const address = this.activeAddress ?? provider.selectedAddress ?? provider.connectedAccounts?.[0];
+    try {
+      await provider.disconnect(address);
+    } finally {
+      this.activeAddress = undefined;
+    }
   }
 
   async signMessage(request: SignMessageRequest) {
@@ -65,6 +91,28 @@ export class DropFiAdapter extends BaseWalletAdapter {
     const provider = this.options.provider ?? (globalThis as unknown as { xrpl?: DropFiProvider }).xrpl;
     if (!provider && required) throw new Error("Please install DropFi Wallet");
     return provider;
+  }
+
+  private async initialize(provider: DropFiProvider): Promise<DropFiState | null> {
+    if (!provider.initialize) return null;
+    try {
+      return await provider.initialize();
+    } catch {
+      return null;
+    }
+  }
+
+  private async resolveAddress(provider: DropFiProvider, connected: boolean | string, state: DropFiState | null): Promise<string | undefined> {
+    if (typeof connected === "string") return connected;
+    if (typeof provider.getAddress === "function") {
+      const address = await provider.getAddress();
+      if (address) return address;
+    }
+
+    return provider.selectedAddress
+      ?? provider.connectedAccounts?.[0]
+      ?? state?.selectedAddress
+      ?? state?.connectedAccounts?.[0];
   }
 }
 
