@@ -6,6 +6,7 @@ export const XAMAN_ICON = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWl
 
 export interface XamanPkceAuth {
   authorize(): Promise<XamanAuthResult | undefined | Error>;
+  logout?: () => Promise<void> | void;
 }
 
 export interface XamanAuthResult {
@@ -24,7 +25,7 @@ export interface XamanSdkLike {
     createAndSubscribe(payload: unknown, handler?: (event: unknown) => unknown): Promise<XamanPayloadSubscription>;
     get(uuid: string): Promise<XamanPayloadResult | null>;
   };
-  logout?: () => Promise<void>;
+  logout?: () => Promise<void> | void;
 }
 
 export interface XamanPayloadSubscription {
@@ -40,6 +41,14 @@ export interface XamanPayloadSubscription {
 export interface XamanPayloadResult {
   meta?: { signed?: boolean; cancelled?: boolean; expired?: boolean };
   response?: { hex?: string | null; txid?: string | null; account?: string | null };
+}
+
+export interface XamanPayloadEvent {
+  signed?: boolean;
+  expired?: boolean;
+  cancelled?: boolean;
+  opened?: boolean;
+  payload_uuidv4?: string;
 }
 
 export interface XamanAdapterOptions {
@@ -99,8 +108,17 @@ export class XamanAdapter extends BaseWalletAdapter {
   }
 
   async disconnect(): Promise<void> {
-    await this.sdk?.logout?.();
+    const logoutTargets = [this.sdk, this.auth].filter(
+      (target, index, targets): target is XamanSdkLike | XamanPkceAuth => Boolean(target) && targets.indexOf(target) === index
+    );
+
+    for (const target of logoutTargets) {
+      await target.logout?.();
+    }
+
+    this.clearPkceStorage();
     this.sdk = undefined;
+    this.auth = this.options.auth;
   }
 
   async signMessage(request: SignMessageRequest) {
@@ -166,8 +184,14 @@ export class XamanAdapter extends BaseWalletAdapter {
   private async createAndResolvePayload(payload: unknown): Promise<XamanPayloadResult | null> {
     const sdk = this.requireSdk();
     const subscription = await sdk.payload.createAndSubscribe(payload, (event) => {
-      const signed = (event as { signed?: boolean })?.signed;
-      if (typeof signed === "boolean") return event;
+      const payloadEvent = this.resolvePayloadEvent(event);
+      if (
+        typeof payloadEvent.signed === "boolean"
+        || payloadEvent.expired
+        || payloadEvent.cancelled
+      ) {
+        return payloadEvent;
+      }
       return undefined;
     });
 
@@ -179,6 +203,11 @@ export class XamanAdapter extends BaseWalletAdapter {
       throw new Error("Xaman request was rejected or expired");
     }
     return result;
+  }
+
+  private resolvePayloadEvent(event: unknown): XamanPayloadEvent {
+    const eventWithData = event as { data?: XamanPayloadEvent };
+    return eventWithData.data ?? event as XamanPayloadEvent;
   }
 
   private emitPayloadQr(created: XamanPayloadSubscription["created"]): void {
@@ -199,6 +228,15 @@ export class XamanAdapter extends BaseWalletAdapter {
   private toHex(value: string): string {
     const encoder = new TextEncoder();
     return [...encoder.encode(value)].map((byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
+  }
+
+  private clearPkceStorage(): void {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage?.removeItem("XummPkceJwt");
+    } catch {
+      // Ignore storage restrictions in embedded browsers.
+    }
   }
 }
 

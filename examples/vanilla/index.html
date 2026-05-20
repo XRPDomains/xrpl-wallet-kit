@@ -49,12 +49,104 @@
               <option value="modal">Modal</option>
             </select>
           </label>
+          <label>
+            <span>Network</span>
+            <select id="network">
+              <option value="mainnet">Mainnet</option>
+              <option value="devnet">Devnet</option>
+              <option value="testnet">Testnet</option>
+            </select>
+          </label>
         </div>
       </section>
 
       <section class="panel">
-        <h2>Wallets</h2>
-        <div id="wallets" class="wallet-list"></div>
+        <h2>Transaction Lab</h2>
+        <div class="lab-grid">
+          <div class="lab">
+            <h3>Payment signAndSubmit</h3>
+            <label>
+              <span>Destination address</span>
+              <input id="payment-destination" placeholder="r..." />
+            </label>
+            <label>
+              <span>Amount XRP</span>
+              <input id="payment-amount" inputmode="decimal" value="0.01" />
+            </label>
+            <div class="lab-actions">
+              <button id="payment-submit-button" type="button">Submit payment</button>
+            </div>
+            <pre id="payment-result">Connect a wallet to test Payment signAndSubmit.</pre>
+          </div>
+
+          <div class="lab">
+            <h3>NFT Offer signAndSubmit</h3>
+            <label>
+              <span>NFTokenID</span>
+              <input id="nft-token-id" placeholder="0008..." />
+            </label>
+            <div class="inline-fields">
+              <label>
+                <span>Offer type</span>
+                <select id="nft-offer-type">
+                  <option value="sell">Sell offer</option>
+                  <option value="buy">Buy offer</option>
+                </select>
+              </label>
+              <label>
+                <span>Amount drops</span>
+                <input id="nft-offer-amount" inputmode="numeric" value="1000000" />
+              </label>
+            </div>
+            <label>
+              <span>Owner address for buy offer</span>
+              <input id="nft-owner" placeholder="r..." />
+            </label>
+            <label>
+              <span>Destination address optional</span>
+              <input id="nft-destination" placeholder="r..." />
+            </label>
+            <div class="lab-actions">
+              <button id="nft-offer-submit-button" type="button">Create NFT offer</button>
+            </div>
+            <pre id="nft-offer-result">Connect a wallet to test NFT Offer signAndSubmit.</pre>
+          </div>
+
+          <div class="lab">
+            <h3>Accept NFT Offer</h3>
+            <label>
+              <span>Sell offer ID</span>
+              <input id="nft-sell-offer" placeholder="offer index..." />
+            </label>
+            <label>
+              <span>Buy offer ID</span>
+              <input id="nft-buy-offer" placeholder="offer index..." />
+            </label>
+            <label>
+              <span>Broker fee drops optional</span>
+              <input id="nft-broker-fee" inputmode="numeric" placeholder="0" />
+            </label>
+            <div class="lab-actions">
+              <button id="nft-accept-submit-button" type="button">Accept NFT offer</button>
+            </div>
+            <pre id="nft-accept-result">Connect a wallet to test NFT Offer accept.</pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Signing Lab</h2>
+        <div class="lab">
+          <label>
+            <span>Message</span>
+            <textarea id="sign-message" rows="3"></textarea>
+          </label>
+          <div class="lab-actions">
+            <button id="sign-message-button" type="button">Sign message</button>
+            <button id="reset-message-button" type="button" class="secondary-button">Reset message</button>
+          </div>
+          <pre id="sign-result">Connect a wallet to test message signing.</pre>
+        </div>
       </section>
 
       <section class="panel">
