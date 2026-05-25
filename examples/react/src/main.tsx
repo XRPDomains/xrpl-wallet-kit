@@ -8,7 +8,7 @@ import { createGemWalletAdapter } from "../../../packages/adapters/gemwallet/src
 import { createWalletConnectAdapters, createWalletConnectMetadata } from "../../../packages/adapters/walletconnect/src";
 import { createXamanAdapter } from "../../../packages/adapters/xaman/src";
 import { createXrplSnapAdapter } from "../../../packages/adapters/xrpl-snap/src";
-import { createDefaultWalletButtonConfig, createDefaultWalletUiConfig } from "../../../packages/ui/src";
+import { createDefaultWalletUiConfig, resolveWalletButtonOptions } from "../../../packages/ui/src";
 import { WalletButton, WalletKitProvider, useWalletKit } from "../../../packages/react/src";
 import type { WalletAdapter } from "../../../packages/core/src";
 import "./styles.css";
@@ -71,14 +71,27 @@ function createPreviewManager() {
 function Preview() {
   const manager = useMemo(() => createPreviewManager(), []);
   const ui = useMemo(() => createDefaultWalletUiConfig({
-    layout: "list",
-    presentation: "grouped",
-    themeMode: "light"
+    mode: "light",
+    modal: {
+      title: "Connect Wallet",
+      width: "default",
+      footerText: "XRPL Wallet Kit"
+    },
+    walletList: {
+      layout: "list",
+      wallets: "all",
+      showGroup: true
+    },
+    walletConnect: {
+      mode: "group",
+      cta: "both",
+      qr: {
+        style: "dots",
+        showLogo: false
+      }
+    }
   }), []);
-  const button = useMemo(() => createDefaultWalletButtonConfig({
-    themeMode: "light",
-    theme: ui.theme
-  }), [ui.theme]);
+  const button = useMemo(() => resolveWalletButtonOptions({ mode: "light" }, { showBalance: true }), []);
 
   return (
     <WalletKitProvider manager={manager} ui={ui}>
@@ -114,7 +127,7 @@ function ReactStatePanel() {
               {wallet.icon ? <img className="wallet-icon" src={wallet.icon} alt="" /> : <span className="wallet-icon wallet-icon-fallback">{wallet.name.slice(0, 1)}</span>}
               <div className="wallet-info">
                 <strong>{wallet.name}</strong>
-                <span>{wallet.group ?? wallet.type} · {wallet.id}</span>
+                <span>{wallet.group ?? wallet.type} Â· {wallet.id}</span>
               </div>
             </div>
           ))}

@@ -1,0 +1,31 @@
+{
+  "name": "@xrpl-wallet-kit/browser",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/xrpl-wallet-kit.iife.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/xrpl-wallet-kit.iife.js"
+    },
+    "./iife": "./dist/xrpl-wallet-kit.iife.js",
+    "./iife.min": "./dist/xrpl-wallet-kit.iife.min.js",
+    "./legacy-bridge": "./dist/xrpl-wallet-kit-legacy-bridge.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build --mode readable && vite build --mode minified && tsc -p tsconfig.json --emitDeclarationOnly"
+  },
+  "dependencies": {
+    "@xrpl-wallet-kit/client": "0.1.0",
+    "buffer": "^6.0.3"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "typescript": "^5.5.4"
+  }
+}

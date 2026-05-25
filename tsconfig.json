@@ -12,6 +12,7 @@
     { "path": "./packages/ui" },
     { "path": "./packages/react" },
     { "path": "./packages/next" },
-    { "path": "./packages/client" }
+    { "path": "./packages/client" },
+    { "path": "./packages/browser" }
   ]
 }

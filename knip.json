@@ -1,0 +1,26 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": [
+    "packages/*/src/index.ts",
+    "packages/adapters/*/src/index.ts",
+    "packages/browser/src/index.ts",
+    "examples/*/src/**/*.{ts,tsx}",
+    "tests/**/*.ts",
+    "scripts/**/*.mjs"
+  ],
+  "project": [
+    "packages/**/*.{ts,tsx}",
+    "examples/**/*.{ts,tsx}",
+    "tests/**/*.ts",
+    "scripts/**/*.mjs",
+    "*.config.{js,cjs,mjs,ts}"
+  ],
+  "ignore": [
+    "**/dist/**",
+    "**/*.d.ts",
+    "tmp/**"
+  ],
+  "ignoreDependencies": [
+    "@types/react"
+  ]
+}

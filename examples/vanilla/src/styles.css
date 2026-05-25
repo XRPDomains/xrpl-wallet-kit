@@ -10,16 +10,20 @@ body {
 }
 
 .app {
-  width: min(960px, calc(100vw - 32px));
-  margin: 48px auto;
+  width: min(1080px, calc(100vw - 32px));
+  margin: 40px auto;
 }
 
-.toolbar {
+.hero {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding-bottom: 24px;
+  padding: 24px;
 }
 
 h1,
@@ -34,8 +38,40 @@ h1 {
 }
 
 p {
-  margin-top: 8px;
   color: #64748b;
+  margin-top: 6px;
+}
+
+.eyebrow {
+  color: #0078ae;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.top-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr);
+  margin-top: 16px;
+}
+
+.panel-heading {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.panel-heading h2 {
+  margin-bottom: 0;
+}
+
+.panel-heading p {
+  font-size: 13px;
 }
 
 button {
@@ -87,7 +123,7 @@ button:active {
 .controls {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .controls label {
@@ -134,7 +170,8 @@ textarea {
 }
 
 .lab h3 {
-  font-size: 14px;
+  color: #172033;
+  font-size: 15px;
   margin: 0;
 }
 
@@ -158,7 +195,7 @@ textarea {
 .lab-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .inline-fields {
@@ -170,15 +207,14 @@ textarea {
 .panel {
   background: #fff;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border-radius: 16px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
   margin-top: 16px;
-  padding: 18px;
+  padding: 20px;
 }
 
 .panel h2 {
-  font-size: 16px;
-  margin-bottom: 12px;
+  font-size: 17px;
 }
 
 .wallet-list {
@@ -249,10 +285,32 @@ pre {
   white-space: pre-wrap;
 }
 
+pre:empty::before {
+  color: #94a3b8;
+  content: "No events yet.";
+}
+
+@media (max-width: 980px) {
+  .top-grid,
+  .lab-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
-  .toolbar {
+  .app {
+    width: min(100% - 24px, 1080px);
+    margin: 20px auto;
+  }
+
+  .hero {
     align-items: stretch;
     flex-direction: column;
+    padding: 18px;
+  }
+
+  h1 {
+    font-size: 28px;
   }
 
   .wallet-list {

@@ -7,61 +7,97 @@
   </head>
   <body>
     <main class="app">
-      <section class="toolbar">
+      <section class="hero">
         <div>
+          <p class="eyebrow">Beta test console</p>
           <h1>XRPL Wallet Kit</h1>
-          <p>Framework-agnostic wallet adapter preview.</p>
+          <p>Connect wallets, sign messages, submit payments, and test NFT offer flows.</p>
         </div>
         <div id="wallet-button"></div>
       </section>
 
-      <section class="panel controls-panel">
-        <h2>UI Preview</h2>
-        <div class="controls">
-          <label>
-            <span>Layout</span>
-            <select id="ui-layout">
-              <option value="list">List</option>
-              <option value="card">Card</option>
-              <option value="icon">Icon grid</option>
-            </select>
-          </label>
-          <label>
-            <span>WalletConnect mode</span>
-            <select id="walletconnect-mode">
-              <option value="default">Default</option>
-              <option value="list">List</option>
-              <option value="group">Group</option>
-            </select>
-          </label>
-          <label>
-            <span>Theme</span>
-            <select id="ui-theme">
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-              <option value="auto">Auto</option>
-            </select>
-          </label>
-          <label>
-            <span>Account panel</span>
-            <select id="account-panel-mode">
-              <option value="dropdown">Dropdown</option>
-              <option value="modal">Modal</option>
-            </select>
-          </label>
-          <label>
-            <span>Network</span>
-            <select id="network">
-              <option value="mainnet">Mainnet</option>
-              <option value="devnet">Devnet</option>
-              <option value="testnet">Testnet</option>
-            </select>
-          </label>
+      <section class="top-grid">
+        <div class="panel connect-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Connect</h2>
+              <p>Current wallet session and account metadata.</p>
+            </div>
+          </div>
+          <pre id="session">No wallet connected.</pre>
+        </div>
+
+        <div class="panel settings-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Test Settings</h2>
+              <p>Keep these simple while testing real wallet flows.</p>
+            </div>
+          </div>
+          <div class="controls">
+            <label>
+              <span>Network</span>
+              <select id="network">
+                <option value="mainnet">Mainnet</option>
+                <option value="devnet">Devnet</option>
+                <option value="testnet">Testnet</option>
+              </select>
+            </label>
+            <label>
+              <span>Theme</span>
+              <select id="ui-theme">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="auto">Auto</option>
+              </select>
+            </label>
+            <label>
+              <span>Wallet layout</span>
+              <select id="wallet-layout">
+                <option value="list">List</option>
+                <option value="card">Card</option>
+                <option value="icon">Icon</option>
+              </select>
+            </label>
+            <label>
+              <span>WalletConnect mode</span>
+              <select id="walletconnect-mode">
+                <option value="default">Default</option>
+                <option value="list">List</option>
+                <option value="group">Group</option>
+              </select>
+            </label>
+          </div>
         </div>
       </section>
 
       <section class="panel">
-        <h2>Transaction Lab</h2>
+        <div class="panel-heading">
+          <div>
+            <h2>Sign Message</h2>
+            <p>Uses the kit default proof transaction for compatible wallets.</p>
+          </div>
+        </div>
+        <div class="lab">
+          <label>
+            <span>Message</span>
+            <textarea id="sign-message" rows="3"></textarea>
+          </label>
+          <div class="lab-actions">
+            <button id="sign-message-button" type="button">Sign message</button>
+            <button id="reset-message-button" type="button" class="secondary-button">Reset message</button>
+          </div>
+          <pre id="sign-result">Connect a wallet to test message signing.</pre>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Transactions</h2>
+            <p>Payment and NFT offer signing with submit enabled.</p>
+          </div>
+        </div>
         <div class="lab-grid">
           <div class="lab">
             <h3>Payment signAndSubmit</h3>
@@ -135,27 +171,12 @@
       </section>
 
       <section class="panel">
-        <h2>Signing Lab</h2>
-        <div class="lab">
-          <label>
-            <span>Message</span>
-            <textarea id="sign-message" rows="3"></textarea>
-          </label>
-          <div class="lab-actions">
-            <button id="sign-message-button" type="button">Sign message</button>
-            <button id="reset-message-button" type="button" class="secondary-button">Reset message</button>
+        <div class="panel-heading">
+          <div>
+            <h2>Events / Raw Result</h2>
+            <p>Latest kit events are prepended here for debugging wallet behavior.</p>
           </div>
-          <pre id="sign-result">Connect a wallet to test message signing.</pre>
         </div>
-      </section>
-
-      <section class="panel">
-        <h2>Session</h2>
-        <pre id="session">No wallet connected.</pre>
-      </section>
-
-      <section class="panel">
-        <h2>Events</h2>
         <pre id="events"></pre>
       </section>
     </main>

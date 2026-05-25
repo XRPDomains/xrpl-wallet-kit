@@ -1,4 +1,4 @@
-﻿import type { WalletConnectWalletConfig } from "./index";
+import type { WalletConnectWalletConfig } from "./types";
 import { BIFROST_ICON, BITGET_ICON, GIRIN_ICON, JOEY_ICON, STATICBIT_ICON } from "./icons";
 
 export const walletConnectDeeplinks = {
@@ -79,3 +79,4 @@ export const XRPL_WALLETCONNECT_WALLETS: WalletConnectWalletConfig[] = [
     icon: BIFROST_ICON
   }
 ];
+

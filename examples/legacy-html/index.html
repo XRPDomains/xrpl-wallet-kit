@@ -1,0 +1,79 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>XRPL Wallet Kit Legacy HTML Example</title>
+    <style>
+      body { background:#f4f7fb; color:#172033; font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; margin:0; padding:48px; }
+      main { margin:0 auto; max-width:760px; }
+      section { background:#fff; border:1px solid #dbe4ee; border-radius:18px; margin-top:24px; padding:24px; }
+      button { cursor:pointer; }
+      pre { background:#0f172a; border-radius:14px; color:#cbd5e1; min-height:120px; overflow:auto; padding:16px; }
+      .legacy-button { display:none; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>XRPL Wallet Kit Legacy HTML</h1>
+      <p>One-call integration for HTML, jQuery, Bootstrap, or older frontend apps.</p>
+
+      <button class="legacy-button" type="button">Legacy Connect</button>
+      <div id="wallet-kit-button"></div>
+      <input type="hidden" class="currentAddress" />
+
+      <section>
+        <button id="sign-message" type="button">Sign message</button>
+        <pre id="log"></pre>
+      </section>
+    </main>
+
+    <script src="../../packages/browser/dist/xrpl-wallet-kit.iife.min.js"></script>
+    <script src="../../packages/browser/dist/xrpl-wallet-kit-legacy-bridge.js"></script>
+    <script>
+      const log = (label, value) => {
+        document.querySelector('#log').textContent += label + ' ' + JSON.stringify(value, null, 2) + '\n';
+      };
+
+      window.walletKit = XRPLWalletKitLegacyBridge.mount({
+        target: '#wallet-kit-button',
+        legacyButton: '.legacy-button',
+        hiddenAddress: '.currentAddress',
+
+        appName: 'XRPL Wallet Kit Legacy HTML',
+        appDescription: 'Legacy HTML integration example',
+        appUrl: window.location.origin,
+        network: 'mainnet',
+        storage: 'localStorage',
+        autoReconnect: true,
+
+        xamanClientId: window.XAMAN_CLIENT_ID || '',
+        walletConnectProjectId: window.WALLETCONNECT_PROJECT_ID || '',
+
+        showWeb3Name: true,
+        showBalance: true,
+        buttonSize: 'lg',
+        accountPanelMode: 'modal',
+
+        onConnected: function (session, legacy) {
+          log('connected', legacy);
+        },
+        onDisconnected: function () {
+          log('disconnected', {});
+        },
+        onError: function (error) {
+          log('error', { message: error && error.message ? error.message : String(error) });
+        }
+      });
+
+      document.querySelector('#sign-message').addEventListener('click', async function () {
+        if (!window.walletKit.manager.getSession()) {
+          window.walletKit.openModal();
+          return;
+        }
+        const result = await window.walletKit.manager.signMessage({ message: 'Login to legacy HTML example' });
+        log('signed', result);
+      });
+    </script>
+  </body>
+</html>

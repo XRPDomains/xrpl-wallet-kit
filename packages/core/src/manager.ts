@@ -1,27 +1,36 @@
+import { createWalletError, isWalletKitError, normalizeWalletError } from "./errors";
 import { WalletEventEmitter } from "./events";
-import { DEFAULT_XRPL_NETWORKS, resolveNetwork } from "./networks";
+import { createWalletKitLogger } from "./logger";
+import type { WalletKitLogger } from "./logger";
+import { DEFAULT_XRPL_NETWORKS, createNetworkRegistry } from "./networks";
 import { normalizeTxResult } from "./result";
 import { MemoryWalletStorage } from "./storage";
-import type { ConnectOptions, SignAndSubmitRequest, SignMessageRequest, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletManagerConfig, WalletNetwork, WalletSession, WalletStorage } from "./types";
+import type { ConnectOptions, SignAndSubmitRequest, SignMessageRequest, StoredWalletSessionEnvelope, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletCapabilities, WalletManagerConfig, WalletNetwork, WalletSession, WalletStorage } from "./types";
 
 const SESSION_KEY = "session";
+export const WALLET_STORAGE_VERSION = 1;
 
 export class WalletManager extends WalletEventEmitter {
   readonly adapters = new Map<string, WalletAdapter>();
   readonly networks: WalletNetwork[];
+  readonly networkRegistry: ReturnType<typeof createNetworkRegistry>;
   readonly storage: WalletStorage;
+  readonly logger: WalletKitLogger;
   private activeSession: WalletSession | null = null;
   private activeAdapterId: string | null = null;
 
   constructor(private config: WalletManagerConfig) {
     super();
-    this.networks = [...DEFAULT_XRPL_NETWORKS, ...(config.networks ?? [])];
+    this.networkRegistry = createNetworkRegistry([...DEFAULT_XRPL_NETWORKS, ...(config.networks ?? [])]);
+    this.networks = this.networkRegistry.list();
     this.storage = config.storage ?? new MemoryWalletStorage();
+    this.logger = createWalletKitLogger(config.logger);
     config.adapters?.forEach((adapter) => this.register(adapter));
   }
 
   register(adapter: WalletAdapter): this {
     this.adapters.set(adapter.metadata.id, adapter);
+    this.logger.debug(`Registered adapter ${adapter.metadata.id}`);
     return this;
   }
 
@@ -34,7 +43,8 @@ export class WalletManager extends WalletEventEmitter {
       if (!adapter.isAvailable) return [adapter.metadata.id, false] as const;
       try {
         return [adapter.metadata.id, Boolean(await adapter.isAvailable())] as const;
-      } catch {
+      } catch (error) {
+        this.logger.warn(`Availability check failed for ${adapter.metadata.id}`, error);
         return [adapter.metadata.id, false] as const;
       }
     }));
@@ -54,23 +64,62 @@ export class WalletManager extends WalletEventEmitter {
     return this.activeSession;
   }
 
+  getCapabilities(adapterId?: string): WalletCapabilities | undefined {
+    return this.getAdapter(adapterId)?.capabilities;
+  }
+
+  can(capability: keyof WalletCapabilities, adapterId?: string): boolean {
+    return Boolean(this.getCapabilities(adapterId)?.[capability]);
+  }
+
   getNetwork(id = this.config.network ?? "mainnet"): WalletNetwork {
-    return resolveNetwork(this.networks, id);
+    return this.networkRegistry.resolve(id);
   }
 
   async autoReconnect(): Promise<WalletSession | null> {
     if (!this.config.autoReconnect) return null;
     const serialized = await this.storage.getItem(SESSION_KEY);
     if (!serialized) return null;
-    const session = JSON.parse(serialized) as WalletSession;
+    const session = this.parseStoredSession(serialized);
+    if (!session) {
+      await this.storage.removeItem(SESSION_KEY);
+      this.emit("session_expired", {});
+      return null;
+    }
     const adapter = this.adapters.get(session.adapterId);
-    if (!adapter?.restoreSession) return null;
-    const restored = await adapter.restoreSession(session);
-    if (!restored?.session) return null;
-    const enrichedSession = this.withWalletMetadata(restored.session, adapter);
-    this.setSession(enrichedSession);
-    this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
-    return enrichedSession;
+    if (!adapter) {
+      await this.storage.removeItem(SESSION_KEY);
+      this.emit("session_expired", { adapterId: session.adapterId });
+      return null;
+    }
+    try {
+      if (adapter.restoreSession) {
+        const restored = await adapter.restoreSession(session);
+        if (!restored?.session) {
+          this.emit("session_stale", { adapterId: session.adapterId, account: session.account, session, reason: "restore_unavailable" });
+          return null;
+        }
+        const enrichedSession = this.withWalletMetadata(restored.session, adapter);
+        this.setSession(enrichedSession);
+        this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
+        return enrichedSession;
+      }
+
+      if (adapter.isAvailable && !await adapter.isAvailable()) {
+        this.emit("session_stale", { adapterId: session.adapterId, account: session.account, session, reason: "adapter_unavailable" });
+        return null;
+      }
+
+      const enrichedSession = this.withWalletMetadata(session, adapter);
+      this.setSession(enrichedSession);
+      this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession, stale: true });
+      return enrichedSession;
+    } catch (error) {
+      this.logger.warn("Auto reconnect failed", error);
+      await this.storage.removeItem(SESSION_KEY);
+      this.emit("session_expired", { adapterId: session.adapterId });
+      return null;
+    }
   }
 
   async connect(adapterId: string, options: ConnectOptions = {}): Promise<WalletSession> {
@@ -78,25 +127,37 @@ export class WalletManager extends WalletEventEmitter {
     const network = options.network ?? this.getNetwork();
     try {
       this.emit("connecting", { adapterId });
+      if (this.activeAdapterId && this.activeAdapterId !== adapterId) {
+        throw createWalletError.alreadyConnected(this.getAdapter(this.activeAdapterId)?.metadata.name ?? this.activeAdapterId);
+      }
+      if (adapter.isAvailable && !await adapter.isAvailable()) {
+        throw createWalletError.walletNotAvailable(adapter.metadata.name);
+      }
       const result = await adapter.connect({ ...options, network, walletId: adapterId });
       const session = this.withWalletMetadata(result.session ?? { adapterId, account: { ...result.account, network }, connectedAt: Date.now() }, adapter);
       this.setSession(session);
-      await this.storage.setItem(SESSION_KEY, JSON.stringify(session));
+      await this.saveSession(session);
       this.emit("connected", { adapterId, account: session.account, session });
       return session;
     } catch (error) {
-      this.emit("error", { adapterId, error });
-      throw error;
+      const normalized = this.normalizeConnectionError(adapter, error);
+      this.emit("error", { adapterId, error: normalized });
+      throw normalized;
     }
   }
 
   async disconnect(): Promise<void> {
     const adapterId = this.activeAdapterId ?? undefined;
-    await this.getAdapter()?.disconnect?.();
-    this.activeAdapterId = null;
-    this.activeSession = null;
-    await this.storage.removeItem(SESSION_KEY);
-    this.emit("disconnected", { adapterId });
+    try {
+      await this.withTimeout(this.getAdapter()?.disconnect?.(), 2000);
+    } catch (error) {
+      this.logger.warn("Adapter disconnect failed", error);
+    } finally {
+      this.activeAdapterId = null;
+      this.activeSession = null;
+      await this.storage.removeItem(SESSION_KEY);
+      this.emit("disconnected", { adapterId });
+    }
   }
 
   async signMessage(request: SignMessageRequest) {
@@ -107,8 +168,9 @@ export class WalletManager extends WalletEventEmitter {
       this.emit("signed", { adapterId: adapter.metadata.id, kind: "message", result });
       return result;
     } catch (error) {
-      this.emit("rejected", { adapterId: adapter.metadata.id, kind: "message", error });
-      throw error;
+      const normalized = normalizeWalletError(error);
+      this.emit("rejected", { adapterId: adapter.metadata.id, kind: "message", error: normalized });
+      throw normalized;
     }
   }
 
@@ -120,8 +182,9 @@ export class WalletManager extends WalletEventEmitter {
       this.emit("signed", { adapterId: adapter.metadata.id, kind: "transaction", result });
       return result;
     } catch (error) {
-      this.emit("rejected", { adapterId: adapter.metadata.id, kind: "transaction", error });
-      throw error;
+      const normalized = normalizeWalletError(error);
+      this.emit("rejected", { adapterId: adapter.metadata.id, kind: "transaction", error: normalized });
+      throw normalized;
     }
   }
 
@@ -137,20 +200,72 @@ export class WalletManager extends WalletEventEmitter {
   private withWalletMetadata(session: WalletSession, adapter: WalletAdapter): WalletSession {
     return {
       ...session,
-      wallet: session.wallet ?? adapter.metadata
+      wallet: session.wallet ?? adapter.metadata,
+      account: {
+        ...session.account,
+        network: session.account.network ?? this.getNetwork()
+      }
     };
   }
 
   private requireAdapter(adapterId: string): WalletAdapter {
     const adapter = this.adapters.get(adapterId);
-    if (!adapter) throw new Error(`Wallet adapter is not registered: ${adapterId}`);
+    if (!adapter) throw createWalletError.walletNotFound(adapterId);
     return adapter;
   }
 
   private requireActiveAdapter(method: keyof WalletAdapter): WalletAdapter {
     const adapter = this.getAdapter();
-    if (!adapter) throw new Error("No wallet is connected");
-    if (typeof adapter[method] !== "function") throw new Error(`${method} is not supported by ${adapter.metadata.name}`);
+    if (!adapter) throw createWalletError.notConnected();
+    if (typeof adapter[method] !== "function") throw createWalletError.unsupportedMethod(String(method), adapter.metadata.name);
     return adapter;
   }
+
+  private async saveSession(session: WalletSession): Promise<void> {
+    const envelope: StoredWalletSessionEnvelope = {
+      version: WALLET_STORAGE_VERSION,
+      session,
+      updatedAt: Date.now()
+    };
+    await this.storage.setItem(SESSION_KEY, JSON.stringify(envelope));
+  }
+
+  private parseStoredSession(serialized: string): WalletSession | null {
+    try {
+      const parsed = JSON.parse(serialized) as Partial<StoredWalletSessionEnvelope> | WalletSession;
+      if ("version" in parsed && "session" in parsed) {
+        return parsed.version === WALLET_STORAGE_VERSION ? parsed.session ?? null : null;
+      }
+      if ("adapterId" in parsed && "account" in parsed && "connectedAt" in parsed) {
+        return parsed as WalletSession;
+      }
+      return null;
+    } catch (error) {
+      this.logger.warn("Failed to parse stored wallet session", error);
+      return null;
+    }
+  }
+
+  private async withTimeout<T>(promise: Promise<T> | undefined, timeoutMs: number): Promise<T | undefined> {
+    if (!promise) return undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => resolve(undefined), timeoutMs);
+    });
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  private normalizeConnectionError(adapter: WalletAdapter, error: unknown) {
+    if (isWalletKitError(error)) return error;
+    const message = error instanceof Error ? error.message : String(error);
+    if (/reject|denied|cancelled|canceled|closed/i.test(message)) {
+      return createWalletError.connectionRejected(adapter.metadata.name, error);
+    }
+    return createWalletError.connectionFailed(adapter.metadata.name, error);
+  }
 }
+

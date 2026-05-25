@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .npm-cache/
+.quality/
+.codegraph/
 tmp/
 PROJECT_MEMORY.md
 

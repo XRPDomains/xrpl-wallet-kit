@@ -16,15 +16,13 @@ import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
 import { createWalletConnectAdapters, createWalletConnectMetadata } from "@xrpl-wallet-kit/adapter-walletconnect";
 import { createXamanAdapter } from "@xrpl-wallet-kit/adapter-xaman";
 import { createXrplSnapAdapter } from "@xrpl-wallet-kit/adapter-xrpl-snap";
-import { createDefaultWalletButtonConfig, createDefaultWalletUiConfig, createWalletButton, createWalletModal } from "@xrpl-wallet-kit/ui";
+import { createDefaultWalletUiConfig, createWalletButton, createWalletModal, resolveWalletButtonOptions as resolveUiWalletButtonOptions } from "@xrpl-wallet-kit/ui";
 import type {
   WalletButtonConfig,
-  WalletButtonOptions,
   WalletButtonTarget,
+  WalletConnectUiMode,
   WalletUiConfig,
-  WalletUiOptions,
-  WalletUiPresentation,
-  WalletUiSize
+  WalletUiOptions
 } from "@xrpl-wallet-kit/ui";
 
 export type WalletKitAdapterId =
@@ -40,16 +38,13 @@ export type WalletKitAdapterId =
   | "bifrost"
   | (string & {});
 
-export type WalletConnectMode = "default" | "list" | "group";
+export type WalletConnectMode = WalletConnectUiMode;
 export type ResponsiveValue<T> = T | { smallScreen?: T; largeScreen?: T };
 export type WalletAccountStatus = "full" | "address" | "icon";
 
-export interface WalletKitUiConfig extends WalletUiConfig {
-  walletConnectMode?: WalletConnectMode;
-  modalSize?: WalletUiSize;
-}
+export type WalletKitUiConfig = WalletUiConfig;
 
-export interface WalletKitConnectButtonConfig extends WalletButtonConfig {
+export interface WalletKitConnectButtonConfig extends Omit<WalletButtonConfig, "showBalance"> {
   target?: WalletButtonTarget;
   accountStatus?: ResponsiveValue<WalletAccountStatus>;
   showBalance?: ResponsiveValue<boolean>;
@@ -57,7 +52,6 @@ export interface WalletKitConnectButtonConfig extends WalletButtonConfig {
 
 export interface WalletKitIdentityConfig {
   web3Name?: boolean;
-  xrpName?: boolean;
   fallbackToAddress?: boolean;
 }
 
@@ -67,11 +61,10 @@ export interface CreateWalletClientOptions extends Omit<WalletManagerConfig, "ad
   walletConnectProjectId?: string;
   xamanClientId?: string;
   wallets?: "all" | WalletKitAdapterId[];
-  walletConnectMode?: WalletConnectMode;
+  ui?: WalletKitUiConfig;
 }
 
 export interface CreateWalletKitOptions extends CreateWalletClientOptions {
-  ui?: WalletKitUiConfig;
   identity?: WalletKitIdentityConfig;
   modal?: boolean | (WalletKitUiConfig & { autoOpen?: boolean });
   connectButton?: WalletButtonTarget | WalletKitConnectButtonConfig;
@@ -105,6 +98,10 @@ export function createWalletKit(options: CreateWalletKitOptions) {
     })
     : undefined;
 
+  if (options.autoReconnect) {
+    void manager.autoReconnect();
+  }
+
   if (modal && modalOptions.autoOpen) {
     modal.autoOpen();
   }
@@ -114,7 +111,14 @@ export function createWalletKit(options: CreateWalletKitOptions) {
     modal,
     button,
     openModal: () => modal?.open(),
-    closeModal: () => modal?.close()
+    closeModal: () => modal?.close(),
+    disconnect: () => manager.disconnect(),
+    refreshIdentity: () => button?.refreshIdentity(),
+    refreshBalance: () => button?.refreshBalance(),
+    refreshAccount: () => button?.refreshAccount(),
+    getSession: () => manager.getSession(),
+    signAndSubmit: manager.signAndSubmit.bind(manager),
+    signMessage: manager.signMessage.bind(manager)
   };
 }
 
@@ -132,10 +136,10 @@ function createDefaultAdapters(options: CreateWalletClientOptions, onQr: (event:
   if (shouldInclude(ids, "xrplsnap")) adapters.push(createXrplSnapAdapter());
 
   if (options.walletConnectProjectId && shouldIncludeWalletConnect(ids)) {
-    const walletConnectMode = options.walletConnectMode ?? "group";
+    const walletConnectUiMode = getWalletConnectUiMode(options);
     adapters.push(...createWalletConnectAdapters({
       projectId: options.walletConnectProjectId,
-      mode: walletConnectMode === "default" ? "default" : "details",
+      mode: walletConnectUiMode === "default" ? "default" : "details",
       wallets: resolveWalletConnectWallets(ids),
       metadata: createWalletConnectMetadata({
         name: options.appName,
@@ -144,8 +148,8 @@ function createDefaultAdapters(options: CreateWalletClientOptions, onQr: (event:
         icons: options.appIcons ?? []
       }),
       onQr,
-      useModal: walletConnectMode === "default" ? true : undefined,
-      modalMode: walletConnectMode === "default" ? "always" : undefined
+      useModal: walletConnectUiMode === "default" ? true : undefined,
+      modalMode: walletConnectUiMode === "default" ? "always" : undefined
     }));
   }
 
@@ -158,24 +162,31 @@ function resolveStorage(storage: CreateWalletClientOptions["storage"]): WalletMa
   return storage;
 }
 
-function resolveModalOptions(options: CreateWalletKitOptions): { ui: WalletUiConfig; autoOpen: boolean } {
+function resolveModalOptions(options: CreateWalletKitOptions): { ui: Partial<Omit<WalletUiOptions, "manager" | "mount">>; autoOpen: boolean } {
   const modalConfig = typeof options.modal === "object" ? options.modal : {};
-  const { autoOpen = false, walletConnectMode, modalSize, ...modalUi } = modalConfig;
+  const { autoOpen = false, ...modalUi } = modalConfig;
+  const modalWidth = options.ui?.modal?.width ?? modalConfig.modal?.width;
+  const walletConnectModeValue = options.ui?.walletConnect?.mode
+    ?? modalConfig.walletConnect?.mode
+    ?? "group";
   const merged: WalletKitUiConfig = {
     ...options.ui,
     ...modalUi,
-    walletConnectMode: options.ui?.walletConnectMode ?? walletConnectMode ?? options.walletConnectMode,
-    modalSize: options.ui?.modalSize ?? modalSize
+    modal: {
+      ...options.ui?.modal,
+      ...modalConfig.modal,
+      ...(modalWidth ? { width: modalWidth } : {})
+    },
+    walletConnect: {
+      ...options.ui?.walletConnect,
+      ...modalConfig.walletConnect,
+      mode: walletConnectModeValue
+    }
   };
-  const { walletConnectMode: resolvedWalletConnectMode = "group", modalSize: resolvedModalSize, ...ui } = merged;
 
   return {
     autoOpen,
-    ui: createDefaultWalletUiConfig({
-      ...ui,
-      size: ui.size ?? resolvedModalSize,
-      presentation: ui.presentation ?? walletConnectPresentation(resolvedWalletConnectMode)
-    })
+    ui: createDefaultWalletUiConfig(merged)
   };
 }
 
@@ -187,24 +198,40 @@ function resolveButtonOptions(options: CreateWalletKitOptions): (WalletButtonCon
   if (!raw.target) return undefined;
   const {
     accountStatus: _accountStatus,
-    showBalance: _showBalance,
+    showBalance,
     target,
     ...buttonConfig
   } = raw;
   const identity = options.identity ?? {};
+  const ui: WalletUiConfig = {
+    ...options.ui,
+    identity: {
+      ...options.ui?.identity,
+      enabled: options.ui?.identity?.enabled ?? identity.web3Name,
+      fallbackToAddress: options.ui?.identity?.fallbackToAddress ?? identity.fallbackToAddress
+    }
+  };
+
+  const resolvedShowBalance = resolveResponsiveValue(showBalance);
+  const resolvedButtonConfig = {
+    ...buttonConfig,
+    ...(resolvedShowBalance === undefined ? {} : { showBalance: resolvedShowBalance })
+  };
 
   return {
     target,
-    ...createDefaultWalletButtonConfig({
-      ...buttonConfig,
-      showWeb3Name: buttonConfig.showWeb3Name ?? buttonConfig.showXrpName ?? identity.web3Name ?? identity.xrpName ?? true,
-      fallbackToAddress: buttonConfig.fallbackToAddress ?? identity.fallbackToAddress ?? true
-    })
+    ...resolveUiWalletButtonOptions(ui, resolvedButtonConfig)
   };
 }
 
-function walletConnectPresentation(mode: WalletConnectMode): WalletUiPresentation {
-  return mode === "group" ? "grouped" : "flat";
+function resolveResponsiveValue<T>(value: ResponsiveValue<T> | undefined): T | undefined {
+  if (value == null || typeof value !== "object" || !("smallScreen" in value || "largeScreen" in value)) return value as T | undefined;
+  const isSmallScreen = typeof window !== "undefined" && window.matchMedia?.("(max-width: 640px)").matches;
+  return isSmallScreen ? value.smallScreen ?? value.largeScreen : value.largeScreen ?? value.smallScreen;
+}
+
+function getWalletConnectUiMode(options: Pick<CreateWalletClientOptions, "ui">): WalletConnectMode {
+  return options.ui?.walletConnect?.mode ?? "group";
 }
 
 function shouldInclude(ids: Set<string> | undefined, id: string): boolean {
@@ -233,7 +260,7 @@ function withoutKitOnlyOptions(options: CreateWalletClientOptions): WalletManage
     walletConnectProjectId: _walletConnectProjectId,
     xamanClientId: _xamanClientId,
     wallets: _wallets,
-    walletConnectMode: _walletConnectMode,
+    ui: _ui,
     ...managerConfig
   } = options;
   return managerConfig;

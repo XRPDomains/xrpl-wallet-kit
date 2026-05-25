@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { WalletAccount, WalletManager, WalletMetadata, WalletSession } from "@xrpl-wallet-kit/core";
 import { createWalletButton, createWalletModal } from "@xrpl-wallet-kit/ui";
-import type { WalletButtonController, WalletButtonOptions, WalletModal, WalletUiOptions } from "@xrpl-wallet-kit/ui";
+import type { WalletButtonController, WalletButtonOptions, WalletModal, WalletUiConfig } from "@xrpl-wallet-kit/ui";
 
 export interface WalletKitContextValue {
   manager: WalletManager;
@@ -18,7 +18,7 @@ export interface WalletKitContextValue {
 export interface WalletKitProviderProps {
   manager: WalletManager;
   children: React.ReactNode;
-  ui?: Partial<Omit<WalletUiOptions, "manager" | "mount">>;
+  ui?: WalletUiConfig;
 }
 
 export type ReactWalletButtonProps = Partial<Omit<WalletButtonOptions, "manager" | "modal" | "target">>;

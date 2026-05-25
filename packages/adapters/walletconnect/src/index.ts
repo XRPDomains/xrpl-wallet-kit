@@ -4,6 +4,7 @@ import type { SessionTypes, SignClientTypes } from "@walletconnect/types";
 import { BaseWalletAdapter, normalizeTxResult, pickPath } from "@xrpl-wallet-kit/core";
 import { WALLETCONNECT_ICON } from "./icons";
 import { XRPL_WALLETCONNECT_WALLETS } from "./wallets";
+import type { WalletConnectWalletConfig } from "./types";
 import type {
   ConnectOptions,
   SignAndSubmitRequest,
@@ -38,19 +39,7 @@ export interface WalletConnectAdapterOptions {
   requestTimeoutMs?: number;
 }
 
-export interface WalletConnectWalletConfig {
-  id: string;
-  name: string;
-  description?: string;
-  group?: string;
-  icon?: string;
-  walletConnect?: { metadataName?: string };
-  links?: { universal?: string; native?: string };
-  qrMode?: "walletconnect" | "custom";
-  useModal?: boolean;
-  signMessage?: boolean;
-  deeplink?: (uri: string) => string;
-}
+export type { WalletConnectWalletConfig } from "./types";
 
 export interface CreateWalletConnectAdaptersConfig extends Omit<WalletConnectAdapterOptions, "id" | "name" | "icon" | "deeplink" | "useModal" | "modalMode"> {
   mode?: "default" | "details";
@@ -89,7 +78,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   private session?: SessionTypes.Struct;
   private activeNetwork?: XrplNetwork;
   private initializationPromise?: Promise<SignClient>;
-  private pendingConnection?: { uri: string; approval: () => Promise<SessionTypes.Struct> };
+  private pendingConnection?: { uri: string; approval: () => Promise<SessionTypes.Struct>; existingTopics: Set<string> };
   private modal?: WalletConnectModal;
 
   constructor(private options: WalletConnectAdapterOptions) {
@@ -129,6 +118,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     try {
       const client = await this.getClient();
       const resolvedNetwork = this.requireNetwork(network);
+      const existingTopics = this.getSessionTopics(client);
       const result = await client.connect({
         requiredNamespaces: this.createRequiredNamespaces(resolvedNetwork)
       });
@@ -137,7 +127,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
         throw new Error("Failed to generate WalletConnect URI during pre-initialization");
       }
 
-      this.pendingConnection = { uri: result.uri, approval: result.approval };
+      this.pendingConnection = { uri: result.uri, approval: result.approval, existingTopics };
       this.options.onQr?.({
         adapterId: this.metadata.id,
         uri: result.uri,
@@ -181,6 +171,31 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     };
   }
 
+
+  async restoreSession(session: WalletSession) {
+    const network = this.requireNetwork(session.account.network as XrplNetwork | undefined);
+    const client = await this.getClient();
+    const topic = typeof session.metadata?.topic === "string" ? session.metadata.topic : undefined;
+    const restoredSession = this.findStoredWalletConnectSession(client, topic, network, session.account.address);
+    if (!restoredSession) return null;
+    if (restoredSession.expiry && restoredSession.expiry * 1000 <= Date.now()) return null;
+
+    this.session = restoredSession;
+    this.activeNetwork = network;
+    this.setupEventListeners();
+    const address = this.extractAddress(restoredSession, network);
+    const account = { ...session.account, address, network, networkType: network.networkType };
+    return {
+      account,
+      session: {
+        ...session,
+        account,
+        expiresAt: restoredSession.expiry ? restoredSession.expiry * 1000 : session.expiresAt,
+        metadata: { ...session.metadata, topic: restoredSession.topic }
+      },
+      raw: restoredSession
+    };
+  }
   async disconnect(): Promise<void> {
     if (!this.client || !this.session) return;
 
@@ -259,6 +274,22 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     return this.options.deeplink?.(uri) ?? uri;
   }
 
+
+  private findStoredWalletConnectSession(client: SignClient, topic: string | undefined, network: XrplNetwork, address: string): SessionTypes.Struct | undefined {
+    if (topic) {
+      try {
+        return client.session.get(topic);
+      } catch {
+        return undefined;
+      }
+    }
+
+    const sessions = client.session.getAll();
+    return sessions.find((storedSession) => {
+      const accounts = storedSession.namespaces[XRPL_NAMESPACE]?.accounts ?? [];
+      return accounts.some((account) => account === `${network.walletConnectChainId}:${address}` || account.endsWith(`:${address}`));
+    });
+  }
   private async getClient(): Promise<SignClient> {
     if (this.client) return this.client;
     if (!this.initializationPromise) {
@@ -287,6 +318,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
 
   private async connectWithModal(client: SignClient, network: XrplNetwork): Promise<SessionTypes.Struct> {
     const modal = await this.initializeModal();
+    const existingTopics = this.getSessionTopics(client);
     const { uri, approval } = await client.connect({
       requiredNamespaces: this.createRequiredNamespaces(network)
     });
@@ -309,7 +341,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     await modal.openModal({ uri });
 
     try {
-      return await Promise.race([approval(), modalClosed]);
+      return await Promise.race([this.waitForApprovalOrRecoveredSession(client, network, approval, existingTopics), modalClosed]);
     } finally {
       unsubscribe();
       modal.closeModal();
@@ -321,11 +353,12 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     let connection = this.pendingConnection;
 
     if (!connection) {
+      const existingTopics = this.getSessionTopics(client);
       const result = await client.connect({
         requiredNamespaces: this.createRequiredNamespaces(network)
       });
       if (!result.uri) throw new Error("WalletConnect did not return a connection URI");
-      connection = { uri: result.uri, approval: result.approval };
+      connection = { uri: result.uri, approval: result.approval, existingTopics };
     }
 
     this.pendingConnection = undefined;
@@ -335,7 +368,77 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
       deeplink: this.options.deeplink?.(connection.uri)
     });
 
-    return connection.approval();
+    return this.waitForApprovalOrRecoveredSession(client, network, connection.approval, connection.existingTopics);
+  }
+
+  private waitForApprovalOrRecoveredSession(
+    client: SignClient,
+    network: XrplNetwork,
+    approval: () => Promise<SessionTypes.Struct>,
+    existingTopics: Set<string>
+  ): Promise<SessionTypes.Struct> {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let timer: ReturnType<typeof setInterval> | undefined;
+
+      const cleanup = () => {
+        if (timer) clearInterval(timer);
+        if (typeof window !== "undefined") {
+          window.removeEventListener("focus", check);
+          window.removeEventListener("pageshow", check);
+          document.removeEventListener("visibilitychange", check);
+        }
+      };
+      const settle = (callback: () => void) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        callback();
+      };
+      const check = () => {
+        const recovered = this.findNewWalletConnectSession(client, network, existingTopics);
+        if (recovered) {
+          settle(() => resolve(recovered));
+        }
+      };
+
+      approval()
+        .then((session) => settle(() => resolve(session)))
+        .catch((error) => {
+          check();
+          if (!settled) {
+            setTimeout(() => {
+              check();
+              if (!settled) settle(() => reject(error));
+            }, 1500);
+          }
+        });
+
+      if (typeof window !== "undefined") {
+        window.addEventListener("focus", check);
+        window.addEventListener("pageshow", check);
+        document.addEventListener("visibilitychange", check);
+      }
+      timer = setInterval(check, 1000);
+      check();
+    });
+  }
+
+  private getSessionTopics(client: SignClient): Set<string> {
+    return new Set(client.session.getAll().map((session) => session.topic));
+  }
+
+  private findNewWalletConnectSession(client: SignClient, network: XrplNetwork, existingTopics: Set<string>): SessionTypes.Struct | undefined {
+    return client.session.getAll().find((storedSession) => {
+      if (existingTopics.has(storedSession.topic)) return false;
+      if (storedSession.expiry && storedSession.expiry * 1000 <= Date.now()) return false;
+      return this.sessionHasNetworkAccount(storedSession, network);
+    });
+  }
+
+  private sessionHasNetworkAccount(session: SessionTypes.Struct, network: XrplNetwork): boolean {
+    const accounts = session.namespaces[XRPL_NAMESPACE]?.accounts ?? [];
+    return accounts.some((account) => account.startsWith(`${network.walletConnectChainId}:`));
   }
 
   private createRequiredNamespaces(network: XrplNetwork) {
@@ -450,11 +553,19 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
 
   private setupEventListeners(): void {
     if (!this.client) return;
-    this.client.on("session_delete", () => this.cleanup());
-    this.client.on("session_expire", () => this.cleanup());
+    void this.runCleanup();
+    const onSessionDelete = () => this.cleanup();
+    const onSessionExpire = () => this.cleanup();
+    this.client.on("session_delete", onSessionDelete);
+    this.client.on("session_expire", onSessionExpire);
+    this.addCleanup(() => {
+      this.client?.off("session_delete", onSessionDelete);
+      this.client?.off("session_expire", onSessionExpire);
+    });
   }
 
   private cleanup(): void {
+    void this.runCleanup();
     this.modal?.closeModal();
     this.removeWalletConnectModalElements();
     this.modal = undefined;

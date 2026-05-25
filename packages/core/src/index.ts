@@ -1,5 +1,7 @@
 export * from "./adapter";
+export * from "./errors";
 export * from "./events";
+export * from "./logger";
 export * from "./manager";
 export * from "./networks";
 export * from "./result";

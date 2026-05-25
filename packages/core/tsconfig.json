@@ -18,7 +18,8 @@
       "@xrpl-wallet-kit/adapter-walletconnect": ["packages/adapters/walletconnect/src/index.ts"],
       "@xrpl-wallet-kit/adapter-xrpl-snap": ["packages/adapters/xrpl-snap/src/index.ts"],
       "@xrpl-wallet-kit/ui": ["packages/ui/src/index.ts"],
-      "@xrpl-wallet-kit/react": ["packages/react/src/index.tsx"]
+      "@xrpl-wallet-kit/react": ["packages/react/src/index.tsx"],
+      "@xrpl-wallet-kit/client": ["packages/client/src/index.ts"]
     },
     "strict": true,
     "skipLibCheck": true,

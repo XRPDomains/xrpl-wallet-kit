@@ -1,12 +1,22 @@
+import type { WalletKitLogger, WalletKitLoggerOptions } from "./logger";
+
 export type WalletNetworkId = "mainnet" | "testnet" | "devnet" | (string & {});
+export type WalletNetworkFamily = "xrpl" | (string & {});
 
 export interface WalletNetwork {
   id: WalletNetworkId;
   name: string;
+  family?: WalletNetworkFamily;
   networkType: "MAINNET" | "TESTNET" | "DEVNET" | "CUSTOM";
+  nativeAsset?: string;
+  nativeAssetDecimals?: number;
   rpcUrl: string;
+  httpRpcUrl?: string;
   walletConnectChainId: string;
+  networkId?: number;
+  definitionsUrl?: string;
   explorerTxUrl?: string;
+  explorerAccountUrl?: string;
 }
 
 export type WalletAdapterType = "mobile" | "extension" | "walletconnect" | "snap" | "hardware" | "embedded";
@@ -43,6 +53,7 @@ export interface WalletAccount {
   publicKey?: string;
   network?: WalletNetwork;
   networkType?: string;
+  activationStatus?: "active" | "unfunded" | "unknown";
 }
 
 export interface WalletSession {
@@ -115,6 +126,7 @@ export type WalletEventName =
   | "signed"
   | "rejected"
   | "session_restored"
+  | "session_stale"
   | "session_expired";
 
 export interface WalletEvents {
@@ -126,7 +138,8 @@ export interface WalletEvents {
   signing: { adapterId: string; kind: "message" | "transaction" };
   signed: { adapterId: string; kind: "message" | "transaction"; result: unknown };
   rejected: { adapterId: string; kind?: "message" | "transaction"; error?: unknown };
-  session_restored: { adapterId: string; account: WalletAccount; session: WalletSession };
+  session_restored: { adapterId: string; account: WalletAccount; session: WalletSession; stale?: boolean };
+  session_stale: { adapterId: string; account?: WalletAccount; session?: WalletSession; reason?: string };
   session_expired: { adapterId?: string };
 }
 
@@ -136,6 +149,12 @@ export interface WalletStorage {
   getItem(key: string): string | null | Promise<string | null>;
   setItem(key: string, value: string): void | Promise<void>;
   removeItem(key: string): void | Promise<void>;
+}
+
+export interface StoredWalletSessionEnvelope {
+  version: number;
+  session: WalletSession;
+  updatedAt: number;
 }
 
 export interface WalletManagerConfig {
@@ -148,8 +167,10 @@ export interface WalletManagerConfig {
   adapters?: WalletAdapter[];
   storage?: WalletStorage;
   autoReconnect?: boolean;
+  logger?: WalletKitLogger | WalletKitLoggerOptions;
 }
 
 export type XrplNetworkId = WalletNetworkId;
 export type XrplNetwork = WalletNetwork;
 export type XrplTxJson = TransactionPayload;
+

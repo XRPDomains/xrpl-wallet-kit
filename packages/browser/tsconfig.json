@@ -1,0 +1,12 @@
+{
+  "extends": "../core/tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "emitDeclarationOnly": false,
+    "composite": true
+  },
+  "references": [{ "path": "../client" }],
+  "include": ["src"]
+}

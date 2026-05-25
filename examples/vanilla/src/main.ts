@@ -2,7 +2,7 @@ import { WalletManager, createBrowserWalletStorage } from "../../../packages/cor
 import { Buffer } from "buffer";
 import { createDefaultWalletButtonConfig, createDefaultWalletUiConfig } from "../../../packages/ui/src";
 import type { TransactionPayload, WalletAdapter } from "../../../packages/core/src";
-import type { WalletAccountPanelMode, WalletUiLayout, WalletUiPresentation, WalletUiThemeMode } from "../../../packages/ui/src";
+import type { WalletUiLayout, WalletUiThemeMode } from "../../../packages/ui/src";
 
 import "./styles.css";
 
@@ -24,10 +24,9 @@ const PREVIEW_CONFIG = {
 
 const events = document.querySelector<HTMLPreElement>("#events")!;
 const session = document.querySelector<HTMLPreElement>("#session")!;
-const uiLayout = document.querySelector<HTMLSelectElement>("#ui-layout")!;
 const walletConnectMode = document.querySelector<HTMLSelectElement>("#walletconnect-mode")!;
+const walletLayout = document.querySelector<HTMLSelectElement>("#wallet-layout")!;
 const uiTheme = document.querySelector<HTMLSelectElement>("#ui-theme")!;
-const accountPanelMode = document.querySelector<HTMLSelectElement>("#account-panel-mode")!;
 const networkSelect = document.querySelector<HTMLSelectElement>("#network")!;
 const paymentDestinationInput = document.querySelector<HTMLInputElement>("#payment-destination")!;
 const paymentAmountInput = document.querySelector<HTMLInputElement>("#payment-amount")!;
@@ -60,7 +59,7 @@ let modal: { open(): void; updateOptions(options: Record<string, unknown>): void
 let walletButton: { updateOptions(options: Record<string, unknown>): void; destroy(): void } | undefined;
 let bootstrapRun = 0;
 
-[uiLayout, uiTheme, accountPanelMode].forEach((control) => {
+[uiTheme, walletLayout].forEach((control) => {
   control.addEventListener("change", () => {
     modal?.updateOptions(getWalletUiOptions());
     walletButton?.updateOptions(getWalletButtonOptions());
@@ -389,17 +388,41 @@ function xrpToDrops(value: string) {
 
 function getWalletUiOptions() {
   return createDefaultWalletUiConfig({
-    layout: uiLayout.value as WalletUiLayout,
-    presentation: getWalletUiPresentation(),
-    themeMode: uiTheme.value as WalletUiThemeMode
+    mode: uiTheme.value as WalletUiThemeMode,
+    modal: {
+      title: "Connect Wallet",
+      width: "default",
+      footerText: "XRPL Wallet Kit"
+    },
+    walletList: {
+      layout: getWalletLayout(),
+      wallets: "all",
+      showGroup: true,
+      showInstalledBadge: true
+    },
+    walletConnect: {
+      mode: getWalletConnectMode(),
+      cta: "both",
+      qr: {
+        style: "dots",
+        showLogo: false
+      }
+    }
   });
 }
 
 function getWalletButtonOptions() {
   return createDefaultWalletButtonConfig({
     themeMode: uiTheme.value as WalletUiThemeMode,
-    accountPanelMode: accountPanelMode.value as WalletAccountPanelMode
+    accountPanelMode: "modal",
+    showBalance: true
   });
+}
+
+function getWalletLayout(): WalletUiLayout {
+  const value = walletLayout.value;
+  if (value === "card" || value === "icon") return value;
+  return "list";
 }
 
 function getWalletConnectMode(): WalletConnectMode {
@@ -416,10 +439,6 @@ function getSelectedNetwork() {
 
 function setDefaultSignMessage() {
   signMessageInput.value = `Login to XRPL Wallet Kit\nNetwork: ${getSelectedNetwork()}\nTimestamp: ${new Date().toISOString()}`;
-}
-
-function getWalletUiPresentation(): WalletUiPresentation {
-  return getWalletConnectMode() === "group" ? "grouped" : "flat";
 }
 
 function createSignMessageRequestPreview(adapter: WalletAdapter, current: NonNullable<ReturnType<WalletManager["getSession"]>>, message: string) {
