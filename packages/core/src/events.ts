@@ -14,6 +14,14 @@ export class WalletEventEmitter {
     this.listeners.get(eventName)?.delete(handler as (event: unknown) => void);
   }
 
+  removeAllListeners(eventName?: WalletEventName): void {
+    if (eventName) {
+      this.listeners.delete(eventName);
+      return;
+    }
+    this.listeners.clear();
+  }
+
   emit<T extends WalletEventName>(eventName: T, event: WalletEvents[T]): void {
     this.listeners.get(eventName)?.forEach((handler) => handler(event));
   }

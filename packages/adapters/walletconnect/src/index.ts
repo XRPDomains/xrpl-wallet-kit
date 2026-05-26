@@ -137,7 +137,8 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
       const resolvedNetwork = this.requireNetwork(network);
       const existingTopics = this.getSessionTopics(client);
       const result = await client.connect({
-        requiredNamespaces: this.createRequiredNamespaces(resolvedNetwork)
+        requiredNamespaces: this.createRequiredNamespaces(resolvedNetwork),
+        optionalNamespaces: this.createOptionalNamespaces(resolvedNetwork)
       });
 
       if (!result.uri) {
@@ -409,14 +410,22 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
 
   private async connectWithModal(client: SignClient, network: XrplNetwork, signal?: AbortSignal): Promise<SessionTypes.Struct> {
     const modal = await this.initializeModal();
-    const existingTopics = this.getSessionTopics(client);
-    this.debug("connect_modal_start", "modal", { network: network.id, existingTopics: existingTopics.size, mobile: isMobile() });
-    const { uri, approval } = await client.connect({
-      requiredNamespaces: this.createRequiredNamespaces(network)
-    });
+    let connection = this.pendingConnection;
+    if (!connection) {
+      const existingTopics = this.getSessionTopics(client);
+      this.debug("connect_modal_start", "modal", { network: network.id, existingTopics: existingTopics.size, mobile: isMobile(), reusedPending: false });
+      const result = await client.connect({
+        requiredNamespaces: this.createRequiredNamespaces(network),
+        optionalNamespaces: this.createOptionalNamespaces(network)
+      });
+      connection = { uri: result.uri ?? "", approval: result.approval, existingTopics };
+    } else {
+      this.debug("connect_modal_start", "modal", { network: network.id, existingTopics: connection.existingTopics.size, mobile: isMobile(), reusedPending: true });
+    }
+    this.pendingConnection = undefined;
 
     this.throwIfAborted(signal);
-    if (!uri) throw new Error("WalletConnect did not return a connection URI");
+    if (!connection.uri) throw new Error("WalletConnect did not return a connection URI");
     let didOpen = false;
     let rejectModalClose: ((error: Error) => void) | undefined;
     const modalClosed = new Promise<never>((_, reject) => {
@@ -433,11 +442,11 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
         rejectModalClose?.(new Error("WalletConnect modal closed"));
       }
     });
-    await modal.openModal({ uri });
-    this.debug("modal_uri_ready", "modal", { uriLength: uri.length });
+    await modal.openModal({ uri: connection.uri });
+    this.debug("modal_uri_ready", "modal", { uriLength: connection.uri.length });
 
     try {
-      const approvalOrRecoveredSession = this.waitForApprovalOrRecoveredSession(client, network, approval, existingTopics, {
+      const approvalOrRecoveredSession = this.waitForApprovalOrRecoveredSession(client, network, connection.approval, connection.existingTopics, {
         rejectOnApprovalError: !isMobile(),
         pollIntervalMs: isMobile() ? 500 : 1000,
         mode: "modal",
@@ -467,7 +476,8 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
       const existingTopics = this.getSessionTopics(client);
       this.debug("connect_custom_start", "custom", { network: network.id, existingTopics: existingTopics.size });
       const result = await client.connect({
-        requiredNamespaces: this.createRequiredNamespaces(network)
+        requiredNamespaces: this.createRequiredNamespaces(network),
+        optionalNamespaces: this.createOptionalNamespaces(network)
       });
       this.throwIfAborted(signal);
       if (!result.uri) throw new Error("WalletConnect did not return a connection URI");
@@ -638,6 +648,19 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
         chains: [network.walletConnectChainId],
         methods: [
           XRPLWalletConnectMethod.SIGN_TRANSACTION
+        ],
+        events: []
+      }
+    };
+  }
+
+  private createOptionalNamespaces(network: XrplNetwork) {
+    return {
+      [XRPL_NAMESPACE]: {
+        chains: [network.walletConnectChainId],
+        methods: [
+          XRPLWalletConnectMethod.SIGN_MESSAGE,
+          XRPLWalletConnectMethod.SIGN_TRANSACTION_FOR
         ],
         events: []
       }

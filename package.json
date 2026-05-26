@@ -11,9 +11,10 @@
   ],
   "scripts": {
     "build": "tsc -b",
-    "build:browser": "npm run build && npm --workspace @xrpl-wallet-kit/browser run build",
+    "build:browser": "npm run build && npm --workspace @xrpl-wallet-kit/browser run build && npm run smoke:browser",
     "typecheck": "tsc -b --pretty false",
     "test": "npm run build && node --import tsx --test tests/*.test.ts",
+    "smoke:browser": "node tests/browser-bundle-smoke.mjs",
     "check:unused": "knip --no-progress --reporter compact",
     "check:unused:report": "knip --no-progress --reporter compact --no-exit-code",
     "check:duplicates": "jscpd --config .jscpd.json packages examples tests",

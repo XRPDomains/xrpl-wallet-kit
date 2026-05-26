@@ -120,6 +120,143 @@ test("WalletManager throws typed errors for missing adapters", async () => {
   );
 });
 
+test("WalletManager switches wallets by disconnecting the active adapter first", async () => {
+  class SwitchAdapter extends BaseWalletAdapter {
+    capabilities = { connect: true, disconnect: true };
+    disconnectCalls = 0;
+
+    constructor(readonly id: string) {
+      super();
+    }
+
+    get metadata() {
+      return { id: this.id, name: this.id, type: "extension" } as const;
+    }
+
+    async connect(options: { network?: typeof network }) {
+      const account = { address: `r${this.id}`, network: options.network ?? network };
+      return {
+        account,
+        session: { adapterId: this.id, account, connectedAt: 1 }
+      };
+    }
+
+    async disconnect() {
+      this.disconnectCalls += 1;
+    }
+  }
+
+  const first = new SwitchAdapter("first");
+  const second = new SwitchAdapter("second");
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [first, second],
+    logger: { level: "silent" }
+  });
+
+  await manager.connect("first", { network });
+  const switched = await manager.connect("second", { network });
+
+  assert.equal(first.disconnectCalls, 1);
+  assert.equal(switched.adapterId, "second");
+  assert.equal(manager.getSession()?.adapterId, "second");
+});
+
+test("WalletManager clears invalid stored sessions instead of restoring poisoned storage", async () => {
+  const storage = new MemoryWalletStorage();
+  await storage.setItem("session", JSON.stringify({
+    version: WALLET_STORAGE_VERSION,
+    session: {
+      adapterId: "mock",
+      account: { address: null },
+      connectedAt: 1
+    }
+  }));
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new MockAdapter()],
+    storage,
+    autoReconnect: true,
+    logger: { level: "silent" }
+  });
+
+  const restored = await manager.autoReconnect();
+
+  assert.equal(restored, null);
+  assert.equal(await storage.getItem("session"), null);
+});
+
+test("WalletManager destroy removes listeners and cancels pending connection", () => {
+  let calls = 0;
+  class PendingAdapter extends BaseWalletAdapter {
+    metadata = { id: "pending", name: "Pending", type: "extension" } as const;
+    capabilities = { connect: true };
+    cancelCalls = 0;
+
+    async connect() {
+      return { account: { address: "rPending" } };
+    }
+
+    cancelPendingConnection() {
+      this.cancelCalls += 1;
+    }
+  }
+
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new PendingAdapter()],
+    logger: { level: "silent" }
+  });
+  manager.on("connected", () => {
+    calls += 1;
+  });
+
+  manager.destroy();
+  manager.emit("connected", { adapterId: "pending", account: { address: "rPending" } });
+
+  assert.equal(calls, 0);
+});
+
+test("WalletManager forces adapter cleanup after disconnect timeout", async () => {
+  class SlowDisconnectAdapter extends BaseWalletAdapter {
+    metadata = { id: "slow", name: "Slow", type: "extension" } as const;
+    capabilities = { connect: true, disconnect: true };
+    cancelCalls = 0;
+
+    async connect() {
+      return {
+        account: { address: "rSlow", network },
+        session: {
+          adapterId: this.metadata.id,
+          account: { address: "rSlow", network },
+          connectedAt: 1
+        }
+      };
+    }
+
+    async disconnect() {
+      await new Promise(() => undefined);
+    }
+
+    cancelPendingConnection() {
+      this.cancelCalls += 1;
+    }
+  }
+
+  const adapter = new SlowDisconnectAdapter();
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [adapter],
+    logger: { level: "silent" }
+  });
+
+  await manager.connect("slow", { network });
+  await manager.disconnect();
+
+  assert.equal(adapter.cancelCalls, 1);
+  assert.equal(manager.getSession(), null);
+});
+
 test("WalletManager recovers pending return sessions once and stores them", async () => {
   class RecoverAdapter extends BaseWalletAdapter {
     metadata = { id: "recover", name: "Recover Wallet", type: "mobile" } as const;

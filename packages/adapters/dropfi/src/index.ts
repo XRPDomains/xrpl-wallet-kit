@@ -70,7 +70,18 @@ export class DropFiAdapter extends BaseWalletAdapter {
   async restoreSession(session: WalletSession) {
     const provider = this.provider(false);
     if (!provider) return null;
-    const address = await this.resolveAddress(provider, true, null) ?? session.account.address;
+    if (!this.isAvailable()) return null;
+    if (typeof provider.isConnected === "function") {
+      try {
+        if (!await provider.isConnected()) return null;
+      } catch {
+        return null;
+      }
+    }
+
+    const address = await this.resolvePassiveAddress(provider);
+    if (!address || address !== session.account.address) return null;
+
     this.activeAddress = address;
     return {
       account: { ...session.account, address },
@@ -165,6 +176,21 @@ export class DropFiAdapter extends BaseWalletAdapter {
       ?? state?.selectedAddress
       ?? state?.connectedAccounts?.[0]
       ?? state?.accounts?.[0];
+  }
+
+  private async resolvePassiveAddress(provider: DropFiProvider): Promise<string | undefined> {
+    if (typeof provider.getAddress === "function") {
+      try {
+        const address = await provider.getAddress();
+        if (address) return address;
+      } catch {
+        return undefined;
+      }
+    }
+
+    return provider.selectedAddress
+      ?? provider.connectedAccounts?.[0]
+      ?? provider.accounts?.[0];
   }
 
   private async resolveConnected(provider: DropFiProvider, state: DropFiState | null) {
