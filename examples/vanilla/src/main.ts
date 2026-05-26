@@ -184,7 +184,8 @@ async function bootstrap(run = bootstrapRun) {
       mode: walletConnectAdapterMode,
       wallets: "all",
       signMessageDestination: PREVIEW_CONFIG.walletConnectSignMessageDestination,
-      onQr: ({ adapterId, uri, deeplink }) => manager.emitQr(adapterId, uri, deeplink)
+      onQr: ({ adapterId, uri, deeplink }) => manager.emitQr(adapterId, uri, deeplink),
+      onDebug: (event) => log("walletconnect_debug", event)
     }).forEach((adapter) => manager.register(adapter));
   } else {
     log("config_warning", { message: "VITE_WALLETCONNECT_PROJECT_ID is not set; WalletConnect preview adapters are disabled." });
@@ -216,6 +217,14 @@ async function bootstrap(run = bootstrapRun) {
     renderTransactionState();
     renderSigningState();
   });
+  manager.on("session_restored", (event) => {
+    log("session_restored", event);
+    renderSession();
+    renderTransactionState();
+    renderSigningState();
+  });
+  manager.on("session_stale", (event) => log("session_stale", event));
+  manager.on("session_expired", (event) => log("session_expired", event));
   manager.on("qr", (event) => log("qr", { adapterId: event.adapterId, uriLength: event.uri.length, deeplink: event.deeplink }));
   manager.on("signing", (event) => log("signing", event));
   manager.on("signed", (event) => log("signed", event));

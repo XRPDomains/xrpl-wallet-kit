@@ -110,8 +110,11 @@ export interface WalletAdapter {
   capabilities: WalletCapabilities;
   isAvailable?: () => boolean | Promise<boolean>;
   connect: (options: ConnectOptions) => Promise<ConnectResult>;
+  cancelPendingConnection?: () => void | Promise<void>;
   disconnect?: () => Promise<void>;
   restoreSession?: (session: WalletSession) => Promise<ConnectResult | null>;
+  canRecoverSession?: (options: ConnectOptions) => boolean | Promise<boolean>;
+  recoverSession?: (options: ConnectOptions) => Promise<ConnectResult | null>;
   signMessage?: (request: SignMessageRequest) => Promise<SignMessageResult>;
   signAndSubmit?: (request: SignAndSubmitRequest) => Promise<TxResult>;
 }
@@ -130,7 +133,7 @@ export type WalletEventName =
   | "session_expired";
 
 export interface WalletEvents {
-  connecting: { adapterId: string };
+  connecting: { adapterId: string; recovering?: boolean };
   connected: { adapterId: string; account: WalletAccount; session?: WalletSession };
   disconnected: { adapterId?: string };
   error: { adapterId?: string; error: unknown };
@@ -139,7 +142,7 @@ export interface WalletEvents {
   signed: { adapterId: string; kind: "message" | "transaction"; result: unknown };
   rejected: { adapterId: string; kind?: "message" | "transaction"; error?: unknown };
   session_restored: { adapterId: string; account: WalletAccount; session: WalletSession; stale?: boolean };
-  session_stale: { adapterId: string; account?: WalletAccount; session?: WalletSession; reason?: string };
+  session_stale: { adapterId: string; account?: WalletAccount; session?: WalletSession; reason?: string; attempts?: number };
   session_expired: { adapterId?: string };
 }
 

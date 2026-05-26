@@ -40,7 +40,10 @@ export class WalletModal {
         this.closeHandlers = new Set();
         this.onDocumentKeyDown = (event) => this.handleDocumentKeyDown(event);
         this.options = { manager: options.manager, ...resolveWalletUiOptions(options) };
-        this.offEvents.push(options.manager.on("qr", ({ adapterId, uri, deeplink }) => this.showQr(adapterId, uri, deeplink)), options.manager.on("connecting", ({ adapterId }) => this.setLoading(adapterId)), options.manager.on("connected", ({ adapterId }) => this.handleConnected(adapterId)), options.manager.on("error", ({ adapterId, error }) => this.setError(error, adapterId)));
+        this.offEvents.push(options.manager.on("qr", ({ adapterId, uri, deeplink }) => this.showQr(adapterId, uri, deeplink)), options.manager.on("connecting", ({ adapterId, recovering }) => {
+            if (!recovering)
+                this.setLoading(adapterId);
+        }), options.manager.on("connected", ({ adapterId }) => this.handleConnected(adapterId)), options.manager.on("error", ({ adapterId, error }) => this.setError(error, adapterId)));
     }
     autoOpen() {
         this.open();
@@ -60,6 +63,8 @@ export class WalletModal {
         document.removeEventListener("keydown", this.onDocumentKeyDown);
         if (this.qrCopyResetTimer)
             window.clearTimeout(this.qrCopyResetTimer);
+        if (notify)
+            void this.options.manager.cancelPendingConnection();
         this.resetQrState();
         this.root?.remove();
         this.root = undefined;
@@ -127,11 +132,14 @@ export class WalletModal {
     private handleBack() {
         const groupId = this.activeGroupId;
         if (this.root?.dataset.xwkView === "qr" && groupId && this.getGroups().some((group) => group.id === groupId)) {
+            void this.options.manager.cancelPendingConnection();
             this.resetQrState();
             this.mount("list");
             this.showWalletGroup(groupId);
             return;
         }
+        if (this.root?.dataset.xwkView === "qr" || this.root?.dataset.xwkView === "connect")
+            void this.options.manager.cancelPendingConnection();
         this.showList();
     }
     private async retryQrConnection() {

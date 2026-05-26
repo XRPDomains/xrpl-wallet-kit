@@ -62,8 +62,17 @@ export class WalletButtonController {
       this.render();
     }));
     this.offEvents.push(options.manager.on("session_restored", ({ session }) => {
+      this.connecting = false;
       void this.resolveIdentity(session);
       void this.resolveBalance(session);
+      this.render();
+    }));
+    this.offEvents.push(options.manager.on("session_stale", () => {
+      this.connecting = false;
+      this.render();
+    }));
+    this.offEvents.push(options.manager.on("session_expired", () => {
+      this.connecting = false;
       this.render();
     }));
     this.offEvents.push(options.manager.on("disconnected", () => {

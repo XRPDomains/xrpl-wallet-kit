@@ -110,6 +110,59 @@ test("WalletManager throws typed errors for missing adapters", async () => {
   );
 });
 
+test("WalletManager recovers pending return sessions once and stores them", async () => {
+  class RecoverAdapter extends BaseWalletAdapter {
+    metadata = { id: "recover", name: "Recover Wallet", type: "mobile" } as const;
+    capabilities = { connect: true };
+    canRecoverCalls = 0;
+    recoverCalls = 0;
+
+    async connect() {
+      return { account: { address: "rRecover" } };
+    }
+
+    canRecoverSession() {
+      this.canRecoverCalls += 1;
+      return true;
+    }
+
+    async recoverSession(options: { network?: typeof network }) {
+      this.recoverCalls += 1;
+      const account = { address: "rRecovered", network: options.network ?? network };
+      return {
+        account,
+        session: {
+          adapterId: this.metadata.id,
+          account,
+          connectedAt: 2
+        }
+      };
+    }
+  }
+
+  const storage = new MemoryWalletStorage();
+  const adapter = new RecoverAdapter();
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [adapter],
+    storage,
+    autoReconnect: true,
+    logger: { level: "silent" }
+  });
+
+  const [first, second] = await Promise.all([manager.autoReconnect(), manager.autoReconnect()]);
+  const stored = JSON.parse(await storage.getItem("session") ?? "{}") as {
+    session?: { adapterId?: string; account?: { address?: string } };
+  };
+
+  assert.equal(adapter.canRecoverCalls, 1);
+  assert.equal(adapter.recoverCalls, 1);
+  assert.equal(first?.account.address, "rRecovered");
+  assert.equal(second?.account.address, "rRecovered");
+  assert.equal(stored.session?.adapterId, "recover");
+  assert.equal(stored.session?.account?.address, "rRecovered");
+});
+
 
 test("NetworkRegistry resolves native asset, HTTP RPC, explorer, and mainnet identity guard", () => {
   const xahau = {

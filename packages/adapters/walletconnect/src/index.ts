@@ -7,6 +7,7 @@ import { XRPL_WALLETCONNECT_WALLETS } from "./wallets";
 import type { WalletConnectWalletConfig } from "./types";
 import type {
   ConnectOptions,
+  ConnectResult,
   SignAndSubmitRequest,
   SignMessageRequest,
   WalletAdapter,
@@ -37,9 +38,17 @@ export interface WalletConnectAdapterOptions {
   signMessage?: boolean;
   signMessageDestination?: string;
   requestTimeoutMs?: number;
+  onDebug?: (event: WalletConnectDebugEvent) => void;
 }
 
 export type { WalletConnectWalletConfig } from "./types";
+
+export interface WalletConnectDebugEvent {
+  adapterId: string;
+  step: string;
+  mode?: "modal" | "custom";
+  detail?: Record<string, unknown>;
+}
 
 export interface CreateWalletConnectAdaptersConfig extends Omit<WalletConnectAdapterOptions, "id" | "name" | "icon" | "deeplink" | "useModal" | "modalMode"> {
   mode?: "default" | "details";
@@ -55,10 +64,16 @@ export const WALLETCONNECT_LOGO = WALLETCONNECT_ICON;
 const XRPL_NAMESPACE = "xrpl";
 const USER_DISCONNECTED = { code: 6000, message: "User disconnected" };
 const DEFAULT_REQUEST_TIMEOUT_MS = 120000;
+const PENDING_RECOVERY_TTL_MS = 180000;
 
 function isMobile(): boolean {
   if (typeof navigator === "undefined") return false;
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const userAgent = navigator.userAgent;
+  const platform = navigator.platform;
+  const maxTouchPoints = navigator.maxTouchPoints ?? 0;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
+    || (platform === "MacIntel" && maxTouchPoints > 1)
+    || (typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches);
 }
 
 function defaultMetadata(): SignClientTypes.Metadata {
@@ -79,6 +94,8 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   private activeNetwork?: XrplNetwork;
   private initializationPromise?: Promise<SignClient>;
   private pendingConnection?: { uri: string; approval: () => Promise<SessionTypes.Struct>; existingTopics: Set<string> };
+  private connectPromise?: Promise<SessionTypes.Struct>;
+  private pendingAbortController?: AbortController;
   private modal?: WalletConnectModal;
 
   constructor(private options: WalletConnectAdapterOptions) {
@@ -147,12 +164,23 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     const shouldUseModal = this.shouldUseModal();
 
     if (!this.session) {
-      if (shouldUseModal) {
-        this.session = await this.connectWithModal(client, network);
-      } else {
-        this.session = await this.connectWithCustomQr(client, network);
+      if (!this.connectPromise) {
+        this.setPendingRecoveryMarker();
+        this.pendingAbortController = new AbortController();
+        const signal = options.signal
+          ? this.combineSignals(options.signal, this.pendingAbortController.signal)
+          : this.pendingAbortController.signal;
+        this.connectPromise = (shouldUseModal
+          ? this.connectWithModal(client, network, signal)
+          : this.connectWithCustomQr(client, network, signal)
+        ).finally(() => {
+          this.connectPromise = undefined;
+          this.pendingAbortController = undefined;
+        });
       }
+      this.session = await this.connectPromise;
     }
+    this.clearPendingRecoveryMarker();
 
     const address = this.extractAddress(this.session, network);
     const account = { address, network, networkType: network.networkType };
@@ -169,6 +197,16 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
       } satisfies WalletSession,
       raw: this.session
     };
+  }
+
+  cancelPendingConnection(): void {
+    this.pendingAbortController?.abort();
+    this.pendingAbortController = undefined;
+    this.pendingConnection = undefined;
+    this.connectPromise = undefined;
+    this.modal?.closeModal();
+    this.removeWalletConnectModalElements();
+    this.clearPendingRecoveryMarker();
   }
 
 
@@ -196,6 +234,44 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
       raw: restoredSession
     };
   }
+
+  async recoverSession(options: ConnectOptions): Promise<ConnectResult | null> {
+    const network = this.requireNetwork(options.network);
+    if (!this.canRecoverSession()) return null;
+
+    const client = await this.getClient();
+    const recoveredSession = this.findLatestStoredWalletConnectSession(client, network);
+    this.debug("recover_session_check", "modal", {
+      sessions: client.session.getAll().length,
+      recovered: Boolean(recoveredSession),
+      network: network.id
+    });
+    if (!recoveredSession) return null;
+    this.clearPendingRecoveryMarker();
+
+    this.session = recoveredSession;
+    this.activeNetwork = network;
+    this.setupEventListeners();
+
+    const address = this.extractAddress(recoveredSession, network);
+    const account = { address, network, networkType: network.networkType };
+    return {
+      account,
+      session: {
+        adapterId: this.metadata.id,
+        account,
+        connectedAt: Date.now(),
+        expiresAt: recoveredSession.expiry ? recoveredSession.expiry * 1000 : undefined,
+        metadata: { topic: recoveredSession.topic, recoveredFrom: "walletconnect_signclient" }
+      },
+      raw: recoveredSession
+    };
+  }
+
+  canRecoverSession(): boolean {
+    return this.shouldRecoverWithoutStoredSession() && this.hasPendingRecoveryMarker();
+  }
+
   async disconnect(): Promise<void> {
     if (!this.client || !this.session) return;
 
@@ -290,6 +366,21 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
       return accounts.some((account) => account === `${network.walletConnectChainId}:${address}` || account.endsWith(`:${address}`));
     });
   }
+
+  private findLatestStoredWalletConnectSession(client: SignClient, network: XrplNetwork): SessionTypes.Struct | undefined {
+    const sessions = client.session.getAll()
+      .filter((storedSession) => {
+        if (storedSession.expiry && storedSession.expiry * 1000 <= Date.now()) return false;
+        return this.sessionHasNetworkAccount(storedSession, network);
+      })
+      .sort((a, b) => (b.expiry ?? 0) - (a.expiry ?? 0));
+    return sessions[0];
+  }
+
+  private shouldRecoverWithoutStoredSession(): boolean {
+    return this.metadata.id === "walletconnect";
+  }
+
   private async getClient(): Promise<SignClient> {
     if (this.client) return this.client;
     if (!this.initializationPromise) {
@@ -316,13 +407,15 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     return this.modal;
   }
 
-  private async connectWithModal(client: SignClient, network: XrplNetwork): Promise<SessionTypes.Struct> {
+  private async connectWithModal(client: SignClient, network: XrplNetwork, signal?: AbortSignal): Promise<SessionTypes.Struct> {
     const modal = await this.initializeModal();
     const existingTopics = this.getSessionTopics(client);
+    this.debug("connect_modal_start", "modal", { network: network.id, existingTopics: existingTopics.size, mobile: isMobile() });
     const { uri, approval } = await client.connect({
       requiredNamespaces: this.createRequiredNamespaces(network)
     });
 
+    this.throwIfAborted(signal);
     if (!uri) throw new Error("WalletConnect did not return a connection URI");
     let didOpen = false;
     let rejectModalClose: ((error: Error) => void) | undefined;
@@ -332,57 +425,88 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     const unsubscribe = modal.subscribeModal((state) => {
       if (state.open) {
         didOpen = true;
+        this.debug("modal_open", "modal");
         return;
       }
       if (didOpen) {
+        this.debug("modal_close", "modal");
         rejectModalClose?.(new Error("WalletConnect modal closed"));
       }
     });
     await modal.openModal({ uri });
+    this.debug("modal_uri_ready", "modal", { uriLength: uri.length });
 
     try {
-      return await Promise.race([this.waitForApprovalOrRecoveredSession(client, network, approval, existingTopics), modalClosed]);
+      const approvalOrRecoveredSession = this.waitForApprovalOrRecoveredSession(client, network, approval, existingTopics, {
+        rejectOnApprovalError: !isMobile(),
+        pollIntervalMs: isMobile() ? 500 : 1000,
+        mode: "modal",
+        signal
+      });
+
+      if (isMobile()) {
+        // On iOS/Safari and in-app browsers the WalletConnect modal can close when the
+        // browser is backgrounded for a wallet deeplink. Keep listening for the session
+        // when the page returns instead of treating modal close as cancellation.
+        return await approvalOrRecoveredSession;
+      }
+
+      return await Promise.race([approvalOrRecoveredSession, modalClosed]);
     } finally {
+      this.debug("connect_modal_cleanup", "modal");
       unsubscribe();
       modal.closeModal();
       this.removeWalletConnectModalElements();
     }
   }
 
-  private async connectWithCustomQr(client: SignClient, network: XrplNetwork): Promise<SessionTypes.Struct> {
+  private async connectWithCustomQr(client: SignClient, network: XrplNetwork, signal?: AbortSignal): Promise<SessionTypes.Struct> {
     let connection = this.pendingConnection;
 
     if (!connection) {
       const existingTopics = this.getSessionTopics(client);
+      this.debug("connect_custom_start", "custom", { network: network.id, existingTopics: existingTopics.size });
       const result = await client.connect({
         requiredNamespaces: this.createRequiredNamespaces(network)
       });
+      this.throwIfAborted(signal);
       if (!result.uri) throw new Error("WalletConnect did not return a connection URI");
       connection = { uri: result.uri, approval: result.approval, existingTopics };
     }
 
+    this.throwIfAborted(signal);
     this.pendingConnection = undefined;
+    this.debug("custom_uri_ready", "custom", { uriLength: connection.uri.length });
     this.options.onQr?.({
       adapterId: this.metadata.id,
       uri: connection.uri,
       deeplink: this.options.deeplink?.(connection.uri)
     });
 
-    return this.waitForApprovalOrRecoveredSession(client, network, connection.approval, connection.existingTopics);
+    return this.waitForApprovalOrRecoveredSession(client, network, connection.approval, connection.existingTopics, {
+      rejectOnApprovalError: true,
+      pollIntervalMs: 1000,
+      mode: "custom",
+      signal
+    });
   }
 
   private waitForApprovalOrRecoveredSession(
     client: SignClient,
     network: XrplNetwork,
     approval: () => Promise<SessionTypes.Struct>,
-    existingTopics: Set<string>
+    existingTopics: Set<string>,
+    options: { rejectOnApprovalError: boolean; pollIntervalMs: number; mode: "modal" | "custom"; signal?: AbortSignal }
   ): Promise<SessionTypes.Struct> {
     return new Promise((resolve, reject) => {
       let settled = false;
       let timer: ReturnType<typeof setInterval> | undefined;
+      let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+      let checkCount = 0;
 
       const cleanup = () => {
         if (timer) clearInterval(timer);
+        if (timeoutTimer) clearTimeout(timeoutTimer);
         if (typeof window !== "undefined") {
           window.removeEventListener("focus", check);
           window.removeEventListener("pageshow", check);
@@ -395,18 +519,50 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
         cleanup();
         callback();
       };
+      const abort = () => settle(() => reject(new Error("WalletConnect connection was cancelled")));
       const check = () => {
+        if (options.signal?.aborted) {
+          abort();
+          return;
+        }
+        checkCount += 1;
+        const sessions = client.session.getAll();
         const recovered = this.findNewWalletConnectSession(client, network, existingTopics);
+        if (checkCount <= 12 || recovered) {
+          const xrplAccounts = sessions
+            .flatMap((session) => session.namespaces[XRPL_NAMESPACE]?.accounts ?? [])
+            .filter((account) => account.startsWith(`${network.walletConnectChainId}:`));
+          this.debug("session_poll", options.mode, {
+            checkCount,
+            sessions: sessions.length,
+            topics: sessions.map((session) => session.topic).slice(-5),
+            xrplAccounts: xrplAccounts.slice(-5),
+            existingTopics: existingTopics.size,
+            recovered: Boolean(recovered),
+            visibilityState: typeof document !== "undefined" ? document.visibilityState : undefined
+          });
+        }
         if (recovered) {
-          settle(() => resolve(recovered));
+          settle(() => {
+            this.debug("session_recovered", options.mode, { topic: recovered.topic, expiry: recovered.expiry });
+            resolve(recovered);
+          });
         }
       };
 
       approval()
-        .then((session) => settle(() => resolve(session)))
+        .then((session) => settle(() => {
+          this.debug("approval_resolved", options.mode, { topic: session.topic, expiry: session.expiry });
+          resolve(session);
+        }))
         .catch((error) => {
+          this.debug("approval_rejected", options.mode, {
+            message: error instanceof Error ? error.message : String(error),
+            rejectOnApprovalError: options.rejectOnApprovalError
+          });
           check();
           if (!settled) {
+            if (!options.rejectOnApprovalError) return;
             setTimeout(() => {
               check();
               if (!settled) settle(() => reject(error));
@@ -419,7 +575,17 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
         window.addEventListener("pageshow", check);
         document.addEventListener("visibilitychange", check);
       }
-      timer = setInterval(check, 1000);
+      options.signal?.addEventListener("abort", abort, { once: true });
+      timer = setInterval(check, options.pollIntervalMs);
+      timeoutTimer = setTimeout(() => {
+        check();
+        if (!settled) {
+          settle(() => {
+            this.debug("connection_timeout", options.mode, { checkCount });
+            reject(new Error("WalletConnect connection timed out. Please try again."));
+          });
+        }
+      }, this.options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS);
       check();
     });
   }
@@ -434,6 +600,31 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
       if (storedSession.expiry && storedSession.expiry * 1000 <= Date.now()) return false;
       return this.sessionHasNetworkAccount(storedSession, network);
     });
+  }
+
+  private debug(step: string, mode?: "modal" | "custom", detail?: Record<string, unknown>): void {
+    this.options.onDebug?.({
+      adapterId: this.metadata.id,
+      step,
+      mode,
+      detail
+    });
+  }
+
+  private throwIfAborted(signal?: AbortSignal): void {
+    if (signal?.aborted) throw new Error("WalletConnect connection was cancelled");
+  }
+
+  private combineSignals(first: AbortSignal, second: AbortSignal): AbortSignal {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (first.aborted || second.aborted) {
+      controller.abort();
+      return controller.signal;
+    }
+    first.addEventListener("abort", abort, { once: true });
+    second.addEventListener("abort", abort, { once: true });
+    return controller.signal;
   }
 
   private sessionHasNetworkAccount(session: SessionTypes.Struct, network: XrplNetwork): boolean {
@@ -572,7 +763,48 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     this.session = undefined;
     this.activeNetwork = undefined;
     this.pendingConnection = undefined;
+    this.connectPromise = undefined;
+    this.pendingAbortController = undefined;
     this.initializationPromise = undefined;
+    this.clearPendingRecoveryMarker();
+  }
+
+  private getPendingRecoveryKey(): string {
+    return `xwk.walletconnect.pending.${this.options.projectId}.${this.metadata.id}`;
+  }
+
+  private setPendingRecoveryMarker(): void {
+    if (!this.shouldRecoverWithoutStoredSession() || typeof window === "undefined") return;
+    try {
+      window.localStorage?.setItem(this.getPendingRecoveryKey(), String(Date.now()));
+    } catch {
+      // Storage can be restricted in embedded browsers.
+    }
+  }
+
+  private hasPendingRecoveryMarker(): boolean {
+    if (typeof window === "undefined") return false;
+    try {
+      const value = window.localStorage?.getItem(this.getPendingRecoveryKey());
+      if (!value) return false;
+      const timestamp = Number(value);
+      if (!Number.isFinite(timestamp) || Date.now() - timestamp > PENDING_RECOVERY_TTL_MS) {
+        this.clearPendingRecoveryMarker();
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private clearPendingRecoveryMarker(): void {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage?.removeItem(this.getPendingRecoveryKey());
+    } catch {
+      // Storage can be restricted in embedded browsers.
+    }
   }
 
   private requireNetwork(network?: XrplNetwork): XrplNetwork {
