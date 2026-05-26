@@ -11,7 +11,8 @@ import {
   getHttpRpcUrl,
   getNativeAsset,
   isMainnetNetwork,
-  isWalletKitError
+  isWalletKitError,
+  normalizeTxResult
 } from "../packages/core/src/index";
 
 const network = {
@@ -154,4 +155,16 @@ test("BaseWalletAdapter runs cleanup handlers once in reverse order", async () =
   await adapter.disconnect();
 
   assert.deepEqual(calls, ["second", "first"]);
+});
+
+test("normalizeTxResult preserves signed-only transaction results", () => {
+  const result = normalizeTxResult({
+    signed: true,
+    raw: {
+      txBlob: "ABC"
+    }
+  });
+
+  assert.equal(result.signed, true);
+  assert.equal(result.rejected, undefined);
 });

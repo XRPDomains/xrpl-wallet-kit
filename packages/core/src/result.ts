@@ -23,10 +23,13 @@ export function normalizeTxResult(raw: unknown): TxResult {
 
   const hash = pickPath(raw, ["hash", "txid", "tx_json.hash", "result.hash", "result.tx_json.hash", "response.data.resp.result.hash"]);
   const status = pickPath(raw, ["status", "result", "engine_result", "result.engine_result", "result.meta.TransactionResult", "response.data.resp.result.meta.TransactionResult"]);
+  const signed = pickPath(raw, ["signed"]);
+  const rejected = pickPath(raw, ["rejected"]);
   return {
     hash: typeof hash === "string" ? hash : undefined,
     status: typeof status === "string" ? status : undefined,
-    signed: status === "tesSUCCESS" || Boolean(hash),
+    signed: typeof signed === "boolean" ? signed : status === "tesSUCCESS" || Boolean(hash),
+    rejected: typeof rejected === "boolean" ? rejected : undefined,
     raw
   };
 }

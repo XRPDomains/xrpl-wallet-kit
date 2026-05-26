@@ -1,0 +1,3 @@
+display_name: XRPL Wallet Kit Adapter Developer
+short_description: Build or review XRPL Wallet Kit adapters from wallet provider docs.
+default_prompt: Implement or review a production-ready XRPL Wallet Kit adapter from the provided wallet API documentation, following the local adapter interface, capability rules, cleanup rules, and validation checklist.
