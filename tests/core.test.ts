@@ -6,13 +6,15 @@ import {
   WalletKitErrorCode,
   WalletManager,
   WALLET_STORAGE_VERSION,
+  assertWalletAdapter,
   createNetworkRegistry,
   getExplorerAccountUrl,
   getHttpRpcUrl,
   getNativeAsset,
   isMainnetNetwork,
   isWalletKitError,
-  normalizeTxResult
+  normalizeTxResult,
+  validateWalletAdapter
 } from "../packages/core/src/index";
 
 const network = {
@@ -47,6 +49,14 @@ class MockAdapter extends BaseWalletAdapter {
   async restoreSession(session: Awaited<ReturnType<WalletManager["connect"]>>) {
     this.restoreCalls += 1;
     return { account: session.account, session };
+  }
+
+  async signMessage() {
+    return { signature: "mock-signature" };
+  }
+
+  async signAndSubmit() {
+    return { hash: "mock-hash", status: "success" };
   }
 }
 
@@ -208,6 +218,36 @@ test("BaseWalletAdapter runs cleanup handlers once in reverse order", async () =
   await adapter.disconnect();
 
   assert.deepEqual(calls, ["second", "first"]);
+});
+
+test("validateWalletAdapter enforces the adapter contract", () => {
+  const valid = validateWalletAdapter(new MockAdapter());
+
+  assert.equal(valid.valid, true);
+
+  const invalid = validateWalletAdapter({
+    metadata: { id: "Bad Adapter", name: "", type: "extension" },
+    capabilities: { connect: false, signMessage: true },
+    connect: undefined as never,
+    recoverSession: async () => null
+  });
+
+  assert.equal(invalid.valid, false);
+  assert.ok(invalid.issues.some((issue) => issue.field === "metadata.id"));
+  assert.ok(invalid.issues.some((issue) => issue.field === "capabilities.connect"));
+  assert.ok(invalid.issues.some((issue) => issue.field === "signMessage"));
+  assert.ok(invalid.issues.some((issue) => issue.field === "canRecoverSession"));
+});
+
+test("assertWalletAdapter throws a typed invalid adapter error", () => {
+  assert.throws(
+    () => assertWalletAdapter({
+      metadata: { id: "invalid", name: "Invalid", type: "extension" },
+      capabilities: { connect: true, signAndSubmit: true },
+      connect: async () => ({ account: { address: "rInvalid" } })
+    }),
+    (error) => isWalletKitError(error) && error.code === WalletKitErrorCode.INVALID_ADAPTER
+  );
 });
 
 test("normalizeTxResult preserves signed-only transaction results", () => {

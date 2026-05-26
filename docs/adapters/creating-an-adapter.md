@@ -3,7 +3,7 @@
 ## Minimal shape
 
 ```ts
-import { BaseWalletAdapter, createWalletError } from "@xrpl-wallet-kit/core";
+import { BaseWalletAdapter, WALLET_ADAPTER_API_VERSION, createWalletError } from "@xrpl-wallet-kit/core";
 import type {
   ConnectOptions,
   ConnectResult,
@@ -15,6 +15,8 @@ import type {
 } from "@xrpl-wallet-kit/core";
 
 export class MyWalletAdapter extends BaseWalletAdapter {
+  adapterApiVersion = WALLET_ADAPTER_API_VERSION;
+
   metadata: WalletMetadata = {
     id: "mywallet",
     name: "My Wallet",
@@ -91,6 +93,18 @@ Important capabilities:
 - `payments`: payment flow is supported and tested.
 - `nftOffers`: NFT offer create/accept/cancel is supported and tested.
 - `qr` and `deeplink`: adapter emits URI/deeplink flows to the manager/UI.
+
+## Contract validation
+
+Run the shared contract validator in adapter tests:
+
+```ts
+import { assertWalletAdapter } from "@xrpl-wallet-kit/core";
+
+assertWalletAdapter(new MyWalletAdapter());
+```
+
+Use `validateWalletAdapter(adapter)` when you want a non-throwing result with warnings and errors. The validator checks stable metadata, capability/method consistency, required `connect()`, and safe recovery hook pairing.
 
 ## Error rules
 

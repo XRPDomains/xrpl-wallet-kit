@@ -1,4 +1,4 @@
-import { BaseWalletAdapter, createWalletError } from "@xrpl-wallet-kit/core";
+import { BaseWalletAdapter, WALLET_ADAPTER_API_VERSION, createWalletError } from "@xrpl-wallet-kit/core";
 import type {
   ConnectOptions,
   ConnectResult,
@@ -24,6 +24,7 @@ export interface MyWalletAdapterOptions {
 }
 
 export class MyWalletAdapter extends BaseWalletAdapter {
+  adapterApiVersion = WALLET_ADAPTER_API_VERSION;
   metadata: WalletMetadata;
   capabilities: WalletCapabilities = {
     connect: true,

@@ -26,6 +26,7 @@ If working inside this repository, inspect only the files needed for the task:
 - `packages/core/src/types.ts`
 - `packages/core/src/adapter.ts`
 - `packages/core/src/errors.ts`
+- `docs/adapters/adapter-contract.md`
 - a similar adapter under `packages/adapters/*/src/index.ts`
 - `docs/adapters/creating-an-adapter.md`
 - `docs/adapters/testing-checklist.md`
@@ -68,12 +69,28 @@ Every adapter must expose:
 - `connect(options)`: returns normalized `{ account, session?, raw? }`;
 - `isAvailable()`: detects provider availability without throwing for normal missing-provider cases.
 
+When available, set `adapterApiVersion = WALLET_ADAPTER_API_VERSION`.
+
 Optional methods:
 
 - `disconnect()` if provider supports cleanup/logout;
 - `restoreSession(session)` for `autoReconnect`;
 - `signMessage(request)` only if supported;
 - `signAndSubmit(request)` only if supported.
+- `canRecoverSession()` plus `recoverSession()` only for redirect/deeplink/session recovery flows.
+- `cancelPendingConnection()` when the adapter can leave pending proposals, popups, timers, or temporary markers.
+
+## Contract Validation
+
+Use the core validator in tests:
+
+```ts
+import { assertWalletAdapter } from "@xrpl-wallet-kit/core";
+
+assertWalletAdapter(adapter);
+```
+
+If reviewing a contribution, call `validateWalletAdapter(adapter)` and inspect warnings plus errors. Do not accept adapters that fail the validator unless the core contract itself is being intentionally changed.
 
 ## Capability Rules
 

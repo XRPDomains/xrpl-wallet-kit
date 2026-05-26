@@ -8,6 +8,7 @@ export enum WalletKitErrorCode {
   SIGN_REJECTED = "SIGN_REJECTED",
   REQUEST_TIMEOUT = "REQUEST_TIMEOUT",
   UNSUPPORTED_METHOD = "UNSUPPORTED_METHOD",
+  INVALID_ADAPTER = "INVALID_ADAPTER",
   NETWORK_MISMATCH = "NETWORK_MISMATCH",
   NOT_CONNECTED = "NOT_CONNECTED",
   ALREADY_CONNECTED = "ALREADY_CONNECTED",
@@ -87,6 +88,11 @@ export const createWalletError = {
     WalletKitErrorCode.UNSUPPORTED_METHOD,
     walletName ? `${method} is not supported by ${walletName}` : `${method} is not supported`,
     { details: { method, walletName } }
+  ),
+  invalidAdapter: (adapterId: string, issues: string[]) => new WalletKitError(
+    WalletKitErrorCode.INVALID_ADAPTER,
+    `Wallet adapter is invalid: ${adapterId}`,
+    { details: { adapterId, issues } }
   ),
   notConnected: () => new WalletKitError(
     WalletKitErrorCode.NOT_CONNECTED,

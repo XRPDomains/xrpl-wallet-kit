@@ -5,7 +5,16 @@
 - [ ] `npm.cmd run typecheck`
 - [ ] `npm.cmd test`
 - [ ] `npm.cmd run build:browser`
+- [ ] Adapter passes `assertWalletAdapter(adapter)`.
 - [ ] Fresh consumer TypeScript import resolves package types.
+
+## Contract v1
+
+- [ ] `adapterApiVersion` is omitted or compatible with `1.x`.
+- [ ] `metadata.id` is stable lowercase and unique.
+- [ ] `metadata.name`, `metadata.type`, and `capabilities.connect` are valid.
+- [ ] Enabled capabilities have matching implemented methods.
+- [ ] `recoverSession()` is implemented only with `canRecoverSession()`.
 
 ## Connect flow
 

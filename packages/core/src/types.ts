@@ -106,6 +106,7 @@ export interface ConnectResult {
 }
 
 export interface WalletAdapter {
+  adapterApiVersion?: string;
   metadata: WalletMetadata;
   capabilities: WalletCapabilities;
   isAvailable?: () => boolean | Promise<boolean>;

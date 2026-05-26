@@ -2,6 +2,7 @@
 
 ## Metadata
 
+- Adapter either omits `adapterApiVersion` or declares a compatible `1.x` version.
 - `id` is lowercase, stable, unique, and has no spaces.
 - `name` matches wallet branding.
 - `type` is one of: `mobile`, `extension`, `walletconnect`, `snap`, `hardware`, `embedded`.
@@ -38,8 +39,8 @@
 
 ## Validation
 
+- `assertWalletAdapter(adapter)` passes.
 - Typecheck passes.
 - Tests pass.
 - Browser bundle builds if the adapter is included in browser/all-in-one flows.
 - Manual smoke tests cover missing provider, installed provider, connect, reject, disconnect, and signing capabilities.
-

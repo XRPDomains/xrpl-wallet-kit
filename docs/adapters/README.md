@@ -40,6 +40,12 @@ Third-party IDs should be short and unique, for example `mywallet`.
 
 Use the template in `docs/adapters/templates/adapter-package` as a starting point. Copy it into `packages/adapters/<wallet-id>` when adding an official package to this monorepo.
 
+## Stable contract
+
+Read `adapter-contract.md` before implementing a third-party adapter. It defines Wallet Adapter Contract v1, including required fields, optional recovery hooks, capability rules, and validation helpers.
+
+At minimum, every adapter package should run `assertWalletAdapter(adapter)` in its own tests before doing provider-specific smoke tests.
+
 ## Required validation
 
 Before opening a PR or shipping a new adapter, run:
