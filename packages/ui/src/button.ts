@@ -187,9 +187,30 @@ export class WalletButtonController {
   }
 
   private handleDocumentKeyDown(event: KeyboardEvent): void {
-    if (!this.panelOpen || event.key !== "Escape") return;
-    this.panelOpen = false;
-    this.render();
+    if (!this.panelOpen) return;
+    if (event.key === "Escape") {
+      this.panelOpen = false;
+      this.render();
+      return;
+    }
+    if (event.key !== "Tab" || this.options.accountPanelMode !== "modal") return;
+    const focusable = this.getAccountPanelFocusableElements();
+    if (!focusable.length) {
+      event.preventDefault();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+    if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   private syncPanelListeners(): void {
@@ -198,6 +219,11 @@ export class WalletButtonController {
     if (!this.panelOpen) return;
     document.addEventListener("pointerdown", this.onDocumentPointerDown);
     document.addEventListener("keydown", this.onDocumentKeyDown);
+    if (this.options.accountPanelMode === "modal") {
+      window.setTimeout(() => {
+        this.target?.querySelector<HTMLElement>(".xwk-account-panel-modal")?.focus({ preventScroll: true });
+      }, 0);
+    }
   }
 
   private removePanelListeners(): void {
@@ -359,7 +385,7 @@ export class WalletButtonController {
     if (!session) return "";
     const content = this.renderPanelContent(session);
     if (this.options.accountPanelMode === "modal") {
-      return `<div class="xwk-account-overlay" data-xwk-account-overlay role="presentation"><section class="xwk-account-panel xwk-account-panel-modal" role="dialog" aria-modal="true" aria-label="Connected account"><div class="xwk-account-modal-header"><span></span><h2>Connected</h2><button class="xwk-account-close" type="button" data-xwk-account-close aria-label="Close">&times;</button></div><div class="xwk-account-modal-body">${content}</div></section></div>`;
+      return `<div class="xwk-account-overlay" data-xwk-account-overlay role="presentation"><section class="xwk-account-panel xwk-account-panel-modal" role="dialog" aria-modal="true" aria-label="Connected account" tabindex="-1"><div class="xwk-account-modal-header"><span></span><h2>Connected</h2><button class="xwk-account-close" type="button" data-xwk-account-close aria-label="Close">&times;</button></div><div class="xwk-account-modal-body">${content}</div></section></div>`;
     }
 
     return `<div class="xwk-account-panel xwk-account-panel-dropdown" role="dialog" aria-label="Connected account">${content}</div>`;
@@ -424,6 +450,21 @@ export class WalletButtonController {
     if (!wallet) return `<span class="xwk-button-icon xwk-button-icon-fallback">${this.walletIcon()}</span>`;
     const label = wallet.name.slice(0, 1).toUpperCase();
     return `<span class="xwk-button-icon xwk-button-icon-fallback">${this.escapeHtml(label)}</span>`;
+  }
+
+  private getAccountPanelFocusableElements(): HTMLElement[] {
+    const panel = this.target?.querySelector<HTMLElement>(".xwk-account-panel-modal");
+    if (!panel) return [];
+    const selectors = [
+      "button:not([disabled])",
+      "a[href]",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "[tabindex]:not([tabindex='-1'])"
+    ].join(",");
+    return Array.from(panel.querySelectorAll<HTMLElement>(selectors))
+      .filter((element) => element.offsetParent !== null);
   }
 
   private walletIcon(): string {

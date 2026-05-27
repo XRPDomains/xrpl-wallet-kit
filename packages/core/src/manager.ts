@@ -2,14 +2,15 @@ import { createWalletError, isWalletKitError, normalizeWalletError } from "./err
 import { WalletEventEmitter } from "./events";
 import { createWalletKitLogger } from "./logger";
 import type { WalletKitLogger } from "./logger";
-import { DEFAULT_XRPL_NETWORKS, createNetworkRegistry } from "./networks";
-import { normalizeTxResult } from "./result";
+import { DEFAULT_XRPL_NETWORKS, createNetworkRegistry, getHttpRpcUrl } from "./networks";
+import { normalizeTxResult, pickPath } from "./result";
 import { MemoryWalletStorage } from "./storage";
-import type { ConnectOptions, SignAndSubmitRequest, SignMessageRequest, StoredWalletSessionEnvelope, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletCapabilities, WalletManagerConfig, WalletNetwork, WalletSession, WalletStorage } from "./types";
+import type { ConnectOptions, SignAndSubmitRequest, SignMessageRequest, SignTransactionRequest, SignTransactionResult, StoredWalletSessionEnvelope, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletCapabilities, WalletManagerConfig, WalletNetwork, WalletSession, WalletStorage } from "./types";
 
 const SESSION_KEY = "session";
 export const WALLET_STORAGE_VERSION = 1;
 const RECOVER_SESSION_RETRY_DELAYS_MS = [0, 700, 1600, 3000];
+const DEFAULT_ACCOUNT_STATUS_TIMEOUT_MS = 2500;
 
 export class WalletManager extends WalletEventEmitter {
   readonly adapters = new Map<string, WalletAdapter>();
@@ -54,6 +55,20 @@ export class WalletManager extends WalletEventEmitter {
     }));
 
     return Object.fromEntries(entries);
+  }
+
+  async getAvailableWallets(): Promise<WalletAdapter[]> {
+    const results = await Promise.all([...this.adapters.values()].map(async (adapter) => {
+      if (!adapter.isAvailable) return null;
+      try {
+        return await adapter.isAvailable() ? adapter : null;
+      } catch (error) {
+        this.logger.warn(`Availability check failed for ${adapter.metadata.id}`, error);
+        return null;
+      }
+    }));
+
+    return results.filter((adapter): adapter is WalletAdapter => Boolean(adapter));
   }
 
   getAdapter(adapterId?: string): WalletAdapter | undefined {
@@ -111,7 +126,7 @@ export class WalletManager extends WalletEventEmitter {
           this.emit("session_stale", { adapterId: session.adapterId, account: session.account, session, reason: "restore_unavailable" });
           return null;
         }
-        const enrichedSession = this.withWalletMetadata(restored.session, adapter);
+        const enrichedSession = await this.enrichSession(this.withWalletMetadata(restored.session, adapter));
         this.setSession(enrichedSession);
         this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
         return enrichedSession;
@@ -122,7 +137,7 @@ export class WalletManager extends WalletEventEmitter {
         return null;
       }
 
-      const enrichedSession = this.withWalletMetadata(session, adapter);
+      const enrichedSession = await this.enrichSession(this.withWalletMetadata(session, adapter));
       this.setSession(enrichedSession);
       this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession, stale: true });
       return enrichedSession;
@@ -160,7 +175,7 @@ export class WalletManager extends WalletEventEmitter {
           }
           const recovered = await adapter.recoverSession?.({ network, walletId: adapter.metadata.id });
           if (!recovered?.session) continue;
-          const enrichedSession = this.withWalletMetadata(recovered.session, adapter);
+          const enrichedSession = await this.enrichSession(this.withWalletMetadata(recovered.session, adapter));
           this.setSession(enrichedSession);
           await this.saveSession(enrichedSession);
           this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
@@ -201,7 +216,7 @@ export class WalletManager extends WalletEventEmitter {
       if (signal.aborted || this.pendingAdapterId !== adapterId) {
         throw new Error("Wallet connection was cancelled");
       }
-      const session = this.withWalletMetadata(result.session ?? { adapterId, account: { ...result.account, network }, connectedAt: Date.now() }, adapter);
+      const session = await this.enrichSession(this.withWalletMetadata(result.session ?? { adapterId, account: { ...result.account, network }, connectedAt: Date.now() }, adapter));
       this.setSession(session);
       await this.saveSession(session);
       this.emit("connected", { adapterId, account: session.account, session });
@@ -294,6 +309,58 @@ export class WalletManager extends WalletEventEmitter {
     }
   }
 
+  async signTransaction(request: SignTransactionRequest): Promise<SignTransactionResult> {
+    const adapter = this.getAdapter();
+    if (!adapter) throw createWalletError.notConnected();
+    if (typeof adapter.signTransaction !== "function" && typeof adapter.signAndSubmit !== "function") {
+      throw createWalletError.unsupportedMethod("signTransaction", adapter.metadata.name);
+    }
+
+    try {
+      this.emit("signing", { adapterId: adapter.metadata.id, kind: "transaction" });
+      const raw = typeof adapter.signTransaction === "function"
+        ? await adapter.signTransaction(request)
+        : await adapter.signAndSubmit!({ ...request, submit: false });
+      const result = normalizeSignTransactionResult(raw);
+      this.emit("signed", { adapterId: adapter.metadata.id, kind: "transaction", result });
+      return result;
+    } catch (error) {
+      const normalized = normalizeWalletError(error);
+      this.emit("rejected", { adapterId: adapter.metadata.id, kind: "transaction", error: normalized });
+      throw normalized;
+    }
+  }
+
+  emitAccountChanged(adapterId: string, account: WalletAccount): void {
+    const previousAccount = this.activeSession?.account;
+    if (this.activeSession?.adapterId === adapterId) {
+      this.activeSession = {
+        ...this.activeSession,
+        account: {
+          ...this.activeSession.account,
+          ...account
+        }
+      };
+      void this.saveSession(this.activeSession);
+    }
+    this.emit("accountChanged", { adapterId, account, previousAccount });
+  }
+
+  emitNetworkChanged(adapterId: string, network?: WalletNetwork): void {
+    const previousNetwork = this.activeSession?.account.network;
+    if (this.activeSession?.adapterId === adapterId) {
+      this.activeSession = {
+        ...this.activeSession,
+        account: {
+          ...this.activeSession.account,
+          network
+        }
+      };
+      void this.saveSession(this.activeSession);
+    }
+    this.emit("networkChanged", { adapterId, network, previousNetwork });
+  }
+
   emitQr(adapterId: string, uri: string, deeplink?: string): void {
     this.emit("qr", { adapterId, uri, deeplink });
   }
@@ -317,6 +384,52 @@ export class WalletManager extends WalletEventEmitter {
         network: session.account.network ?? this.getNetwork()
       }
     };
+  }
+
+  private async enrichSession(session: WalletSession): Promise<WalletSession> {
+    const account = await this.resolveActivationStatus(session.account);
+    return {
+      ...session,
+      account
+    };
+  }
+
+  private async resolveActivationStatus(account: WalletAccount): Promise<WalletAccount> {
+    if (this.config.accountStatus?.enabled === false || account.activationStatus) return account;
+    const rpcUrl = account.network?.httpRpcUrl ? getHttpRpcUrl(account.network) : undefined;
+    if (!rpcUrl || typeof fetch !== "function") return account;
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const controller = typeof AbortController !== "undefined" ? new AbortController() : undefined;
+      if (controller) {
+        timer = setTimeout(() => controller.abort(), this.config.accountStatus?.timeoutMs ?? DEFAULT_ACCOUNT_STATUS_TIMEOUT_MS);
+      }
+      const response = await fetch(rpcUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          method: "account_info",
+          params: [{ account: account.address, ledger_index: "current" }]
+        }),
+        signal: controller?.signal
+      });
+      if (timer) clearTimeout(timer);
+      const body = await response.json() as {
+        result?: {
+          account_data?: unknown;
+          error?: string;
+        };
+      };
+      if (body.result?.account_data) return { ...account, activationStatus: "active" };
+      if (body.result?.error === "actNotFound") return { ...account, activationStatus: "unfunded" };
+      return { ...account, activationStatus: "unknown" };
+    } catch (error) {
+      this.logger.debug("Account activation status lookup failed", error);
+      return { ...account, activationStatus: "unknown" };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   private requireAdapter(adapterId: string): WalletAdapter {
@@ -392,5 +505,28 @@ export class WalletManager extends WalletEventEmitter {
     }
     return createWalletError.connectionFailed(adapter.metadata.name, error);
   }
+}
+
+function normalizeSignTransactionResult(raw: unknown): SignTransactionResult {
+  const txBlob = pickPath(raw, [
+    "txBlob",
+    "tx_blob",
+    "result.txBlob",
+    "result.tx_blob",
+    "response.txBlob",
+    "response.tx_blob",
+    "raw.txBlob",
+    "raw.tx_blob",
+    "tx_json",
+    "result.tx_json"
+  ]);
+  const signed = pickPath(raw, ["signed", "result.signed"]);
+  const rejected = pickPath(raw, ["rejected", "result.rejected"]);
+  return {
+    txBlob: typeof txBlob === "string" ? txBlob : undefined,
+    signed: typeof signed === "boolean" ? signed : Boolean(txBlob),
+    rejected: typeof rejected === "boolean" ? rejected : undefined,
+    raw
+  };
 }
 

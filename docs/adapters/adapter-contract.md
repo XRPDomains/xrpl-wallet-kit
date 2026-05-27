@@ -36,6 +36,7 @@ interface WalletAdapter {
   cancelPendingConnection?: () => void | Promise<void>;
 
   signMessage?: (request: SignMessageRequest) => Promise<SignMessageResult>;
+  signTransaction?: (request: SignTransactionRequest) => Promise<SignTransactionResult>;
   signAndSubmit?: (request: SignAndSubmitRequest) => Promise<TxResult>;
 }
 ```
@@ -62,6 +63,7 @@ Capabilities must describe implemented behavior, not planned behavior.
 
 - `disconnect: true` requires `disconnect()`.
 - `signMessage: true` requires `signMessage()`.
+- `signTransaction: true` requires `signTransaction()` and must sign without submitting to the network.
 - `signAndSubmit: true` requires `signAndSubmit()`.
 - `payments` and `nftOffers` should be enabled only after real wallet testing.
 - `qr` and `deeplink` should be enabled only when the adapter can emit or produce usable QR/deeplink data.

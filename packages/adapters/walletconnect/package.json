@@ -1,6 +1,8 @@
 {
   "name": "@xrpl-wallet-kit/adapter-walletconnect",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.0",
+  "description": "WalletConnect adapter for XRPL Wallet Kit, including supported XRPL wallet profiles.",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -10,14 +12,38 @@
       "import": "./dist/index.js"
     }
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
   "dependencies": {
-    "@xrpl-wallet-kit/core": "0.1.0",
+    "@xrpl-wallet-kit/core": "0.1.0-beta.0",
     "@walletconnect/modal": "^2.7.0",
     "@walletconnect/sign-client": "^2.23.9",
     "@walletconnect/types": "^2.23.9",
     "@walletconnect/utils": "^2.23.9"
   },
-  "scripts": {
-    "build": "tsc -p tsconfig.json"
-  }
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XRPDomains/xrpl-wallet-kit.git"
+  },
+  "homepage": "https://github.com/XRPDomains/xrpl-wallet-kit#readme",
+  "bugs": {
+    "url": "https://github.com/XRPDomains/xrpl-wallet-kit/issues"
+  },
+  "keywords": [
+    "xrpl",
+    "wallet",
+    "wallet-adapter",
+    "wallet-kit",
+    "xrp-ledger",
+    "web3",
+    "adapter"
+  ]
 }

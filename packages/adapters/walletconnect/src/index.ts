@@ -10,6 +10,7 @@ import type {
   ConnectResult,
   SignAndSubmitRequest,
   SignMessageRequest,
+  SignTransactionRequest,
   WalletAdapter,
   WalletCapabilities,
   WalletMetadata,
@@ -109,6 +110,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
       connect: true,
       disconnect: true,
       signMessage: options.signMessage ?? true,
+      signTransaction: true,
       signAndSubmit: true,
       qr: !(options.useModal && (options.modalMode ?? "mobile-only") === "always"),
       deeplink: true,
@@ -295,6 +297,22 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     const result = await this.requestSignTransaction(network, request.txJson, request.submit ?? true);
 
     return normalizeTxResult((result as { tx_json?: unknown }).tx_json ?? result);
+  }
+
+  async signTransaction(request: SignTransactionRequest) {
+    if (!this.client || !this.session) {
+      throw new Error("WalletConnect session not found");
+    }
+
+    const network = this.requireNetwork(this.activeNetwork);
+    const result = await this.requestSignTransaction(network, request.txJson, false);
+    const txBlob = pickPath(result, ["tx_blob", "txBlob", "result.tx_blob", "result.txBlob", "tx_json", "result.tx_json"]);
+
+    return {
+      txBlob: typeof txBlob === "string" ? txBlob : undefined,
+      signed: true,
+      raw: result
+    };
   }
 
   async signMessage(request: SignMessageRequest) {

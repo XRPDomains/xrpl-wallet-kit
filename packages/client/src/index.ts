@@ -118,6 +118,7 @@ export function createWalletKit(options: CreateWalletKitOptions) {
     refreshAccount: () => button?.refreshAccount(),
     getSession: () => manager.getSession(),
     signAndSubmit: manager.signAndSubmit.bind(manager),
+    signTransaction: manager.signTransaction.bind(manager),
     signMessage: manager.signMessage.bind(manager)
   };
 }

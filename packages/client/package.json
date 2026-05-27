@@ -1,1 +1,52 @@
-{"name":"@xrpl-wallet-kit/client","version":"0.1.0","type":"module","main":"./dist/index.js","types":"./dist/index.d.ts","exports":{".":{"types":"./dist/index.d.ts","import":"./dist/index.js"}},"dependencies":{"@xrpl-wallet-kit/core":"0.1.0","@xrpl-wallet-kit/adapter-crossmark":"0.1.0","@xrpl-wallet-kit/adapter-dropfi":"0.1.0","@xrpl-wallet-kit/adapter-gemwallet":"0.1.0","@xrpl-wallet-kit/adapter-ledger":"0.1.0","@xrpl-wallet-kit/adapter-walletconnect":"0.1.0","@xrpl-wallet-kit/adapter-xaman":"0.1.0","@xrpl-wallet-kit/adapter-xrpl-snap":"0.1.0","@xrpl-wallet-kit/ui":"0.1.0"},"scripts":{"build":"tsc -p tsconfig.json"}}
+{
+  "name": "@xrpl-wallet-kit/client",
+  "version": "0.1.0-beta.0",
+  "description": "All-in-one XRPL Wallet Kit client with core, UI, and first-party adapters.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@xrpl-wallet-kit/core": "0.1.0-beta.0",
+    "@xrpl-wallet-kit/adapter-crossmark": "0.1.0-beta.0",
+    "@xrpl-wallet-kit/adapter-dropfi": "0.1.0-beta.0",
+    "@xrpl-wallet-kit/adapter-gemwallet": "0.1.0-beta.0",
+    "@xrpl-wallet-kit/adapter-ledger": "0.1.0-beta.0",
+    "@xrpl-wallet-kit/adapter-walletconnect": "0.1.0-beta.0",
+    "@xrpl-wallet-kit/adapter-xaman": "0.1.0-beta.0",
+    "@xrpl-wallet-kit/adapter-xrpl-snap": "0.1.0-beta.0",
+    "@xrpl-wallet-kit/ui": "0.1.0-beta.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XRPDomains/xrpl-wallet-kit.git"
+  },
+  "homepage": "https://github.com/XRPDomains/xrpl-wallet-kit#readme",
+  "bugs": {
+    "url": "https://github.com/XRPDomains/xrpl-wallet-kit/issues"
+  },
+  "keywords": [
+    "xrpl",
+    "wallet",
+    "wallet-adapter",
+    "wallet-kit",
+    "xrp-ledger",
+    "web3"
+  ]
+}

@@ -1,6 +1,8 @@
 {
   "name": "@xrpl-wallet-kit/browser",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.0",
+  "description": "Browser-ready XRPL Wallet Kit bundle for vanilla JavaScript and legacy HTML sites.",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/xrpl-wallet-kit.iife.js",
   "types": "./dist/index.d.ts",
@@ -15,17 +17,37 @@
     "./legacy-bridge": "./dist/xrpl-wallet-kit-legacy-bridge.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "vite build --mode readable && vite build --mode minified && tsc -p tsconfig.json --emitDeclarationOnly"
   },
   "dependencies": {
-    "@xrpl-wallet-kit/client": "0.1.0",
+    "@xrpl-wallet-kit/client": "0.1.0-beta.0",
     "buffer": "^6.0.3"
   },
   "devDependencies": {
     "vite": "^5.4.0",
     "typescript": "^5.5.4"
-  }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XRPDomains/xrpl-wallet-kit.git"
+  },
+  "homepage": "https://github.com/XRPDomains/xrpl-wallet-kit#readme",
+  "bugs": {
+    "url": "https://github.com/XRPDomains/xrpl-wallet-kit/issues"
+  },
+  "keywords": [
+    "xrpl",
+    "wallet",
+    "wallet-adapter",
+    "wallet-kit",
+    "xrp-ledger",
+    "web3"
+  ]
 }

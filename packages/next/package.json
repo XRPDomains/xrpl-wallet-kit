@@ -1,1 +1,49 @@
-{"name":"@xrpl-wallet-kit/next","version":"0.1.0","type":"module","main":"./dist/index.js","types":"./dist/index.d.ts","exports":{".":{"types":"./dist/index.d.ts","import":"./dist/index.js"}},"dependencies":{"@xrpl-wallet-kit/core":"0.1.0","@xrpl-wallet-kit/react":"0.1.0"},"peerDependencies":{"next":">=14","react":">=18"},"scripts":{"build":"tsc -p tsconfig.json"}}
+{
+  "name": "@xrpl-wallet-kit/next",
+  "version": "0.1.0-beta.0",
+  "description": "Next.js helpers for XRPL Wallet Kit.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@xrpl-wallet-kit/core": "0.1.0-beta.0",
+    "@xrpl-wallet-kit/react": "0.1.0-beta.0"
+  },
+  "peerDependencies": {
+    "next": ">=14",
+    "react": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XRPDomains/xrpl-wallet-kit.git"
+  },
+  "homepage": "https://github.com/XRPDomains/xrpl-wallet-kit#readme",
+  "bugs": {
+    "url": "https://github.com/XRPDomains/xrpl-wallet-kit/issues"
+  },
+  "keywords": [
+    "xrpl",
+    "wallet",
+    "wallet-adapter",
+    "wallet-kit",
+    "xrp-ledger",
+    "web3"
+  ]
+}

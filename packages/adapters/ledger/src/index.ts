@@ -7,6 +7,8 @@ import type {
   ConnectOptions,
   ConnectResult,
   SignAndSubmitRequest,
+  SignTransactionRequest,
+  SignTransactionResult,
   TxResult,
   WalletCapabilities,
   WalletMetadata,
@@ -72,6 +74,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
   capabilities: WalletCapabilities = {
     connect: true,
     disconnect: true,
+    signTransaction: true,
     signAndSubmit: true
   };
 
@@ -156,6 +159,20 @@ export class LedgerAdapter extends BaseWalletAdapter {
           txBlob: result.txBlob,
           ...asRecord(result.raw ?? result)
         }
+      };
+    } catch (error) {
+      throw this.mapSigningError(error);
+    }
+  }
+
+  async signTransaction(request: SignTransactionRequest): Promise<SignTransactionResult> {
+    if (!this.session) throw createWalletError.notConnected();
+    try {
+      const result = await this.session.signTransaction(request.txJson, false);
+      return {
+        txBlob: result.txBlob,
+        signed: result.signed ?? Boolean(result.txBlob),
+        raw: result.raw ?? result
       };
     } catch (error) {
       throw this.mapSigningError(error);

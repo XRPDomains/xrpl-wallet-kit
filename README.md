@@ -1,149 +1,140 @@
 # XRPL Wallet Kit
 
-Framework-agnostic wallet adapter toolkit for XRPL apps.
+Framework-agnostic wallet adapter toolkit for XRPL applications.
 
-XRPL Wallet Kit provides a headless core, wallet adapters, and optional prebuilt UI for browser-based XRPL dApps. It is designed to work with plain HTML, React, Next.js, and custom application shells while keeping wallet logic separate from product-specific business logic.
+XRPL Wallet Kit provides a headless core, wallet adapters, a prebuilt wallet UI, React helpers, and a browser bundle for legacy HTML sites. It is designed for dApps that need wallet connection, account state, signing, payment, NFT, identity, and WalletConnect flows without coupling wallet logic to a specific business app.
 
 ## Packages
 
-Core packages:
+Core and UI:
 
 - `@xrpl-wallet-kit/core`
 - `@xrpl-wallet-kit/ui`
+- `@xrpl-wallet-kit/client`
+- `@xrpl-wallet-kit/browser`
 - `@xrpl-wallet-kit/react`
 - `@xrpl-wallet-kit/next`
-- `@xrpl-wallet-kit/client`
 
-Wallet adapters:
+Adapters:
 
 - `@xrpl-wallet-kit/adapter-xaman`
 - `@xrpl-wallet-kit/adapter-gemwallet`
 - `@xrpl-wallet-kit/adapter-crossmark`
-- `@xrpl-wallet-kit/adapter-walletconnect`
 - `@xrpl-wallet-kit/adapter-dropfi`
+- `@xrpl-wallet-kit/adapter-walletconnect`
 - `@xrpl-wallet-kit/adapter-xrpl-snap`
 - `@xrpl-wallet-kit/adapter-ledger`
 
-`@xrpl-wallet-kit/client` is the convenience package for apps that want one import surface. Apps that care about bundle size can install only the core, UI, and adapters they need.
+## Install
 
-## Design Goals
+```bash
+npm install @xrpl-wallet-kit/client@beta
+```
 
-- Headless core with no UI or application dependency.
-- Adapter-based architecture for wallet-specific behavior.
-- Optional prebuilt UI with list, icon, and card layouts.
-- WalletConnect support with default, list, and grouped UX strategies.
-- Event-driven connection, QR, signing, rejection, and error flows.
-- Session and storage management with optional auto-reconnect.
-- Mainnet, testnet, devnet, and custom XRPL network support.
-- No private keys, seeds, or application secrets in SDK code.
+For React:
+
+```bash
+npm install @xrpl-wallet-kit/client@beta @xrpl-wallet-kit/react@beta
+```
+
+For plain HTML or legacy jQuery sites:
+
+```bash
+npm install @xrpl-wallet-kit/browser@beta
+```
 
 ## Quick Start
 
 ```ts
-import {
-  WalletManager,
-  createBrowserWalletStorage,
-  createWalletModal,
-  createGemWalletAdapter,
-  createCrossmarkAdapter,
-  createWalletConnectAdapters
-} from "@xrpl-wallet-kit/client";
+import { createWalletKit } from "@xrpl-wallet-kit/client";
 
-const manager = new WalletManager({
+const kit = createWalletKit({
   appName: "My XRPL App",
   network: "mainnet",
-  autoReconnect: true,
-  storage: createBrowserWalletStorage("my-app.wallet."),
-  adapters: [
-    createGemWalletAdapter(),
-    createCrossmarkAdapter(),
-    ...createWalletConnectAdapters({
-      projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-      mode: "details",
-      wallets: "all"
-    })
-  ]
+  autoConnect: true,
+  walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
+  ui: {
+    themeMode: "light",
+    layout: "list",
+    walletConnectMode: "group",
+    showWeb3Name: true,
+    showBalance: true
+  }
 });
 
-const modal = createWalletModal({
-  manager,
-  layout: "list",
-  themeMode: "light"
-});
-
-document.querySelector("#connect")?.addEventListener("click", () => {
-  modal.open();
-});
+kit.button.mount("#connect-wallet");
 ```
 
-## WalletConnect UX
+## Browser Bundle
 
-WalletConnect can be integrated in three common ways:
+Use the IIFE bundle when an app cannot use a build step.
 
-- `default`: show one WalletConnect item and let the official WalletConnect modal handle wallet selection and QR rendering.
+```html
+<div id="connect-wallet"></div>
+<script src="/vendor/xrpl-wallet-kit.iife.min.js"></script>
+<script>
+  const kit = window.XRPLWalletKit.createWalletKit({
+    appName: "My XRPL App",
+    network: "mainnet",
+    autoConnect: true,
+    walletConnectProjectId: "YOUR_PROJECT_ID",
+    ui: {
+      accountPanelMode: "modal",
+      showWeb3Name: true,
+      showBalance: true
+    }
+  });
+
+  kit.button.mount("#connect-wallet");
+</script>
+```
+
+## React Usage
+
+```tsx
+import { createWalletKit } from "@xrpl-wallet-kit/client";
+import { WalletKitProvider, WalletButton } from "@xrpl-wallet-kit/react";
+
+const kit = createWalletKit({
+  appName: "My XRPL App",
+  network: "mainnet",
+  walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
+  autoConnect: true
+});
+
+export function App() {
+  return (
+    <WalletKitProvider manager={kit.manager}>
+      <WalletButton />
+    </WalletKitProvider>
+  );
+}
+```
+
+## WalletConnect Modes
+
+- `default`: one WalletConnect entry, using the official WalletConnect modal.
 - `list`: show supported WalletConnect wallets as normal wallet items.
-- `group`: show one WalletConnect item, then drill into the supported WalletConnect wallets.
+- `group`: show one WalletConnect entry, then let users choose a supported wallet.
 
-Adapter creation is controlled by `createWalletConnectAdapters()`:
-
-```ts
-createWalletConnectAdapters({
-  projectId,
-  mode: "default"
-});
-
-createWalletConnectAdapters({
-  projectId,
-  mode: "details",
-  wallets: "all"
-});
-```
-
-The preview app maps this into `WalletConnect mode`: `default`, `list`, and `group`.
-
-## Session Data
-
-Connected sessions include both account data and wallet display metadata:
-
-```ts
-const session = manager.getSession();
-
-console.log(session?.account.address);
-console.log(session?.wallet?.name);
-console.log(session?.wallet?.icon);
-```
-
-The `session.metadata` field is reserved for adapter/session technical data such as WalletConnect topics.
-
-## Local Preview
-
-Copy `.env.example` to `.env.local` and set:
+## Environment
 
 ```env
 VITE_WALLETCONNECT_PROJECT_ID=
 VITE_XAMAN_CLIENT_ID=
 ```
 
-Run:
-
-```powershell
-npm.cmd install
-npm.cmd run dev:vanilla
-```
-
-Open:
-
-```text
-http://127.0.0.1:5173/
-```
+`WalletConnect projectId` must be provided by the integrating app. No private key, seed, or wallet secret belongs in the SDK or frontend config.
 
 ## Development
 
 ```powershell
+npm.cmd install
 npm.cmd run typecheck
-npm.cmd run build
+npm.cmd test
+npm.cmd run build:browser
 ```
 
 ## Status
 
-This repository is in early development. Package names and APIs may change before the first public npm release.
+`0.1.0-beta.0` is the first public beta target. APIs are intended to be stable enough for integration testing, but may still change before `1.0.0`.

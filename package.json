@@ -1,8 +1,9 @@
 {
   "name": "xrpl-wallet-kit-workspace",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.0-beta.0",
   "description": "Framework-agnostic XRPL Wallet Adapter / Wallet Kit monorepo.",
+  "license": "MIT",
   "type": "module",
   "workspaces": [
     "packages/*",
@@ -41,5 +42,21 @@
     "vite": "^5.4.0",
     "xumm": "^1.8.0",
     "xumm-oauth2-pkce": "^2.8.7"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XRPDomains/xrpl-wallet-kit.git"
+  },
+  "homepage": "https://github.com/XRPDomains/xrpl-wallet-kit#readme",
+  "bugs": {
+    "url": "https://github.com/XRPDomains/xrpl-wallet-kit/issues"
+  },
+  "keywords": [
+    "xrpl",
+    "wallet",
+    "wallet-adapter",
+    "wallet-kit",
+    "xrp-ledger",
+    "web3"
+  ]
 }

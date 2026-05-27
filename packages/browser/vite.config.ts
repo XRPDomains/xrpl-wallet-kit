@@ -53,7 +53,7 @@ export default defineConfig(({ mode }) => {
       outDir: "dist",
       emptyOutDir: !minified,
       minify: minified ? "esbuild" : false,
-      sourcemap: true,
+      sourcemap: false,
       lib: {
         entry: resolve(__dirname, "src/index.ts"),
         name: "XRPLWalletKit",

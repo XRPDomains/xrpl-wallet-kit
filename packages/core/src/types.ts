@@ -85,6 +85,19 @@ export interface SignAndSubmitRequest {
   submit?: boolean;
 }
 
+export interface SignTransactionRequest {
+  txJson: TransactionPayload;
+  methodHint?: SignAndSubmitRequest["methodHint"];
+  walletPayload?: unknown;
+}
+
+export interface SignTransactionResult {
+  txBlob?: string;
+  signed?: boolean;
+  rejected?: boolean;
+  raw?: unknown;
+}
+
 export interface TxResult {
   hash?: string;
   status?: string;
@@ -117,6 +130,7 @@ export interface WalletAdapter {
   canRecoverSession?: (options: ConnectOptions) => boolean | Promise<boolean>;
   recoverSession?: (options: ConnectOptions) => Promise<ConnectResult | null>;
   signMessage?: (request: SignMessageRequest) => Promise<SignMessageResult>;
+  signTransaction?: (request: SignTransactionRequest) => Promise<SignTransactionResult>;
   signAndSubmit?: (request: SignAndSubmitRequest) => Promise<TxResult>;
 }
 
@@ -129,6 +143,8 @@ export type WalletEventName =
   | "signing"
   | "signed"
   | "rejected"
+  | "accountChanged"
+  | "networkChanged"
   | "session_restored"
   | "session_stale"
   | "session_expired";
@@ -142,6 +158,8 @@ export interface WalletEvents {
   signing: { adapterId: string; kind: "message" | "transaction" };
   signed: { adapterId: string; kind: "message" | "transaction"; result: unknown };
   rejected: { adapterId: string; kind?: "message" | "transaction"; error?: unknown };
+  accountChanged: { adapterId: string; account: WalletAccount; previousAccount?: WalletAccount };
+  networkChanged: { adapterId: string; network?: WalletNetwork; previousNetwork?: WalletNetwork };
   session_restored: { adapterId: string; account: WalletAccount; session: WalletSession; stale?: boolean };
   session_stale: { adapterId: string; account?: WalletAccount; session?: WalletSession; reason?: string; attempts?: number };
   session_expired: { adapterId?: string };
@@ -171,6 +189,10 @@ export interface WalletManagerConfig {
   adapters?: WalletAdapter[];
   storage?: WalletStorage;
   autoReconnect?: boolean;
+  accountStatus?: {
+    enabled?: boolean;
+    timeoutMs?: number;
+  };
   logger?: WalletKitLogger | WalletKitLoggerOptions;
 }
 

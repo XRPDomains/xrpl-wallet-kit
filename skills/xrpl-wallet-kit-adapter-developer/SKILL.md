@@ -158,5 +158,26 @@ Manual smoke test at minimum:
 Read these only when needed:
 
 - `references/adapter-checklist.md` when reviewing or approving an adapter.
-- `references/scaffold.md` when creating a new adapter package.
+- `references/scaffold.md` when creating a new official adapter package inside this monorepo.
 - `references/hardware-adapters.md` when implementing Ledger, Trezor, or any USB/HID/hardware transport adapter.
+- `references/walletconnect-wallet.md` when adding a new WalletConnect wallet definition to `wallets.ts`.
+- `references/test-template.md` when writing unit tests for a new adapter (Node test runner + tsx).
+
+## Template
+
+A ready-to-copy adapter package scaffold lives at:
+
+```
+skills/xrpl-wallet-kit-adapter-developer/templates/adapter-package/
+  src/index.ts       — base adapter class with all optional methods stubbed
+  package.json       — @xrpl-wallet-kit/adapter-mywallet base config
+  tsconfig.json      — extends core tsconfig
+```
+
+Copy this directory to `packages/adapters/<wallet-id>/` and replace `mywallet` / `MyWallet` with the actual wallet name and id.
+
+## Claude Code usage
+
+When working inside this repository, Claude Code reads `CLAUDE.md` at the project root for project-wide context (build commands, architecture rules, hard constraints). This skill provides adapter-specific implementation guidance on top of that.
+
+To invoke this skill from Claude Code: read this `SKILL.md` file and follow the workflow above. Reference files are in `references/` and the adapter template is in `templates/adapter-package/`.

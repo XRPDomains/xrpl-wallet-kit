@@ -82,6 +82,9 @@ export function validateWalletAdapter(adapter: unknown): AdapterValidationResult
     if (walletAdapter.capabilities.signMessage && !isFunction(walletAdapter.signMessage)) {
       addIssue(issues, "error", "signMessage", "capabilities.signMessage is true but signMessage() is not implemented.");
     }
+    if (walletAdapter.capabilities.signTransaction && !isFunction(walletAdapter.signTransaction)) {
+      addIssue(issues, "error", "signTransaction", "capabilities.signTransaction is true but signTransaction() is not implemented.");
+    }
     if (walletAdapter.capabilities.signAndSubmit && !isFunction(walletAdapter.signAndSubmit)) {
       addIssue(issues, "error", "signAndSubmit", "capabilities.signAndSubmit is true but signAndSubmit() is not implemented.");
     }

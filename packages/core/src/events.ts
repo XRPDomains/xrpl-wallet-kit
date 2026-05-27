@@ -10,6 +10,14 @@ export class WalletEventEmitter {
     return () => this.off(eventName, handler);
   }
 
+  once<T extends WalletEventName>(eventName: T, handler: WalletEventHandler<T>): () => void {
+    const unsubscribe = this.on(eventName, (event) => {
+      unsubscribe();
+      handler(event);
+    });
+    return unsubscribe;
+  }
+
   off<T extends WalletEventName>(eventName: T, handler: WalletEventHandler<T>): void {
     this.listeners.get(eventName)?.delete(handler as (event: unknown) => void);
   }

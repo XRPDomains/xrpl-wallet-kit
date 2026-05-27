@@ -60,6 +60,55 @@ class MockAdapter extends BaseWalletAdapter {
   }
 }
 
+test("WalletEventEmitter once unsubscribes after the first event", () => {
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new MockAdapter()],
+    logger: { level: "silent" }
+  });
+  let calls = 0;
+
+  manager.once("connected", () => {
+    calls += 1;
+  });
+  manager.emit("connected", { adapterId: "mock", account: { address: "rOnce" } });
+  manager.emit("connected", { adapterId: "mock", account: { address: "rOnce" } });
+
+  assert.equal(calls, 1);
+});
+
+test("WalletManager returns available wallet adapters", async () => {
+  class AvailabilityAdapter extends BaseWalletAdapter {
+    capabilities = { connect: true };
+
+    constructor(readonly id: string, private available: boolean) {
+      super();
+    }
+
+    get metadata() {
+      return { id: this.id, name: this.id, type: "extension" } as const;
+    }
+
+    async isAvailable() {
+      return this.available;
+    }
+
+    async connect() {
+      return { account: { address: `r${this.id}` } };
+    }
+  }
+
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new AvailabilityAdapter("available", true), new AvailabilityAdapter("missing", false)],
+    logger: { level: "silent" }
+  });
+
+  const wallets = await manager.getAvailableWallets();
+
+  assert.deepEqual(wallets.map((wallet) => wallet.metadata.id), ["available"]);
+});
+
 test("WalletManager stores sessions in a versioned envelope", async () => {
   const storage = new MemoryWalletStorage();
   const manager = new WalletManager({
@@ -308,6 +357,109 @@ test("WalletManager recovers pending return sessions once and stores them", asyn
   assert.equal(second?.account.address, "rRecovered");
   assert.equal(stored.session?.adapterId, "recover");
   assert.equal(stored.session?.account?.address, "rRecovered");
+});
+
+test("WalletManager signs transactions without submitting when adapter supports signTransaction", async () => {
+  class SignOnlyAdapter extends MockAdapter {
+    capabilities = { connect: true, signTransaction: true };
+
+    async signTransaction() {
+      return { txBlob: "SIGNED_BLOB", signed: true };
+    }
+  }
+
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new SignOnlyAdapter()],
+    logger: { level: "silent" }
+  });
+
+  await manager.connect("mock", { network });
+  const result = await manager.signTransaction({ txJson: { TransactionType: "Payment" } });
+
+  assert.equal(result.txBlob, "SIGNED_BLOB");
+  assert.equal(result.signed, true);
+});
+
+test("WalletManager falls back to signAndSubmit with submit false for signTransaction", async () => {
+  class FallbackSignAdapter extends MockAdapter {
+    lastSubmitValue: boolean | undefined;
+
+    async signAndSubmit(request: { submit?: boolean }) {
+      this.lastSubmitValue = request.submit;
+      return { txBlob: "FALLBACK_BLOB", signed: true, raw: { txBlob: "FALLBACK_BLOB" } };
+    }
+  }
+
+  const adapter = new FallbackSignAdapter();
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [adapter],
+    logger: { level: "silent" }
+  });
+
+  await manager.connect("mock", { network });
+  const result = await manager.signTransaction({ txJson: { TransactionType: "Payment" } });
+
+  assert.equal(adapter.lastSubmitValue, false);
+  assert.equal(result.txBlob, "FALLBACK_BLOB");
+  assert.equal(result.signed, true);
+});
+
+test("WalletManager populates activationStatus from account_info", async () => {
+  const statusNetwork = {
+    ...network,
+    httpRpcUrl: "https://rpc.test"
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    result: {
+      account_data: {
+        Account: "rMockAddress"
+      }
+    }
+  }), { status: 200 });
+
+  try {
+    const manager = new WalletManager({
+      appName: "Test",
+      adapters: [new MockAdapter()],
+      logger: { level: "silent" }
+    });
+
+    const session = await manager.connect("mock", { network: statusNetwork });
+
+    assert.equal(session.account.activationStatus, "active");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("WalletManager marks actNotFound accounts as unfunded", async () => {
+  const statusNetwork = {
+    ...network,
+    httpRpcUrl: "https://rpc.test"
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    result: {
+      error: "actNotFound"
+    }
+  }), { status: 200 });
+
+  try {
+    const manager = new WalletManager({
+      appName: "Test",
+      adapters: [new MockAdapter()],
+      logger: { level: "silent" }
+    });
+
+    const session = await manager.connect("mock", { network: statusNetwork });
+
+    assert.equal(session.account.activationStatus, "unfunded");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 
