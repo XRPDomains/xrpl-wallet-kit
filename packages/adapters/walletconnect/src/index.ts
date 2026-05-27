@@ -1,7 +1,7 @@
 import SignClient from "@walletconnect/sign-client";
 import { WalletConnectModal } from "@walletconnect/modal";
 import type { SessionTypes, SignClientTypes } from "@walletconnect/types";
-import { BaseWalletAdapter, normalizeTxResult, pickPath } from "@xrpl-wallet-kit/core";
+import { BaseWalletAdapter, createBrowserWalletStorage, normalizeTxResult, pickPath } from "@xrpl-wallet-kit/core";
 import { WALLETCONNECT_ICON } from "./icons";
 import { XRPL_WALLETCONNECT_WALLETS } from "./wallets";
 import type { WalletConnectWalletConfig } from "./types";
@@ -14,6 +14,7 @@ import type {
   WalletAdapter,
   WalletCapabilities,
   WalletMetadata,
+  WalletStorage,
   WalletSession,
   XrplNetwork
 } from "@xrpl-wallet-kit/core";
@@ -39,6 +40,7 @@ export interface WalletConnectAdapterOptions {
   signMessage?: boolean;
   signMessageDestination?: string;
   requestTimeoutMs?: number;
+  recoveryStorage?: WalletStorage;
   onDebug?: (event: WalletConnectDebugEvent) => void;
 }
 
@@ -98,6 +100,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   private connectPromise?: Promise<SessionTypes.Struct>;
   private pendingAbortController?: AbortController;
   private modal?: WalletConnectModal;
+  private recoveryStorage: WalletStorage;
 
   constructor(private options: WalletConnectAdapterOptions) {
     super();
@@ -106,6 +109,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     }
 
     this.client = options.signClient;
+    this.recoveryStorage = options.recoveryStorage ?? createBrowserWalletStorage("");
     this.capabilities = {
       connect: true,
       disconnect: true,
@@ -168,7 +172,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
 
     if (!this.session) {
       if (!this.connectPromise) {
-        this.setPendingRecoveryMarker();
+        await this.setPendingRecoveryMarker();
         this.pendingAbortController = new AbortController();
         const signal = options.signal
           ? this.combineSignals(options.signal, this.pendingAbortController.signal)
@@ -240,7 +244,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
 
   async recoverSession(options: ConnectOptions): Promise<ConnectResult | null> {
     const network = this.requireNetwork(options.network);
-    if (!this.canRecoverSession()) return null;
+    if (!await this.canRecoverSession()) return null;
 
     const client = await this.getClient();
     const recoveredSession = this.findLatestStoredWalletConnectSession(client, network);
@@ -271,8 +275,8 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     };
   }
 
-  canRecoverSession(): boolean {
-    return this.shouldRecoverWithoutStoredSession() && this.hasPendingRecoveryMarker();
+  async canRecoverSession(): Promise<boolean> {
+    return this.shouldRecoverWithoutStoredSession() && await this.hasPendingRecoveryMarker();
   }
 
   async disconnect(): Promise<void> {
@@ -356,7 +360,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
       };
 
     return {
-      chainId: network.walletConnectChainId,
+      chainId: this.requireWalletConnectChainId(network),
       topic: this.session?.topic,
       request: {
         method,
@@ -382,7 +386,8 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     const sessions = client.session.getAll();
     return sessions.find((storedSession) => {
       const accounts = storedSession.namespaces[XRPL_NAMESPACE]?.accounts ?? [];
-      return accounts.some((account) => account === `${network.walletConnectChainId}:${address}` || account.endsWith(`:${address}`));
+      const chainId = this.requireWalletConnectChainId(network);
+      return accounts.some((account) => account === `${chainId}:${address}` || account.endsWith(`:${address}`));
     });
   }
 
@@ -397,7 +402,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   }
 
   private shouldRecoverWithoutStoredSession(): boolean {
-    return this.metadata.id === "walletconnect";
+    return this.metadata.type === "walletconnect";
   }
 
   private async getClient(): Promise<SignClient> {
@@ -559,7 +564,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
         if (checkCount <= 12 || recovered) {
           const xrplAccounts = sessions
             .flatMap((session) => session.namespaces[XRPL_NAMESPACE]?.accounts ?? [])
-            .filter((account) => account.startsWith(`${network.walletConnectChainId}:`));
+            .filter((account) => account.startsWith(`${this.requireWalletConnectChainId(network)}:`));
           this.debug("session_poll", options.mode, {
             checkCount,
             sessions: sessions.length,
@@ -657,13 +662,14 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
 
   private sessionHasNetworkAccount(session: SessionTypes.Struct, network: XrplNetwork): boolean {
     const accounts = session.namespaces[XRPL_NAMESPACE]?.accounts ?? [];
-    return accounts.some((account) => account.startsWith(`${network.walletConnectChainId}:`));
+    return accounts.some((account) => account.startsWith(`${this.requireWalletConnectChainId(network)}:`));
   }
 
   private createRequiredNamespaces(network: XrplNetwork) {
+    const chainId = this.requireWalletConnectChainId(network);
     return {
       [XRPL_NAMESPACE]: {
-        chains: [network.walletConnectChainId],
+        chains: [chainId],
         methods: [
           XRPLWalletConnectMethod.SIGN_TRANSACTION
         ],
@@ -673,9 +679,10 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   }
 
   private createOptionalNamespaces(network: XrplNetwork) {
+    const chainId = this.requireWalletConnectChainId(network);
     return {
       [XRPL_NAMESPACE]: {
-        chains: [network.walletConnectChainId],
+        chains: [chainId],
         methods: [
           XRPLWalletConnectMethod.SIGN_MESSAGE,
           XRPLWalletConnectMethod.SIGN_TRANSACTION_FOR
@@ -688,7 +695,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   private async signMessageWithWalletConnectMethod(network: XrplNetwork, request: SignMessageRequest) {
     if (!this.client || !this.session) throw new Error("WalletConnect session not found");
     return this.withRequestTimeout(this.client.request({
-      chainId: network.walletConnectChainId,
+      chainId: this.requireWalletConnectChainId(network),
       topic: this.session.topic,
       request: {
         method: XRPLWalletConnectMethod.SIGN_MESSAGE,
@@ -720,7 +727,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   private async requestSignTransaction(network: XrplNetwork, txJson: unknown, submit: boolean) {
     if (!this.client || !this.session) throw new Error("WalletConnect session not found");
     return this.withRequestTimeout(this.client.request({
-      chainId: network.walletConnectChainId,
+      chainId: this.requireWalletConnectChainId(network),
       topic: this.session.topic,
       request: {
         method: XRPLWalletConnectMethod.SIGN_TRANSACTION,
@@ -780,7 +787,8 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     if (!account) throw new Error("WalletConnect XRPL account not found in session");
 
     const parts = account.split(":");
-    return parts[2] ?? account.replace(`${network.walletConnectChainId}:`, "");
+    const chainId = this.requireWalletConnectChainId(network);
+    return parts[2] ?? account.replace(`${chainId}:`, "");
   }
 
   private setupEventListeners(): void {
@@ -814,19 +822,18 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     return `xwk.walletconnect.pending.${this.options.projectId}.${this.metadata.id}`;
   }
 
-  private setPendingRecoveryMarker(): void {
-    if (!this.shouldRecoverWithoutStoredSession() || typeof window === "undefined") return;
+  private async setPendingRecoveryMarker(): Promise<void> {
+    if (!this.shouldRecoverWithoutStoredSession()) return;
     try {
-      window.localStorage?.setItem(this.getPendingRecoveryKey(), String(Date.now()));
+      await this.recoveryStorage.setItem(this.getPendingRecoveryKey(), String(Date.now()));
     } catch {
       // Storage can be restricted in embedded browsers.
     }
   }
 
-  private hasPendingRecoveryMarker(): boolean {
-    if (typeof window === "undefined") return false;
+  private async hasPendingRecoveryMarker(): Promise<boolean> {
     try {
-      const value = window.localStorage?.getItem(this.getPendingRecoveryKey());
+      const value = await this.recoveryStorage.getItem(this.getPendingRecoveryKey());
       if (!value) return false;
       const timestamp = Number(value);
       if (!Number.isFinite(timestamp) || Date.now() - timestamp > PENDING_RECOVERY_TTL_MS) {
@@ -840,9 +847,8 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   }
 
   private clearPendingRecoveryMarker(): void {
-    if (typeof window === "undefined") return;
     try {
-      window.localStorage?.removeItem(this.getPendingRecoveryKey());
+      void this.recoveryStorage.removeItem(this.getPendingRecoveryKey());
     } catch {
       // Storage can be restricted in embedded browsers.
     }
@@ -851,6 +857,13 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   private requireNetwork(network?: XrplNetwork): XrplNetwork {
     if (!network) throw new Error("XRPL network is required for WalletConnect");
     return network;
+  }
+
+  private requireWalletConnectChainId(network: XrplNetwork): string {
+    if (!network.walletConnectChainId) {
+      throw new Error(`WalletConnect requires walletConnectChainId for network ${network.id}`);
+    }
+    return network.walletConnectChainId;
   }
 
   private removeWalletConnectModalElements(): void {

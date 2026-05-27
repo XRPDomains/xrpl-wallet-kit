@@ -1,4 +1,5 @@
 import type { WalletButtonConfig, WalletUiConfig, WalletUiOptions } from "./types";
+import { resolveWalletUiMessages } from "./locales";
 import { defaultFontFamily } from "./themes";
 export function resolveWalletUiOptions(overrides: (WalletUiConfig & Partial<Omit<WalletUiOptions, "manager" | "mount">>) = {}): Partial<Omit<WalletUiOptions, "manager" | "mount">> {
   const {
@@ -11,8 +12,11 @@ export function resolveWalletUiOptions(overrides: (WalletUiConfig & Partial<Omit
     accountPanel: _accountPanel,
     identity: _identity,
     themeName: _themeName,
-    language: _language
+    language,
+    messages,
+    transactionPreview
   } = overrides;
+  const resolvedMessages = resolveWalletUiMessages(language, messages);
   const walletConnectUiMode = walletConnect?.mode ?? overrides.walletConnectUiMode;
   const wallets = walletList?.wallets === "all" ? undefined : walletList?.wallets;
 
@@ -24,7 +28,10 @@ export function resolveWalletUiOptions(overrides: (WalletUiConfig & Partial<Omit
     textSize: overrides.textSize ?? "sm",
     wallets: wallets ?? overrides.wallets,
     groups: walletList?.groups ?? overrides.groups,
-    title: modal?.title ?? overrides.title ?? "Connect Wallet",
+    language,
+    messages: resolvedMessages,
+    transactionPreview,
+    title: modal?.title ?? overrides.title ?? resolvedMessages.connectWallet,
     footerText: modal?.footerText ?? overrides.footerText ?? "XRPL Wallet Kit",
     showWalletGroup: walletList?.showGroup ?? overrides.showWalletGroup ?? true,
     theme: {
@@ -57,6 +64,8 @@ export function resolveWalletButtonOptions(ui: WalletUiConfig = {}, overrides: W
   };
 
   return createDefaultWalletButtonConfig({
+    language: ui.language,
+    messages: resolveWalletUiMessages(ui.language, ui.messages),
     label: connectButton.label,
     showAdapterIcon: connectButton.showAdapterIcon,
     showChevron: connectButton.showChevron,
@@ -78,6 +87,7 @@ export function resolveWalletButtonOptions(ui: WalletUiConfig = {}, overrides: W
 
 export function createDefaultWalletButtonConfig(overrides: WalletButtonConfig = {}): WalletButtonConfig {
   const { theme, ...rest } = overrides;
+  const messages = resolveWalletUiMessages(overrides.language, overrides.messages);
   return {
     showWeb3Name: true,
     showAdapterIcon: true,
@@ -91,6 +101,9 @@ export function createDefaultWalletButtonConfig(overrides: WalletButtonConfig = 
     accountPanelMode: "modal",
     themeMode: "light",
     ...rest,
+    language: rest.language ?? overrides.language,
+    messages,
+    label: rest.label ?? messages.connectWallet,
     theme: {
       accent: "#0078ae",
       radius: "14px",

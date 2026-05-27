@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { WalletKitErrorCode, getErrorMessage, isWalletKitError } from "@xrpl-wallet-kit/core";
 import type { WalletMetadata } from "@xrpl-wallet-kit/core";
 import { resolveWalletUiOptions } from "./config";
+import { resolveWalletUiMessages } from "./locales";
 import { darkTheme, lightTheme } from "./themes";
 import { lockPageScroll, unlockPageScroll } from "./dom";
 import { QR_DARK, QR_LIGHT, QR_SIZE, WALLETCONNECT_GROUP_ICON } from "./icons";
@@ -14,6 +15,7 @@ type WalletQrState =
     | { status: "loading"; adapterId: string; walletName: string }
     | { status: "ready"; adapterId: string; walletName: string; uri: string; deeplink?: string; copied: boolean }
     | { status: "rejected"; adapterId?: string; walletName: string }
+    | { status: "timeout"; adapterId?: string; walletName: string }
     | { status: "error"; adapterId?: string; walletName: string; message: string; uri?: string; deeplink?: string };
 
 export class WalletModal {
@@ -25,6 +27,7 @@ export class WalletModal {
     private pendingQr?: { adapterId: string; uri: string; deeplink?: string };
     private availability: Record<string, boolean>;
     private offEvents: Array<() => void>;
+    private openHandlers: Set<() => void>;
     private closeHandlers: Set<() => void>;
     private onDocumentKeyDown: (event: KeyboardEvent) => void;
     private lastFocusedElement: HTMLElement | null = null;
@@ -37,6 +40,7 @@ export class WalletModal {
         this.qrCopied = false;
         this.availability = {};
         this.offEvents = [];
+        this.openHandlers = new Set();
         this.closeHandlers = new Set();
         this.onDocumentKeyDown = (event) => this.handleDocumentKeyDown(event);
         this.options = { manager: options.manager, ...resolveWalletUiOptions(options) };
@@ -52,6 +56,7 @@ export class WalletModal {
         this.activeGroupId = undefined;
         this.lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         this.mount("list");
+        this.openHandlers.forEach((handler) => handler());
         void this.refreshAvailability();
         if (this.pendingQr) {
             const { adapterId, uri, deeplink } = this.pendingQr;
@@ -79,13 +84,21 @@ export class WalletModal {
         if (this.qrCopyResetTimer)
             window.clearTimeout(this.qrCopyResetTimer);
         this.offEvents.splice(0).forEach((off) => off());
+        this.openHandlers.clear();
         this.closeHandlers.clear();
     }
-    onClose(handler: () => void): () => void {
-        this.closeHandlers.add(handler);
+    isOpen(): boolean {
+        return Boolean(this.root?.isConnected);
+    }
+    on(event: "open" | "close", handler: () => void): () => void {
+        const handlers = event === "open" ? this.openHandlers : this.closeHandlers;
+        handlers.add(handler);
         return () => {
-            this.closeHandlers.delete(handler);
+            handlers.delete(handler);
         };
+    }
+    onClose(handler: () => void): () => void {
+        return this.on("close", handler);
     }
     updateOptions(options: WalletUiConfig) {
         this.options = { ...this.options, ...resolveWalletUiOptions(options) };
@@ -150,7 +163,7 @@ export class WalletModal {
         if (button) {
             button.disabled = true;
             button.classList.add("xwk-retrying");
-            button.innerHTML = `${this.refreshIcon()} Retrying...`;
+            button.innerHTML = `${this.refreshIcon()} ${this.escapeHtml(this.messages().retrying)}`;
         }
         try {
             await this.waitForPaint();
@@ -222,7 +235,7 @@ export class WalletModal {
         button.innerHTML = this.renderQrCopyButtonContent();
         const liveRegion = this.root?.querySelector("[data-xwk-copy-live]");
         if (liveRegion)
-            liveRegion.textContent = this.qrCopied ? "QR URI copied." : "";
+            liveRegion.textContent = this.qrCopied ? this.messages().qrUriCopied : "";
     }
     private mount(view: WalletModalView) {
         const pendingQr = this.pendingQr;
@@ -376,7 +389,7 @@ export class WalletModal {
         this.root?.querySelector("[data-xwk-back]")?.classList.add("xwk-hidden");
         const title = this.root?.querySelector(".xwk-title");
         if (title)
-            title.textContent = this.options.title ?? "Connect Wallet";
+            title.textContent = this.options.title ?? this.messages().connectWallet;
         const grid = this.root?.querySelector(".xwk-grid");
         if (grid)
             grid.innerHTML = this.renderWalletList(this.options.layout ?? "list");
@@ -461,6 +474,17 @@ export class WalletModal {
                 this.renderQrShell(this.qrState);
                 return;
             }
+            if (this.isTimeoutError(error, message)) {
+                this.qrUri = "";
+                this.qrCopied = false;
+                this.qrState = {
+                    status: "timeout",
+                    adapterId: previous?.adapterId,
+                    walletName: previous?.walletName ?? "WalletConnect"
+                };
+                this.renderQrShell(this.qrState);
+                return;
+            }
             this.qrState = {
                 status: "error",
                 adapterId: previous?.adapterId,
@@ -506,6 +530,11 @@ export class WalletModal {
         }
         return /reject|denied|cancelled|canceled|closed|user rejected|proposal expired|expired/i.test(message);
     }
+    private isTimeoutError(error: unknown, message: string): boolean {
+        if (isWalletKitError(error))
+            return error.code === WalletKitErrorCode.REQUEST_TIMEOUT;
+        return /timeout|timed out/i.test(message);
+    }
     private getFriendlyErrorMessage(error: unknown): string {
         if (isWalletKitError(error)) {
             switch (error.code) {
@@ -536,11 +565,12 @@ export class WalletModal {
         return message;
     }
     private renderShell() {
+        const messages = this.messages();
         const theme = this.resolveTheme();
         const layout = this.options.layout ?? "list";
         const size = this.options.size ?? "default";
         const textSize = this.options.textSize ?? "sm";
-        return `<style>${this.renderStyles(theme, layout, size, textSize)}${this.renderMobileSheetOverrides(theme)}</style><section class="xwk-modal xwk-layout-${layout}" role="dialog" aria-modal="true" aria-label="${this.escapeHtml(this.options.title ?? "Connect Wallet")}" tabindex="-1"><div class="xwk-header"><button class="xwk-back xwk-hidden" data-xwk-back aria-label="Back">${this.backIcon()}</button><div class="xwk-title">${this.escapeHtml(this.options.title ?? "Connect Wallet")}</div><button class="xwk-close" data-xwk-close aria-label="Close">&times;</button></div><div class="xwk-body"><div class="xwk-list">${this.renderNetworkBadge()}<div class="xwk-grid">${this.renderWalletList(layout)}</div><div class="xwk-status" role="status" aria-live="polite"></div></div><div class="xwk-connect xwk-hidden"><div class="xwk-spinner"><div class="xwk-connect-icon"></div></div><strong class="xwk-connect-name"></strong><p class="xwk-connect-status" role="status" aria-live="polite">Approve the request in your wallet.</p></div><div class="xwk-qr xwk-hidden"><h3 class="xwk-qr-title"></h3><div class="xwk-qr-code">${this.renderQrLoading()}</div><p class="xwk-qr-help">Waiting for WalletConnect URI...</p></div></div><div class="xwk-footer">${this.escapeHtml(this.options.footerText ?? "XRPL Wallet Kit")}</div></section>`;
+        return `<style>${this.renderStyles(theme, layout, size, textSize)}${this.renderMobileSheetOverrides(theme)}</style><section class="xwk-modal xwk-layout-${layout}" role="dialog" aria-modal="true" aria-label="${this.escapeHtml(this.options.title ?? messages.connectWallet)}" tabindex="-1"><div class="xwk-header"><button class="xwk-back xwk-hidden" data-xwk-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button><div class="xwk-title">${this.escapeHtml(this.options.title ?? messages.connectWallet)}</div><button class="xwk-close" data-xwk-close aria-label="${this.escapeHtml(messages.close)}">&times;</button></div><div class="xwk-body"><div class="xwk-list">${this.renderNetworkBadge()}<div class="xwk-grid">${this.renderWalletList(layout)}</div><div class="xwk-status" role="status" aria-live="polite"></div></div><div class="xwk-connect xwk-hidden"><div class="xwk-spinner" aria-hidden="true"><div class="xwk-connect-icon"></div></div><strong class="xwk-connect-name"></strong><p class="xwk-connect-status" role="status" aria-live="polite">${this.escapeHtml(messages.approveRequest)}</p></div><div class="xwk-qr xwk-hidden"><h3 class="xwk-qr-title"></h3><div class="xwk-qr-code">${this.renderQrLoading()}</div><p class="xwk-qr-help">${this.escapeHtml(messages.waitingForWalletConnectUri)}</p></div></div><div class="xwk-footer">${this.escapeHtml(this.options.footerText ?? "XRPL Wallet Kit")}</div></section>`;
     }
     private renderNetworkBadge() {
         const network = this.options.manager.getNetwork();
@@ -552,6 +582,7 @@ export class WalletModal {
         return label ? `<div class="xwk-network-row"><span class="xwk-network-badge">${this.escapeHtml(label)}</span></div>` : "";
     }
     private renderQrShell(state: WalletQrState) {
+        const messages = this.messages();
         const theme = this.resolveTheme();
         const layout = this.options.layout ?? "list";
         const size = this.options.size ?? "default";
@@ -559,49 +590,56 @@ export class WalletModal {
         const hasReadyUri = state.status === "ready" && Boolean(state.uri);
         const uri = state.status === "ready" ? state.uri : state.status === "error" ? state.uri : undefined;
         const deeplink = state.status === "ready" ? state.deeplink : state.status === "error" ? state.deeplink : undefined;
+        const qrCodeAttributes = hasReadyUri ? ` aria-hidden="true"` : "";
         const openAction = hasReadyUri && deeplink
-            ? `<a class="xwk-action xwk-action-primary" data-xwk-open href="${this.escapeHtml(deeplink)}">Open Wallet</a>`
+            ? `<a class="xwk-action xwk-action-primary" data-xwk-open href="${this.escapeHtml(deeplink)}">${this.escapeHtml(messages.openWallet)}</a>`
             : "";
         const copyAction = hasReadyUri
             ? `<button class="xwk-action xwk-copy-inside" data-xwk-copy type="button">${this.renderQrCopyButtonContent()}</button>`
             : "";
-        const retryAction = state.status === "rejected" || state.status === "error"
-            ? `<button class="xwk-action xwk-action-primary" data-xwk-retry type="button">${this.refreshIcon()} Try again</button>`
+        const retryAction = state.status === "rejected" || state.status === "timeout" || state.status === "error"
+            ? `<button class="xwk-action xwk-action-primary" data-xwk-retry type="button">${this.refreshIcon()} ${this.escapeHtml(messages.tryAgain)}</button>`
             : "";
         const actions = copyAction || openAction || retryAction
             ? `<div class="xwk-qr-card-actions ${openAction && copyAction ? "xwk-qr-card-actions-dual" : ""}">${copyAction}${openAction}${retryAction}</div>`
             : `<div class="xwk-qr-card-actions xwk-qr-card-actions-placeholder" aria-hidden="true"><button class="xwk-action xwk-copy-inside" type="button" disabled>${this.renderQrCopyButtonContent()}</button></div>`;
         const qrContent = state.status === "rejected"
-            ? `<div class="xwk-qr-message" role="alert"><strong>Connection canceled</strong><span>The request was rejected in your wallet.</span></div>`
+            ? `<div class="xwk-qr-message" role="alert"><strong>${this.escapeHtml(messages.connectionCanceledTitle)}</strong><span>${this.escapeHtml(messages.requestRejected)}</span></div>`
+            : state.status === "timeout"
+                ? `<div class="xwk-qr-message xwk-error-text" role="alert"><strong>${this.escapeHtml(messages.connectionTimedOutTitle)}</strong><span>${this.escapeHtml(messages.requestTimedOut)}</span></div>`
             : state.status === "error"
-                ? `<div class="xwk-qr-message xwk-error-text" role="alert"><strong>Connection failed</strong><span>${this.escapeHtml(state.message)}</span></div>`
+                ? `<div class="xwk-qr-message xwk-error-text" role="alert"><strong>${this.escapeHtml(messages.connectionFailedTitle)}</strong><span>${this.escapeHtml(state.message)}</span></div>`
                 : this.renderQrLoading();
         const qrFallback = state.status === "error" && uri
             ? `<div class="xwk-qr-fallback">${this.escapeHtml(uri)}</div>`
             : "";
         const helpText = hasReadyUri
-            ? "Scan with your wallet app to connect."
+            ? messages.helpScan
             : state.status === "rejected"
-                ? "Tap Try again to create a new request."
+                ? messages.helpTryAgainNewRequest
+                : state.status === "timeout"
+                    ? messages.helpTryAgainNewRequest
                 : state.status === "error"
-                    ? "Please try again."
-                    : "Waiting for WalletConnect URI...";
+                    ? messages.pleaseTryAgain
+                    : messages.waitingForWalletConnectUri;
         if (!this.root?.isConnected) {
             this.mount("qr");
         }
         if (!this.root)
             return;
         this.root.dataset.xwkView = "qr";
-        this.root.innerHTML = `<style>${this.renderStyles(theme, layout, size, textSize)}${this.renderMobileSheetOverrides(theme)}</style><section class="xwk-modal xwk-qr-modal" role="dialog" aria-modal="true" aria-label="${this.escapeHtml(state.walletName)}" tabindex="-1"><div class="xwk-header"><button class="xwk-back" data-xwk-back aria-label="Back">${this.backIcon()}</button><div class="xwk-title">${this.escapeHtml(state.walletName)}</div><button class="xwk-close" data-xwk-close aria-label="Close">&times;</button></div><div class="xwk-body"><div class="xwk-qr xwk-standalone-qr"><div class="xwk-qr-card"><div class="xwk-qr-code">${qrContent}</div>${qrFallback}${actions}</div><p class="xwk-qr-help">${helpText}</p><span class="xwk-sr-only" aria-live="assertive" data-xwk-copy-live></span></div></div><div class="xwk-footer">${this.escapeHtml(this.options.footerText ?? "XRPL Wallet Kit")}</div></section>`;
+        this.root.innerHTML = `<style>${this.renderStyles(theme, layout, size, textSize)}${this.renderMobileSheetOverrides(theme)}</style><section class="xwk-modal xwk-qr-modal" role="dialog" aria-modal="true" aria-label="${this.escapeHtml(state.walletName)}" tabindex="-1"><div class="xwk-header"><button class="xwk-back" data-xwk-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button><div class="xwk-title">${this.escapeHtml(state.walletName)}</div><button class="xwk-close" data-xwk-close aria-label="${this.escapeHtml(messages.close)}">&times;</button></div><div class="xwk-body"><div class="xwk-qr xwk-standalone-qr"><div class="xwk-qr-card"><div class="xwk-qr-code"${qrCodeAttributes}>${qrContent}</div>${qrFallback}${actions}</div><p class="xwk-qr-help">${this.escapeHtml(helpText)}</p><span class="xwk-sr-only">${this.escapeHtml(messages.qrSrHint)}</span><span class="xwk-sr-only" aria-live="assertive" data-xwk-copy-live></span></div></div><div class="xwk-footer">${this.escapeHtml(this.options.footerText ?? "XRPL Wallet Kit")}</div></section>`;
         this.bindChrome();
     }
     private renderQrLoading() {
-        return `<span class="xwk-qr-loading" role="status" aria-live="polite"><span class="xwk-qr-loading-spinner"></span><span>Generating QR...</span></span>`;
+        return `<span class="xwk-qr-loading" role="status" aria-live="polite"><span class="xwk-qr-loading-spinner"></span><span>${this.escapeHtml(this.messages().generatingQr)}</span></span>`;
     }
     private renderQrCopyButtonContent() {
-        return this.qrCopied ? `${this.checkIcon()} Copied` : `${this.linkIcon()} Copy URI`;
+        const messages = this.messages();
+        return this.qrCopied ? `${this.checkIcon()} ${this.escapeHtml(messages.copied)}` : `${this.linkIcon()} ${this.escapeHtml(messages.copyUri)}`;
     }
     private renderConnectShell(wallet: WalletMetadata | undefined, adapterId: string) {
+        const messages = this.messages();
         const theme = this.resolveTheme();
         const layout = this.options.layout ?? "list";
         const size = this.options.size ?? "default";
@@ -614,21 +652,22 @@ export class WalletModal {
         if (!this.root)
             return;
         this.root.dataset.xwkView = "connect";
-        this.root.innerHTML = `<style>${this.renderStyles(theme, layout, size, textSize)}${this.renderMobileSheetOverrides(theme)}</style><section class="xwk-modal xwk-connect-modal" role="dialog" aria-modal="true" aria-label="Connect ${this.escapeHtml(walletName)}" tabindex="-1"><div class="xwk-header"><button class="xwk-back" data-xwk-back aria-label="Back">${this.backIcon()}</button><div class="xwk-title">Connect</div><button class="xwk-close" data-xwk-close aria-label="Close">&times;</button></div><div class="xwk-body"><div class="xwk-connect xwk-standalone-connect"><div class="xwk-spinner"><div class="xwk-connect-icon">${this.renderWalletIcon(wallet)}</div></div><strong class="xwk-connect-name">${this.escapeHtml(walletName)}</strong><p class="xwk-connect-status" role="status" aria-live="polite">${this.escapeHtml(statusText)}</p></div></div><div class="xwk-footer">${this.escapeHtml(this.options.footerText ?? "XRPL Wallet Kit")}</div></section>`;
+        this.root.innerHTML = `<style>${this.renderStyles(theme, layout, size, textSize)}${this.renderMobileSheetOverrides(theme)}</style><section class="xwk-modal xwk-connect-modal" role="dialog" aria-modal="true" aria-label="${this.escapeHtml(messages.connectWalletAria(walletName))}" tabindex="-1"><div class="xwk-header"><button class="xwk-back" data-xwk-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button><div class="xwk-title">${this.escapeHtml(messages.connect)}</div><button class="xwk-close" data-xwk-close aria-label="${this.escapeHtml(messages.close)}">&times;</button></div><div class="xwk-body"><div class="xwk-connect xwk-standalone-connect"><div class="xwk-spinner" aria-hidden="true"><div class="xwk-connect-icon">${this.renderWalletIcon(wallet)}</div></div><strong class="xwk-connect-name">${this.escapeHtml(walletName)}</strong><p class="xwk-connect-status" role="status" aria-live="polite">${this.escapeHtml(statusText)}</p></div></div><div class="xwk-footer">${this.escapeHtml(this.options.footerText ?? "XRPL Wallet Kit")}</div></section>`;
         this.bindChrome();
     }
     private getConnectStatusText(wallet: WalletMetadata | undefined, adapterId: string) {
+        const messages = this.messages();
         const adapter = this.options.manager.getAdapter(adapterId);
-        const walletName = wallet?.name ?? adapter?.metadata.name ?? "wallet";
+        const walletName = wallet?.name ?? adapter?.metadata.name ?? messages.walletFallbackName;
         if (wallet?.type === "hardware")
-            return `Confirm on your ${walletName} device.`;
+            return messages.confirmOnDevice(walletName);
         if (wallet?.type === "walletconnect" || wallet?.group === "WalletConnect")
-            return `Open your ${walletName} app and approve.`;
+            return messages.openWalletAppApprove(walletName);
         if (wallet?.type === "mobile" || adapter?.capabilities.qr || adapter?.capabilities.deeplink)
-            return `Open your ${walletName} app and approve.`;
+            return messages.openWalletAppApprove(walletName);
         if (wallet?.type === "snap")
-            return `Approve in your browser wallet.`;
-        return `Click connect in your ${walletName} popup.`;
+            return messages.approveBrowserWallet();
+        return messages.clickConnectPopup(walletName);
     }
     private renderStyles(theme: Required<WalletUiTheme>, layout: WalletUiLayout, size: WalletUiSize, textSize: WalletUiTextSize) {
         const cardLayout = layout === "card" || layout === "grid";
@@ -645,7 +684,7 @@ export class WalletModal {
         const groupFontSize = textSize === "lg" ? "12px" : "11px";
         const bodyFontSize = textSize === "lg" ? "16px" : textSize === "md" ? "15px" : "14px";
         const walletNameColor = this.resolveThemeMode() === "dark" ? theme.foreground : "#333333";
-        const badgeColor = this.resolveThemeMode() === "dark" ? "#cbd5e1" : "#6b7280";
+        const badgeColor = this.resolveThemeMode() === "dark" ? "#cbd5e1" : "#5c6878";
         const badgeBackground = this.resolveThemeMode() === "dark" ? "rgba(255,255,255,.08)" : "#f0f1f3";
         const badgeDot = this.resolveThemeMode() === "dark" ? "#94a3b8" : "#9ca3af";
         const miniIconBorder = this.resolveThemeMode() === "dark" ? "rgba(255,255,255,.12)" : "rgba(15,23,42,.08)";
@@ -669,6 +708,7 @@ export class WalletModal {
         ].join("");
     }
     private renderWalletGroup(group: WalletUiGroup, layout: WalletUiLayout) {
+        const messages = this.messages();
         const wallets = this.getGroupWallets(group);
         const previewLimit = group.maxPreviewIcons ?? 5;
         const previewWallets = wallets.slice(0, previewLimit);
@@ -677,12 +717,12 @@ export class WalletModal {
             ? `<img src="${this.escapeHtml(group.icon)}" alt="">`
             : `<span class="xwk-icon-fallback">${this.escapeHtml(group.name.slice(0, 1).toUpperCase())}</span>`;
         const secondary = layout === "list"
-            ? `<span class="xwk-group">${wallets.length} wallets</span>`
+            ? `<span class="xwk-group">${this.escapeHtml(messages.walletCount(wallets.length))}</span>`
             : layout === "card" || layout === "grid"
-                ? `<span class="xwk-group">+${wallets.length} wallets</span>`
+                ? `<span class="xwk-group">+${this.escapeHtml(messages.walletCount(wallets.length))}</span>`
                 : "";
         const preview = previewWallets.length
-            ? `<span class="xwk-group-icons">${previewWallets.map((wallet) => this.renderMiniWalletIcon(wallet)).join("")}${overflow > 0 ? `<span class="xwk-mini-more">+${overflow}</span>` : ""}</span>`
+            ? `<span class="xwk-group-icons">${previewWallets.map((wallet) => this.renderMiniWalletIcon(wallet)).join("")}${overflow > 0 ? `<span class="xwk-mini-more" aria-label="${this.escapeHtml(messages.moreWallets(overflow))}">+${overflow}</span>` : ""}</span>`
             : "";
         return `<button class="xwk-wallet xwk-wallet-group" data-wallet-group-id="${this.escapeHtml(group.id)}">${icon}<span class="xwk-wallet-info"><span class="xwk-name">${this.escapeHtml(group.name)}</span>${secondary}${preview}</span></button>`;
     }
@@ -700,7 +740,7 @@ export class WalletModal {
         if (!isExtensionLike)
             return "";
         const className = this.availability[wallet.id] ? "xwk-wallet-badge xwk-installed" : "xwk-wallet-badge";
-        return `<span class="${className}">Installed</span>`;
+        return `<span class="${className}">${this.escapeHtml(this.messages().installed)}</span>`;
     }
     private renderWalletIcon(wallet?: WalletMetadata) {
         if (wallet?.icon)
@@ -727,6 +767,9 @@ export class WalletModal {
     }
     private checkIcon() {
         return `<svg class="xwk-copied-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#1d9bf0"/><path d="m7.8 12.4 2.7 2.7 5.9-6.2" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+    private messages() {
+        return resolveWalletUiMessages(this.options.language, this.options.messages);
     }
     private resolveTheme(): Required<WalletUiTheme> {
         const mode = this.resolveThemeMode();

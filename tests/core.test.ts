@@ -16,6 +16,8 @@ import {
   normalizeTxResult,
   validateWalletAdapter
 } from "../packages/core/src/index";
+import { createWalletConnectAdapter } from "../packages/adapters/walletconnect/src/index";
+import { normalizeWalletUiLocale, resolveWalletUiMessages } from "../packages/ui/src/index";
 
 const network = {
   id: "mainnet",
@@ -359,6 +361,99 @@ test("WalletManager recovers pending return sessions once and stores them", asyn
   assert.equal(stored.session?.account?.address, "rRecovered");
 });
 
+test("WalletConnect detail adapters can use marker-gated pending return recovery", () => {
+  const adapter = createWalletConnectAdapter({
+    projectId: "test-project",
+    id: "joey",
+    name: "Joey",
+    useModal: false,
+    modalMode: "never"
+  });
+
+  assert.equal((adapter as unknown as { shouldRecoverWithoutStoredSession(): boolean }).shouldRecoverWithoutStoredSession(), true);
+});
+
+test("WalletConnect validates missing chain id only when WalletConnect paths need it", () => {
+  const adapter = createWalletConnectAdapter({
+    projectId: "test-project",
+    useModal: false,
+    modalMode: "never"
+  });
+  const customNetwork = {
+    id: "custom",
+    name: "Custom Network",
+    networkType: "CUSTOM",
+    rpcUrl: "wss://custom.example"
+  };
+
+  assert.throws(
+    () => (adapter as unknown as { createRequiredNamespaces(network: typeof customNetwork): unknown }).createRequiredNamespaces(customNetwork),
+    /walletConnectChainId/
+  );
+});
+
+test("WalletManager authenticate signs a structured login message", async () => {
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new MockAdapter()],
+    logger: { level: "silent" }
+  });
+
+  await manager.connect("mock", { network });
+  const result = await manager.authenticate({ statement: "Sign in to Test", expiresIn: 60 });
+
+  assert.equal(result.address, "rMockAddress");
+  assert.equal(result.statement, "Sign in to Test");
+  assert.equal(result.signature, "mock-signature");
+  assert.match(result.message, /Sign in to Test/);
+  assert.match(result.message, /Address: rMockAddress/);
+  assert.equal(typeof result.issuedAt, "string");
+  assert.equal(typeof result.expiresAt, "string");
+});
+
+test("WalletManager emits transaction lifecycle events and stores submitted transactions", async () => {
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new MockAdapter()],
+    logger: { level: "silent" }
+  });
+  const submitted: string[] = [];
+  const confirmed: string[] = [];
+  const failed: string[] = [];
+
+  manager.on("tx_submitted", (event) => submitted.push(event.hash));
+  manager.on("tx_confirmed", (event) => confirmed.push(event.hash));
+  manager.on("tx_failed", (event) => failed.push(event.hash ?? "missing"));
+
+  await manager.connect("mock", { network });
+  await manager.signAndSubmit({ txJson: { TransactionType: "Payment" } });
+  manager.addTransaction({ hash: "manual-confirm", status: "confirmed", result: { engine_result: "tesSUCCESS" } });
+  manager.addTransaction({ hash: "manual-fail", status: "failed", error: new Error("failed") });
+
+  assert.deepEqual(submitted, ["mock-hash"]);
+  assert.deepEqual(confirmed, ["manual-confirm"]);
+  assert.deepEqual(failed, ["manual-fail"]);
+  assert.deepEqual(manager.getTransactions().map((tx) => tx.hash), ["mock-hash", "manual-confirm", "manual-fail"]);
+});
+
+test("WalletManager keeps the active session in sync with account and network changes", async () => {
+  const storage = new MemoryWalletStorage();
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new MockAdapter()],
+    storage,
+    logger: { level: "silent" }
+  });
+  const nextNetwork = { ...network, id: "testnet", name: "XRPL Testnet", networkType: "TESTNET" } as const;
+
+  await manager.connect("mock", { network });
+  manager.emitAccountChanged("mock", { address: "rNextAddress" });
+  manager.emitNetworkChanged("mock", nextNetwork);
+
+  assert.equal(manager.getSession()?.account.address, "rNextAddress");
+  assert.equal(manager.getSession()?.account.network?.id, "testnet");
+});
+
 test("WalletManager signs transactions without submitting when adapter supports signTransaction", async () => {
   class SignOnlyAdapter extends MockAdapter {
     capabilities = { connect: true, signTransaction: true };
@@ -549,4 +644,18 @@ test("normalizeTxResult preserves signed-only transaction results", () => {
 
   assert.equal(result.signed, true);
   assert.equal(result.rejected, undefined);
+});
+
+test("Wallet UI messages resolve locale defaults and caller overrides", () => {
+  const messages = resolveWalletUiMessages("vi-VN", {
+    connectWallet: "Custom connect",
+    walletCount: (count) => `${count} custom wallets`
+  });
+
+  assert.equal(messages.connectWallet, "Custom connect");
+  assert.equal(messages.disconnect, "Ngắt kết nối");
+  assert.equal(messages.walletCount(3), "3 custom wallets");
+  assert.equal(normalizeWalletUiLocale("vi"), "vi-VN");
+  assert.equal(resolveWalletUiMessages("vi").disconnect, "Ngắt kết nối");
+  assert.equal(resolveWalletUiMessages("en-US").connectWallet, "Connect Wallet");
 });

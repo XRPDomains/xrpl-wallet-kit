@@ -1,6 +1,7 @@
 export * from "./types";
 export * from "./themes";
 export * from "./config";
+export * from "./locales";
 export * from "./modal";
 export * from "./button";
 export * from "./balance";

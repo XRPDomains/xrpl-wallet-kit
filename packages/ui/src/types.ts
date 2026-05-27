@@ -1,4 +1,5 @@
 import type { WalletManager, WalletNetwork, WalletSession } from "@xrpl-wallet-kit/core";
+import type { WalletUiLocale, WalletUiMessagesInput } from "./locales";
 export type WalletUiLayout = "list" | "card" | "grid" | "icon";
 export type WalletUiSize = "compact" | "default" | "wide";
 export type WalletUiThemeMode = "light" | "dark" | "auto";
@@ -44,6 +45,9 @@ export interface WalletUiOptions {
   groups?: WalletUiGroup[];
   title?: string;
   footerText?: string;
+  language?: WalletUiLocale;
+  messages?: WalletUiMessagesInput;
+  transactionPreview?: WalletTransactionPreviewResolver;
   showWalletGroup?: boolean;
 }
 
@@ -84,6 +88,8 @@ export type WalletBalanceResolver = (context: {
 export interface WalletModalController {
   open(): void;
   close(notify?: boolean, restoreFocus?: boolean): void;
+  isOpen(): boolean;
+  on(event: "open" | "close", handler: () => void): () => void;
   onClose(handler: () => void): () => void;
 }
 
@@ -106,6 +112,8 @@ export interface WalletButtonOptions {
   variant?: WalletButtonVariant;
   themeMode?: WalletUiThemeMode;
   theme?: WalletUiTheme;
+  language?: WalletUiLocale;
+  messages?: WalletUiMessagesInput;
   identityResolver?: WalletIdentityResolver;
   balanceResolver?: WalletBalanceResolver;
   onIdentityChange?: (identity: WalletIdentity | null, session: WalletSession | null) => void;
@@ -157,6 +165,14 @@ export interface WalletConnectButtonUiConfig {
   showChevron?: boolean;
 }
 
+export interface WalletTransactionPreview {
+  summary: string;
+  details?: Array<{ label: string; value: string }>;
+  raw?: unknown;
+}
+
+export type WalletTransactionPreviewResolver = (txJson: unknown) => WalletTransactionPreview | null | Promise<WalletTransactionPreview | null>;
+
 export interface WalletAccountPanelUiConfig {
   mode?: WalletAccountPanelMode;
   showAvatar?: boolean;
@@ -174,7 +190,8 @@ export interface WalletIdentityUiConfig {
 export interface WalletUiConfig {
   mode?: WalletUiThemeMode;
   themeName?: WalletUiThemeName;
-  language?: string;
+  language?: WalletUiLocale;
+  messages?: WalletUiMessagesInput;
   customTheme?: WalletUiTheme;
   modal?: WalletModalConfig;
   walletList?: WalletListConfig;
@@ -182,6 +199,7 @@ export interface WalletUiConfig {
   connectButton?: WalletConnectButtonUiConfig;
   accountPanel?: WalletAccountPanelUiConfig;
   identity?: WalletIdentityUiConfig;
+  transactionPreview?: WalletTransactionPreviewResolver;
 }
 
 export type WalletButtonConfig = Partial<Omit<WalletButtonOptions, "manager" | "modal" | "target">>;

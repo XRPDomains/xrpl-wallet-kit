@@ -5,12 +5,13 @@ import type { WalletKitLogger } from "./logger";
 import { DEFAULT_XRPL_NETWORKS, createNetworkRegistry, getHttpRpcUrl } from "./networks";
 import { normalizeTxResult, pickPath } from "./result";
 import { MemoryWalletStorage } from "./storage";
-import type { ConnectOptions, SignAndSubmitRequest, SignMessageRequest, SignTransactionRequest, SignTransactionResult, StoredWalletSessionEnvelope, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletCapabilities, WalletManagerConfig, WalletNetwork, WalletSession, WalletStorage } from "./types";
+import type { AddWalletTransactionRequest, AuthenticateRequest, AuthenticateResult, ConnectOptions, SignAndSubmitRequest, SignMessageRequest, SignTransactionRequest, SignTransactionResult, StoredWalletSessionEnvelope, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletCapabilities, WalletManagerConfig, WalletNetwork, WalletSession, WalletStorage, WalletTransaction } from "./types";
 
 const SESSION_KEY = "session";
 export const WALLET_STORAGE_VERSION = 1;
 const RECOVER_SESSION_RETRY_DELAYS_MS = [0, 700, 1600, 3000];
 const DEFAULT_ACCOUNT_STATUS_TIMEOUT_MS = 2500;
+const DEFAULT_AUTHENTICATE_EXPIRES_IN_SECONDS = 3600;
 
 export class WalletManager extends WalletEventEmitter {
   readonly adapters = new Map<string, WalletAdapter>();
@@ -23,6 +24,7 @@ export class WalletManager extends WalletEventEmitter {
   private pendingAdapterId: string | null = null;
   private pendingAbortController?: AbortController;
   private autoReconnectPromise?: Promise<WalletSession | null>;
+  private transactions = new Map<string, WalletTransaction>();
 
   constructor(private config: WalletManagerConfig) {
     super();
@@ -165,7 +167,8 @@ export class WalletManager extends WalletEventEmitter {
 
     const announcedAdapters = new Set<string>();
 
-    for (const delayMs of RECOVER_SESSION_RETRY_DELAYS_MS) {
+    const recoveryRetryDelaysMs = this.config.recoveryRetryDelaysMs ?? RECOVER_SESSION_RETRY_DELAYS_MS;
+    for (const delayMs of recoveryRetryDelaysMs) {
       if (delayMs > 0) await this.delay(delayMs);
       for (const adapter of recoverableAdapters) {
         try {
@@ -187,7 +190,7 @@ export class WalletManager extends WalletEventEmitter {
     }
 
     recoverableAdapters.forEach((adapter) => {
-      this.emit("session_stale", { adapterId: adapter.metadata.id, reason: "recover_unavailable", attempts: RECOVER_SESSION_RETRY_DELAYS_MS.length });
+      this.emit("session_stale", { adapterId: adapter.metadata.id, reason: "recover_unavailable", attempts: recoveryRetryDelaysMs.length });
       void adapter.cancelPendingConnection?.();
     });
     return null;
@@ -295,18 +298,88 @@ export class WalletManager extends WalletEventEmitter {
     }
   }
 
+  async authenticate(request: AuthenticateRequest): Promise<AuthenticateResult> {
+    const account = request.account ?? this.getAccount();
+    if (!account) throw createWalletError.notConnected();
+
+    const issuedAt = new Date();
+    const expiresAt = new Date(issuedAt.getTime() + (request.expiresIn ?? DEFAULT_AUTHENTICATE_EXPIRES_IN_SECONDS) * 1000);
+    const message = [
+      request.statement,
+      "",
+      `Address: ${account.address}`,
+      `Issued At: ${issuedAt.toISOString()}`,
+      `Expires At: ${expiresAt.toISOString()}`
+    ].join("\n");
+    const result = await this.signMessage({ message, account });
+
+    return {
+      address: account.address,
+      message,
+      signature: result.signature,
+      txBlob: result.txBlob,
+      issuedAt: issuedAt.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      statement: request.statement,
+      raw: result.raw
+    };
+  }
+
   async signAndSubmit(request: SignAndSubmitRequest) {
     const adapter = this.requireActiveAdapter("signAndSubmit");
     try {
       this.emit("signing", { adapterId: adapter.metadata.id, kind: "transaction" });
       const result = normalizeTxResult(await adapter.signAndSubmit!(request));
       this.emit("signed", { adapterId: adapter.metadata.id, kind: "transaction", result });
+      if (result.hash) {
+        this.addTransaction({
+          hash: result.hash,
+          status: "submitted",
+          adapterId: adapter.metadata.id,
+          account: this.getAccount() ?? undefined,
+          result
+        });
+      }
       return result;
     } catch (error) {
       const normalized = normalizeWalletError(error);
       this.emit("rejected", { adapterId: adapter.metadata.id, kind: "transaction", error: normalized });
       throw normalized;
     }
+  }
+
+  addTransaction(request: AddWalletTransactionRequest): WalletTransaction {
+    const existing = this.transactions.get(request.hash);
+    const status = request.status ?? existing?.status ?? "submitted";
+    const transaction: WalletTransaction = {
+      ...existing,
+      hash: request.hash,
+      status,
+      adapterId: request.adapterId ?? existing?.adapterId ?? this.activeAdapterId ?? undefined,
+      account: request.account ?? existing?.account ?? this.getAccount() ?? undefined,
+      description: request.description ?? existing?.description,
+      submittedAt: request.submittedAt ?? existing?.submittedAt ?? Date.now(),
+      confirmedAt: request.confirmedAt ?? existing?.confirmedAt,
+      failedAt: request.failedAt ?? existing?.failedAt,
+      result: request.result ?? existing?.result,
+      error: request.error ?? existing?.error,
+      metadata: request.metadata ?? existing?.metadata
+    };
+    this.transactions.set(transaction.hash, transaction);
+
+    if (status === "confirmed") {
+      this.emit("tx_confirmed", { adapterId: transaction.adapterId, account: transaction.account, hash: transaction.hash, result: transaction.result, transaction });
+    } else if (status === "failed") {
+      this.emit("tx_failed", { adapterId: transaction.adapterId, account: transaction.account, hash: transaction.hash, error: transaction.error ?? new Error("Transaction failed"), transaction });
+    } else {
+      this.emit("tx_submitted", { adapterId: transaction.adapterId, account: transaction.account, hash: transaction.hash, transaction });
+    }
+
+    return transaction;
+  }
+
+  getTransactions(): WalletTransaction[] {
+    return [...this.transactions.values()];
   }
 
   async signTransaction(request: SignTransactionRequest): Promise<SignTransactionResult> {

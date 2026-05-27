@@ -10,7 +10,7 @@ export const lightTheme: ResolvedTheme = {
   overlay: "rgba(15,23,42,.46)",
   surface: "#f8fafc",
   surfaceHover: "#f1f5f9",
-  shadow: "none",
+  shadow: "0 8px 40px rgba(15,23,42,.12), 0 0 0 1px rgba(15,23,42,.04)",
   radius: "14px",
   walletRadius: "10px",
   fontFamily: "Inter, system-ui, sans-serif"

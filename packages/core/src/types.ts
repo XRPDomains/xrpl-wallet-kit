@@ -12,7 +12,7 @@ export interface WalletNetwork {
   nativeAssetDecimals?: number;
   rpcUrl: string;
   httpRpcUrl?: string;
-  walletConnectChainId: string;
+  walletConnectChainId?: string;
   networkId?: number;
   definitionsUrl?: string;
   explorerTxUrl?: string;
@@ -78,6 +78,23 @@ export interface SignMessageResult {
   raw?: unknown;
 }
 
+export interface AuthenticateRequest {
+  statement: string;
+  expiresIn?: number;
+  account?: WalletAccount;
+}
+
+export interface AuthenticateResult {
+  address: string;
+  message: string;
+  signature?: string;
+  txBlob?: string;
+  issuedAt: string;
+  expiresAt: string;
+  statement: string;
+  raw?: unknown;
+}
+
 export interface SignAndSubmitRequest {
   txJson: TransactionPayload;
   methodHint?: "payment" | "createNFTOffer" | "acceptNFTOffer" | "cancelNFTOffer" | "generic";
@@ -104,6 +121,36 @@ export interface TxResult {
   signed?: boolean;
   rejected?: boolean;
   raw?: unknown;
+}
+
+export type WalletTransactionStatus = "submitted" | "confirmed" | "failed";
+
+export interface WalletTransaction {
+  hash: string;
+  status: WalletTransactionStatus;
+  adapterId?: string;
+  account?: WalletAccount;
+  description?: string;
+  submittedAt: number;
+  confirmedAt?: number;
+  failedAt?: number;
+  result?: unknown;
+  error?: unknown;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AddWalletTransactionRequest {
+  hash: string;
+  status?: WalletTransactionStatus;
+  adapterId?: string;
+  account?: WalletAccount;
+  description?: string;
+  submittedAt?: number;
+  confirmedAt?: number;
+  failedAt?: number;
+  result?: unknown;
+  error?: unknown;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ConnectOptions {
@@ -145,6 +192,9 @@ export type WalletEventName =
   | "rejected"
   | "accountChanged"
   | "networkChanged"
+  | "tx_submitted"
+  | "tx_confirmed"
+  | "tx_failed"
   | "session_restored"
   | "session_stale"
   | "session_expired";
@@ -160,6 +210,9 @@ export interface WalletEvents {
   rejected: { adapterId: string; kind?: "message" | "transaction"; error?: unknown };
   accountChanged: { adapterId: string; account: WalletAccount; previousAccount?: WalletAccount };
   networkChanged: { adapterId: string; network?: WalletNetwork; previousNetwork?: WalletNetwork };
+  tx_submitted: { adapterId?: string; account?: WalletAccount; hash: string; result?: TxResult | WalletTransaction; transaction?: WalletTransaction };
+  tx_confirmed: { adapterId?: string; account?: WalletAccount; hash: string; result?: unknown; transaction?: WalletTransaction };
+  tx_failed: { adapterId?: string; account?: WalletAccount; hash?: string; error: unknown; transaction?: WalletTransaction };
   session_restored: { adapterId: string; account: WalletAccount; session: WalletSession; stale?: boolean };
   session_stale: { adapterId: string; account?: WalletAccount; session?: WalletSession; reason?: string; attempts?: number };
   session_expired: { adapterId?: string };
@@ -189,6 +242,7 @@ export interface WalletManagerConfig {
   adapters?: WalletAdapter[];
   storage?: WalletStorage;
   autoReconnect?: boolean;
+  recoveryRetryDelaysMs?: number[];
   accountStatus?: {
     enabled?: boolean;
     timeoutMs?: number;
