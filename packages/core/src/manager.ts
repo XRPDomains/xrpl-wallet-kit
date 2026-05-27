@@ -12,6 +12,9 @@ export const WALLET_STORAGE_VERSION = 1;
 const RECOVER_SESSION_RETRY_DELAYS_MS = [0, 700, 1600, 3000];
 const DEFAULT_ACCOUNT_STATUS_TIMEOUT_MS = 2500;
 const DEFAULT_AUTHENTICATE_EXPIRES_IN_SECONDS = 3600;
+const DEFAULT_TX_CONFIRMATION_ATTEMPTS = 6;
+const DEFAULT_TX_CONFIRMATION_INTERVAL_MS = 2500;
+const DEFAULT_TX_CONFIRMATION_TIMEOUT_MS = 4000;
 
 export class WalletManager extends WalletEventEmitter {
   readonly adapters = new Map<string, WalletAdapter>();
@@ -25,6 +28,7 @@ export class WalletManager extends WalletEventEmitter {
   private pendingAbortController?: AbortController;
   private autoReconnectPromise?: Promise<WalletSession | null>;
   private transactions = new Map<string, WalletTransaction>();
+  private pendingConfirmations = new Map<string, AbortController>();
 
   constructor(private config: WalletManagerConfig) {
     super();
@@ -373,6 +377,7 @@ export class WalletManager extends WalletEventEmitter {
       this.emit("tx_failed", { adapterId: transaction.adapterId, account: transaction.account, hash: transaction.hash, error: transaction.error ?? new Error("Transaction failed"), transaction });
     } else {
       this.emit("tx_submitted", { adapterId: transaction.adapterId, account: transaction.account, hash: transaction.hash, transaction });
+      this.confirmTransaction(transaction);
     }
 
     return transaction;
@@ -439,7 +444,9 @@ export class WalletManager extends WalletEventEmitter {
   }
 
   destroy(): void {
+    this.cancelTransactionConfirmations();
     void this.cancelPendingConnection();
+    // Adapter sign methods usually cannot be aborted externally; callers should ignore late results after teardown.
     this.removeAllListeners();
   }
 
@@ -503,6 +510,108 @@ export class WalletManager extends WalletEventEmitter {
     } finally {
       if (timer) clearTimeout(timer);
     }
+  }
+
+  private confirmTransaction(transaction: WalletTransaction): void {
+    if (this.config.transactionConfirmation?.enabled === false) return;
+    if (this.pendingConfirmations.has(transaction.hash)) return;
+    const rpcUrl = transaction.account?.network ? getHttpRpcUrl(transaction.account.network) : undefined;
+    if (!rpcUrl || typeof fetch !== "function") return;
+
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : undefined;
+    if (controller) this.pendingConfirmations.set(transaction.hash, controller);
+    void this.runTransactionConfirmation(transaction, rpcUrl, controller).finally(() => {
+      this.pendingConfirmations.delete(transaction.hash);
+    });
+  }
+
+  private async runTransactionConfirmation(transaction: WalletTransaction, rpcUrl: string, controller?: AbortController): Promise<void> {
+    const attempts = Math.max(1, this.config.transactionConfirmation?.attempts ?? DEFAULT_TX_CONFIRMATION_ATTEMPTS);
+    const intervalMs = Math.max(0, this.config.transactionConfirmation?.intervalMs ?? DEFAULT_TX_CONFIRMATION_INTERVAL_MS);
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      if (controller?.signal.aborted) return;
+      if (attempt > 0 && intervalMs > 0) await this.delay(intervalMs);
+      if (controller?.signal.aborted) return;
+      try {
+        const result = await this.lookupTransaction(transaction.hash, rpcUrl, controller?.signal);
+        if (!result || !result.validated) continue;
+        if (result.transactionResult === "tesSUCCESS") {
+          this.addTransaction({
+            ...transaction,
+            status: "confirmed",
+            confirmedAt: Date.now(),
+            result: result.raw
+          });
+          return;
+        }
+        if (!result.transactionResult) continue;
+        this.addTransaction({
+          ...transaction,
+          status: "failed",
+          failedAt: Date.now(),
+          result: result.raw,
+          error: new Error(result.transactionResult ?? "Transaction failed")
+        });
+        return;
+      } catch (error) {
+        if (controller?.signal.aborted) return;
+        this.logger.debug(`Transaction confirmation lookup failed for ${transaction.hash}`, error);
+      }
+    }
+  }
+
+  private async lookupTransaction(hash: string, rpcUrl: string, signal?: AbortSignal): Promise<{ validated: boolean; transactionResult?: string; raw: unknown } | null> {
+    const response = await this.fetchJsonRpc(rpcUrl, {
+      method: "tx",
+      params: [{ transaction: hash, binary: false }]
+    }, signal, this.config.transactionConfirmation?.timeoutMs ?? DEFAULT_TX_CONFIRMATION_TIMEOUT_MS);
+    const result = response.result as Record<string, unknown> | undefined;
+    if (!result || result.error === "txnNotFound") return null;
+    const validated = result.validated === true;
+    const meta = result.meta ?? result.metaData ?? result.metadata;
+    const transactionResult = pickPath({ meta, result }, [
+      "meta.TransactionResult",
+      "meta.transaction_result",
+      "metaData.TransactionResult",
+      "metadata.TransactionResult",
+      "result.meta.TransactionResult",
+      "result.metaData.TransactionResult"
+    ]);
+    return {
+      validated,
+      transactionResult: typeof transactionResult === "string" ? transactionResult : undefined,
+      raw: response
+    };
+  }
+
+  private async fetchJsonRpc(rpcUrl: string, body: unknown, signal: AbortSignal | undefined, timeoutMs: number): Promise<Record<string, unknown>> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timeoutController: AbortController | undefined;
+    let requestSignal = signal;
+    if (typeof AbortController !== "undefined" && timeoutMs > 0) {
+      timeoutController = new AbortController();
+      requestSignal = timeoutController.signal;
+      if (signal) {
+        signal.addEventListener("abort", () => timeoutController?.abort(), { once: true });
+      }
+      timer = setTimeout(() => timeoutController?.abort(), timeoutMs);
+    }
+    try {
+      const response = await fetch(rpcUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal: requestSignal
+      });
+      return await response.json() as Record<string, unknown>;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  private cancelTransactionConfirmations(): void {
+    this.pendingConfirmations.forEach((controller) => controller.abort());
+    this.pendingConfirmations.clear();
   }
 
   private requireAdapter(adapterId: string): WalletAdapter {

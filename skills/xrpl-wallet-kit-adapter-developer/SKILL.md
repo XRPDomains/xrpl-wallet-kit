@@ -76,6 +76,7 @@ Optional methods:
 - `disconnect()` if provider supports cleanup/logout;
 - `restoreSession(session)` for `autoReconnect`;
 - `signMessage(request)` only if supported;
+- `signTransaction(request)` only if the wallet can sign without submitting;
 - `signAndSubmit(request)` only if supported.
 - `canRecoverSession()` plus `recoverSession()` only for redirect/deeplink/session recovery flows.
 - `cancelPendingConnection()` when the adapter can leave pending proposals, popups, timers, or temporary markers.
@@ -122,7 +123,14 @@ Use `createWalletError` from `@xrpl-wallet-kit/core` where possible.
 - Normalize account metadata into `WalletAccount`.
 - Include `network` when known; otherwise rely on `WalletManager` default network enrichment.
 - Return `session.wallet` metadata if the adapter can provide it.
+- Honor `ConnectOptions.signal` when the provider or SDK exposes an abort/cancel API. If the provider cannot be aborted externally, `cancelPendingConnection()` must still clear local timers, markers, popups, and pending proposal references.
+- Use injected `WalletStorage` or core storage helpers for redirect/mobile recovery markers. Do not call `window.localStorage` directly in new adapter code.
+- For `signTransaction()`, return a signed-only result (`txBlob`, `signed`, `raw`) and never submit to the network.
+- For `signAndSubmit()`, return a normalized result with `hash` whenever the provider submitted a transaction successfully. Core transaction lifecycle events and WalletToast rely on that hash.
+- Use or mirror `normalizeTxResult()` for provider-specific response shapes such as `hash`, `txHash`, `tx_hash`, `transactionHash`, nested `result.hash`, or nested `response.data.transaction_hash`.
+- Preserve provider results under `raw` so integrators can debug wallet-specific behavior without leaking it into normalized public fields.
 - For WalletConnect, keep wallet list/deeplink config separate from protocol logic.
+- For WalletConnect, `walletConnectChainId` is optional on `WalletNetwork`, but WalletConnect paths must validate it at runtime and throw a clear network configuration error when it is missing.
 - For mobile flows, consider focus/pageshow/visibility return paths and stale proposal cleanup.
 - For hardware wallets, do not fake a restored connection after refresh. Require a fresh device/user confirmation unless the transport SDK explicitly supports safe session restoration.
 

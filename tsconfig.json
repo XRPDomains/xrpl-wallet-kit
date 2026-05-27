@@ -9,6 +9,7 @@
     { "path": "./packages/adapters/dropfi" },
     { "path": "./packages/adapters/xrpl-snap" },
     { "path": "./packages/adapters/ledger" },
+    { "path": "./packages/adapters/otsu" },
     { "path": "./packages/ui" },
     { "path": "./packages/react" },
     { "path": "./packages/next" },

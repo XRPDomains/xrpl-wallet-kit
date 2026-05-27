@@ -68,6 +68,11 @@ createWalletKit({
       disconnect: true,
       explorer: false
     },
+    toast: {
+      position: "bottom-right",
+      maxVisible: 3,
+      autoDismissMs: 5000
+    },
     identity: {
       enabled: true,
       fallbackToAddress: true,
@@ -274,6 +279,38 @@ accountPanel: {
 - `explorer`: hiện explorer action khi có `explorerUrl`.
 
 Default hiện tại: `modal`. Trên mobile, `modal` tự thành bottom sheet.
+
+## `ui.toast`
+
+Thong bao transaction dang toast, mac dinh tat neu khong cau hinh.
+
+```ts
+toast: true
+```
+
+hoac:
+
+```ts
+toast: {
+  position: "bottom-right",
+  maxVisible: 3,
+  autoDismissMs: 5000,
+  explorerUrl: (hash, network) => undefined
+}
+```
+
+- `false` hoac bo trong: tat toast.
+- `true`: bat toast voi default.
+- object: bat toast va override cau hinh nang cao.
+
+Field:
+
+- `position`: `bottom-right`, `bottom-left`, hoac `bottom-center`.
+- `maxVisible`: so toast toi da hien cung luc.
+- `autoDismissMs`: thoi gian tu dong an sau khi transaction confirmed/failed. Dat `0` neu muon user tu tat.
+- `explorerUrl`: resolver URL tuy chinh. Neu khong co, toast dung `explorerTxUrl` cua network thong qua `getExplorerTxUrl()`.
+
+Transaction confirmation chi la best-effort. Kit se polling ngan neu co hash va HTTP RPC URL. Neu chua ket luan duoc, toast giu trang thai `Transaction submitted` va hien link `View` de user tu xem tren explorer.
 
 ## `ui.identity`
 

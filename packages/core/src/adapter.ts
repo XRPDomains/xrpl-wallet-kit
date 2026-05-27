@@ -1,7 +1,7 @@
-import type { WalletAdapter, WalletAdapterType, WalletMetadata } from "./types";
+import type { WalletAdapter, WalletAdapterApiVersion, WalletAdapterType, WalletMetadata } from "./types";
 import { createWalletError } from "./errors";
 
-export const WALLET_ADAPTER_API_VERSION = "1.0";
+export const WALLET_ADAPTER_API_VERSION: WalletAdapterApiVersion = "1.0";
 
 export type AdapterValidationSeverity = "error" | "warning";
 
@@ -124,7 +124,7 @@ export function assertWalletAdapter(adapter: unknown): void {
 }
 
 export abstract class BaseWalletAdapter implements WalletAdapter {
-  adapterApiVersion = WALLET_ADAPTER_API_VERSION;
+  adapterApiVersion: WalletAdapterApiVersion = WALLET_ADAPTER_API_VERSION;
   abstract metadata: WalletMetadata;
   abstract capabilities: WalletAdapter["capabilities"];
   abstract connect(...args: Parameters<WalletAdapter["connect"]>): ReturnType<WalletAdapter["connect"]>;

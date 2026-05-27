@@ -22,7 +22,7 @@ Patch and minor releases in the `1.x` line should remain compatible with this co
 
 ```ts
 interface WalletAdapter {
-  adapterApiVersion?: string;
+  adapterApiVersion?: "1.0" | (string & {});
   metadata: WalletMetadata;
   capabilities: WalletCapabilities;
 

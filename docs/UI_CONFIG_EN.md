@@ -74,6 +74,12 @@ createWalletKit({
       explorer: false
     },
 
+    toast: {
+      position: "bottom-right",
+      maxVisible: 3,
+      autoDismissMs: 5000
+    },
+
     identity: {
       enabled: true,
       fallbackToAddress: true,
@@ -352,6 +358,40 @@ Fields:
 - `modal`: centered modal on desktop, bottom sheet on mobile.
 
 Current default: `modal`.
+
+## `ui.toast`
+
+Optional transaction toast notifications.
+
+```ts
+toast: true
+```
+
+or:
+
+```ts
+toast: {
+  position: "bottom-right",
+  maxVisible: 3,
+  autoDismissMs: 5000,
+  explorerUrl: (hash, network) => undefined
+}
+```
+
+Values:
+
+- `false` or omitted: toast UI is disabled.
+- `true`: enables default toast behavior.
+- object: enables toast behavior with overrides.
+
+Fields:
+
+- `position`: `bottom-right`, `bottom-left`, or `bottom-center`.
+- `maxVisible`: maximum visible toast count.
+- `autoDismissMs`: auto-dismiss delay after a transaction reaches `confirmed` or `failed`. Set `0` to keep those toasts until manually dismissed.
+- `explorerUrl`: optional URL resolver. When omitted, the toast uses the connected network's `explorerTxUrl` through `getExplorerTxUrl()`.
+
+Transaction confirmation is best-effort. The kit listens for a submitted hash and does short polling when the network has an HTTP RPC URL. If confirmation is inconclusive, the toast remains in `Transaction submitted` state and keeps the `View` link so the user can inspect the transaction on an explorer.
 
 ## `ui.identity`
 

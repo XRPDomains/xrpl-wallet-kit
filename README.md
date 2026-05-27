@@ -117,6 +117,12 @@ export function App() {
 - `list`: show supported WalletConnect wallets as normal wallet items.
 - `group`: show one WalletConnect entry, then let users choose a supported wallet.
 
+## Transaction Toasts
+
+Enable built-in transaction notifications with `ui.toast: true`, or pass an object for `position`, `maxVisible`, `autoDismissMs`, and `explorerUrl`.
+
+The built-in confirmer is intentionally best-effort. When a submitted hash is available, the kit polls briefly through the network HTTP RPC URL. If the result is confirmed, the toast updates to confirmed; if the result is inconclusive, it stays submitted and provides a `View` link to the configured explorer.
+
 ## Environment
 
 ```env

@@ -9,6 +9,7 @@ import {
   assertWalletAdapter,
   createNetworkRegistry,
   getExplorerAccountUrl,
+  getExplorerTxUrl,
   getHttpRpcUrl,
   getNativeAsset,
   isMainnetNetwork,
@@ -436,6 +437,73 @@ test("WalletManager emits transaction lifecycle events and stores submitted tran
   assert.deepEqual(manager.getTransactions().map((tx) => tx.hash), ["mock-hash", "manual-confirm", "manual-fail"]);
 });
 
+test("WalletManager confirms submitted transactions with best-effort polling", async () => {
+  const originalFetch = globalThis.fetch;
+  const confirmNetwork = { ...network, httpRpcUrl: "https://rpc.test" };
+  globalThis.fetch = async () => ({
+    json: async () => ({
+      result: {
+        validated: true,
+        meta: {
+          TransactionResult: "tesSUCCESS"
+        }
+      }
+    })
+  }) as Response;
+  try {
+    const manager = new WalletManager({
+      appName: "Test",
+      adapters: [new MockAdapter()],
+      accountStatus: { enabled: false },
+      transactionConfirmation: { attempts: 1, intervalMs: 0 },
+      logger: { level: "silent" }
+    });
+    const confirmed = new Promise<string>((resolve) => {
+      manager.on("tx_confirmed", (event) => resolve(event.hash));
+    });
+
+    await manager.connect("mock", { network: confirmNetwork });
+    await manager.signAndSubmit({ txJson: { TransactionType: "Payment" } });
+
+    assert.equal(await confirmed, "mock-hash");
+    assert.equal(manager.getTransactions().find((tx) => tx.hash === "mock-hash")?.status, "confirmed");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("WalletManager keeps submitted transactions pending when confirmation is inconclusive", async () => {
+  const originalFetch = globalThis.fetch;
+  const confirmNetwork = { ...network, httpRpcUrl: "https://rpc.test" };
+  globalThis.fetch = async () => ({
+    json: async () => ({
+      result: {
+        error: "txnNotFound"
+      }
+    })
+  }) as Response;
+  try {
+    const manager = new WalletManager({
+      appName: "Test",
+      adapters: [new MockAdapter()],
+      accountStatus: { enabled: false },
+      transactionConfirmation: { attempts: 1, intervalMs: 0 },
+      logger: { level: "silent" }
+    });
+    const failed: string[] = [];
+    manager.on("tx_failed", (event) => failed.push(event.hash ?? "missing"));
+
+    await manager.connect("mock", { network: confirmNetwork });
+    await manager.signAndSubmit({ txJson: { TransactionType: "Payment" } });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    assert.deepEqual(failed, []);
+    assert.equal(manager.getTransactions().find((tx) => tx.hash === "mock-hash")?.status, "submitted");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("WalletManager keeps the active session in sync with account and network changes", async () => {
   const storage = new MemoryWalletStorage();
   const manager = new WalletManager({
@@ -568,7 +636,8 @@ test("NetworkRegistry resolves native asset, HTTP RPC, explorer, and mainnet ide
     nativeAssetDecimals: 6,
     rpcUrl: "wss://xahau.network",
     walletConnectChainId: "xrpl:21337",
-    explorerAccountUrl: "https://explorer.xahau.network/accounts/{address}"
+    explorerAccountUrl: "https://explorer.xahau.network/accounts/{address}",
+    explorerTxUrl: "https://explorer.xahau.network/tx/{hash}"
   } as const;
   const registry = createNetworkRegistry([network, xahau]);
 
@@ -576,6 +645,7 @@ test("NetworkRegistry resolves native asset, HTTP RPC, explorer, and mainnet ide
   assert.equal(getNativeAsset(xahau), "XAH");
   assert.equal(getHttpRpcUrl(xahau), "https://xahau.network");
   assert.equal(getExplorerAccountUrl(xahau, "rTest"), "https://explorer.xahau.network/accounts/rTest");
+  assert.equal(getExplorerTxUrl(xahau, "ABC/123"), "https://explorer.xahau.network/tx/ABC%2F123");
   assert.equal(isMainnetNetwork(network), true);
   assert.equal(isMainnetNetwork(xahau), false);
 });
@@ -644,6 +714,12 @@ test("normalizeTxResult preserves signed-only transaction results", () => {
 
   assert.equal(result.signed, true);
   assert.equal(result.rejected, undefined);
+});
+
+test("normalizeTxResult extracts wallet-specific transaction hash shapes", () => {
+  assert.equal(normalizeTxResult({ type: "response", result: { hash: "gem-hash" } }).hash, "gem-hash");
+  assert.equal(normalizeTxResult({ result: { txHash: "camel-hash" } }).hash, "camel-hash");
+  assert.equal(normalizeTxResult({ response: { data: { transaction_hash: "snake-hash" } } }).hash, "snake-hash");
 });
 
 test("Wallet UI messages resolve locale defaults and caller overrides", () => {

@@ -101,6 +101,14 @@ export function getExplorerAccountUrl(network: WalletNetwork | undefined, addres
   return undefined;
 }
 
+export function getExplorerTxUrl(network: WalletNetwork | undefined, hash: string): string | undefined {
+  if (!network?.explorerTxUrl) return undefined;
+  const encodedHash = encodeURIComponent(hash);
+  return network.explorerTxUrl.includes("{hash}")
+    ? network.explorerTxUrl.replace("{hash}", encodedHash)
+    : `${network.explorerTxUrl.replace(/\/$/, "")}/${encodedHash}`;
+}
+
 export function isMainnetNetwork(network?: WalletNetwork): boolean {
   return network?.networkType === "MAINNET" && (network.family ?? "xrpl") === "xrpl" && getNativeAsset(network) === "XRP";
 }

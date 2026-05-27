@@ -57,6 +57,7 @@ type SignMessagePreviewAdapter = WalletAdapter & {
 let manager: WalletManager;
 let modal: { open(): void; updateOptions(options: Record<string, unknown>): void; destroy(): void } | undefined;
 let walletButton: { updateOptions(options: Record<string, unknown>): void; destroy(): void } | undefined;
+let walletToast: { mount(): void; destroy(): void } | undefined;
 let bootstrapRun = 0;
 
 [uiTheme, walletLayout].forEach((control) => {
@@ -122,9 +123,12 @@ async function resetPreview() {
   bootstrapRun += 1;
   modal?.destroy();
   walletButton?.destroy();
+  walletToast?.destroy();
   modal = undefined;
   walletButton = undefined;
+  walletToast = undefined;
   document.querySelectorAll(".xwk-overlay").forEach((node) => node.remove());
+  document.querySelectorAll(".xwk-toast-root").forEach((node) => node.remove());
   await bootstrap(bootstrapRun);
 }
 
@@ -191,12 +195,20 @@ async function bootstrap(run = bootstrapRun) {
     log("config_warning", { message: "VITE_WALLETCONNECT_PROJECT_ID is not set; WalletConnect preview adapters are disabled." });
   }
 
-  const { createWalletButton, createWalletModal } = await import("../../../packages/ui/src");
+  const { createWalletButton, createWalletModal, createWalletToast } = await import("../../../packages/ui/src");
   if (run !== bootstrapRun) return;
   modal = createWalletModal({
     manager,
     ...getWalletUiOptions()
   });
+  walletToast = createWalletToast({
+    manager,
+    ...getWalletUiOptions(),
+    position: "bottom-right",
+    maxVisible: 3,
+    autoDismissMs: 5000
+  });
+  walletToast.mount();
   walletButton = createWalletButton({
     manager,
     modal,
@@ -228,6 +240,9 @@ async function bootstrap(run = bootstrapRun) {
   manager.on("qr", (event) => log("qr", { adapterId: event.adapterId, uriLength: event.uri.length, deeplink: event.deeplink }));
   manager.on("signing", (event) => log("signing", event));
   manager.on("signed", (event) => log("signed", event));
+  manager.on("tx_submitted", (event) => log("tx_submitted", event));
+  manager.on("tx_confirmed", (event) => log("tx_confirmed", event));
+  manager.on("tx_failed", (event) => log("tx_failed", { hash: event.hash, message: formatError(event.error) }));
   manager.on("error", (event) => log("error", { message: formatError(event.error) }));
 
   await manager.autoReconnect();

@@ -1,9 +1,10 @@
-import { BaseWalletAdapter, WALLET_ADAPTER_API_VERSION, createWalletError } from "@xrpl-wallet-kit/core";
+import { BaseWalletAdapter, WALLET_ADAPTER_API_VERSION, createWalletError, normalizeTxResult } from "@xrpl-wallet-kit/core";
 import type {
   ConnectOptions,
   ConnectResult,
   SignAndSubmitRequest,
   SignMessageRequest,
+  SignTransactionRequest,
   WalletCapabilities,
   WalletMetadata,
   WalletSession
@@ -15,7 +16,8 @@ interface MyWalletProvider {
   connect(): Promise<string>;
   disconnect?: () => Promise<void>;
   signMessage?: (message: string) => Promise<{ signature?: string; raw?: unknown }>;
-  signAndSubmit?: (txJson: Record<string, unknown>) => Promise<{ hash?: string; status?: string; raw?: unknown }>;
+  signTransaction?: (txJson: Record<string, unknown>) => Promise<{ txBlob?: string; signed?: boolean; raw?: unknown }>;
+  signAndSubmit?: (txJson: Record<string, unknown>) => Promise<unknown>;
 }
 
 export interface MyWalletAdapterOptions {
@@ -30,9 +32,8 @@ export class MyWalletAdapter extends BaseWalletAdapter {
     connect: true,
     disconnect: true,
     signMessage: true,
-    signAndSubmit: true,
-    payments: true,
-    nftOffers: true
+    signTransaction: true,
+    signAndSubmit: true
   };
 
   constructor(private options: MyWalletAdapterOptions = {}) {
@@ -51,6 +52,7 @@ export class MyWalletAdapter extends BaseWalletAdapter {
   }
 
   async connect(options: ConnectOptions): Promise<ConnectResult> {
+    if (options.signal?.aborted) throw createWalletError.connectionRejected(this.metadata.name, new Error("Connection canceled"));
     const provider = this.requireProvider();
     const address = await provider.connect();
     const account = { address, network: options.network };
@@ -81,10 +83,16 @@ export class MyWalletAdapter extends BaseWalletAdapter {
     return provider.signMessage(request.message);
   }
 
+  async signTransaction(request: SignTransactionRequest) {
+    const provider = this.requireProvider();
+    if (!provider.signTransaction) this.unsupported("signTransaction");
+    return provider.signTransaction(request.txJson);
+  }
+
   async signAndSubmit(request: SignAndSubmitRequest) {
     const provider = this.requireProvider();
     if (!provider.signAndSubmit) this.unsupported("signAndSubmit");
-    return provider.signAndSubmit(request.txJson);
+    return normalizeTxResult(await provider.signAndSubmit(request.txJson));
   }
 
   private getProvider(): MyWalletProvider | undefined {

@@ -19,20 +19,29 @@
 ## Session
 
 - `connect()` returns `account.address`, network when known, and a `WalletSession` when useful.
+- `connect(options)` honors `options.signal` when the provider/SDK supports abort or cancellation.
 - `restoreSession()` returns `null` for normal stale/unavailable sessions.
 - `disconnect()` clears provider session where possible and always runs cleanup.
 - Events/listeners/timers are cleaned on disconnect/destroy.
+- Redirect/mobile recovery markers use `WalletStorage` or core storage helpers, not direct `window.localStorage`.
+- `cancelPendingConnection()` clears temporary markers, timers, popups, pending proposals, and local pending promises.
 
 ## Signing
 
 - `signMessage()` result includes `signature`, `txBlob`, or `raw` depending on provider.
+- `signTransaction()` is implemented only when `capabilities.signTransaction` is true and never submits to the network.
+- `signTransaction()` result includes `txBlob`, `signed`, or `raw`.
 - `signAndSubmit()` returns `hash`, `status`, `signed`, `rejected`, and/or `raw`.
+- Successful submitted transactions expose `hash` when the provider returns one, so core can emit `tx_submitted` and WalletToast can show a transaction link.
+- Provider-specific transaction response shapes are normalized with `normalizeTxResult()` or equivalent logic.
+- Provider raw results are preserved under `raw`.
 - Provider-specific payload conversions are documented.
 - No private key or seed flow is introduced.
 
 ## Mobile And WalletConnect
 
 - QR/deeplink URI is emitted through adapter/manager events.
+- WalletConnect network paths validate `walletConnectChainId` at runtime and throw a clear configuration error when missing.
 - Mobile return/focus behavior is considered.
 - Reject/cancel/expired proposal does not leave UI connecting forever.
 - Stale WalletConnect sessions are ignored or cleaned.

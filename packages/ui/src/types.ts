@@ -8,6 +8,7 @@ export type WalletUiThemeName = "default" | "minimal" | "rounded" | "compact" | 
 export type WalletConnectUiMode = "default" | "list" | "group";
 export type WalletConnectCta = "copy" | "open" | "both";
 export type WalletQrStyle = "standard" | "dots";
+export type WalletToastPosition = "bottom-right" | "bottom-left" | "bottom-center";
 
 export interface WalletUiTheme {
   accent?: string;
@@ -49,6 +50,22 @@ export interface WalletUiOptions {
   messages?: WalletUiMessagesInput;
   transactionPreview?: WalletTransactionPreviewResolver;
   showWalletGroup?: boolean;
+}
+
+export interface WalletToastConfig {
+  autoDismissMs?: number;
+  maxVisible?: number;
+  position?: WalletToastPosition;
+  explorerUrl?: (hash: string, network?: WalletNetwork) => string | undefined;
+  themeMode?: WalletUiThemeMode;
+  theme?: WalletUiTheme;
+  language?: WalletUiLocale;
+  messages?: WalletUiMessagesInput;
+}
+
+export interface WalletToastOptions extends WalletToastConfig {
+  manager: WalletManager;
+  mount?: HTMLElement;
 }
 
 export type WalletButtonTarget = string | HTMLElement;
@@ -200,6 +217,7 @@ export interface WalletUiConfig {
   accountPanel?: WalletAccountPanelUiConfig;
   identity?: WalletIdentityUiConfig;
   transactionPreview?: WalletTransactionPreviewResolver;
+  toast?: boolean | WalletToastConfig;
 }
 
 export type WalletButtonConfig = Partial<Omit<WalletButtonOptions, "manager" | "modal" | "target">>;

@@ -30,6 +30,7 @@ interface MockMyWalletProvider {
   connect: () => Promise<string>;
   disconnect?: () => Promise<void>;
   signMessage?: (message: string) => Promise<{ signature: string }>;
+  signTransaction?: (txJson: Record<string, unknown>) => Promise<{ txBlob: string; signed: boolean }>;
   signAndSubmit?: (txJson: Record<string, unknown>) => Promise<{ hash: string; status: string }>;
 }
 
@@ -38,6 +39,7 @@ function makeMockProvider(overrides: Partial<MockMyWalletProvider> = {}): MockMy
     connect: async () => "rMockAddress1234",
     disconnect: async () => {},
     signMessage: async (message) => ({ signature: "mock-sig-" + message.slice(0, 4) }),
+    signTransaction: async () => ({ txBlob: "12000022800000002400000001", signed: true }),
     signAndSubmit: async () => ({ hash: "ABCDEF1234567890", status: "tesSUCCESS" }),
     ...overrides
   };
@@ -179,7 +181,41 @@ test("signMessage throws when user rejects", async () => {
   );
 });
 
-// ─── signAndSubmit ───────────────────────────────────────────────────────────
+// signTransaction
+
+test("signTransaction returns signed-only result when supported", async () => {
+  const adapter = new MyWalletAdapter({ provider: makeMockProvider() });
+  const result = await adapter.signTransaction({
+    methodHint: "payment",
+    txJson: {
+      TransactionType: "Payment",
+      Account: "rMockAddress1234",
+      Destination: "rDestination",
+      Amount: "1000000"
+    }
+  });
+
+  assert.ok("txBlob" in result || "signed" in result || "raw" in result,
+    "signTransaction result must contain txBlob, signed, or raw");
+});
+
+test("signTransaction throws when user rejects", async () => {
+  const provider = makeMockProvider({
+    signTransaction: async () => { throw new Error("Transaction signing rejected by user"); }
+  });
+  const adapter = new MyWalletAdapter({ provider });
+
+  await assert.rejects(
+    () => adapter.signTransaction({
+      methodHint: "payment",
+      txJson: { TransactionType: "Payment", Account: "rTest", Destination: "rDest", Amount: "1000" }
+    }),
+    (error) => /rejected|denied|canceled|cancelled/i.test((error as Error).message)
+      || isWalletKitError(error)
+  );
+});
+
+// signAndSubmit
 
 test("signAndSubmit returns hash for Payment transaction", async () => {
   const adapter = new MyWalletAdapter({ provider: makeMockProvider() });
@@ -197,6 +233,7 @@ test("signAndSubmit returns hash for Payment transaction", async () => {
 
   assert.ok("hash" in result || "raw" in result,
     "signAndSubmit result must contain hash or raw");
+  if ("hash" in result) assert.equal(result.hash, "ABCDEF1234567890");
 });
 
 test("signAndSubmit throws when user rejects", async () => {

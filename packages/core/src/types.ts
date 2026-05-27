@@ -20,6 +20,7 @@ export interface WalletNetwork {
 }
 
 export type WalletAdapterType = "mobile" | "extension" | "walletconnect" | "snap" | "hardware" | "embedded";
+export type WalletAdapterApiVersion = "1.0" | (string & {});
 
 export interface WalletCapabilities {
   connect: boolean;
@@ -166,7 +167,7 @@ export interface ConnectResult {
 }
 
 export interface WalletAdapter {
-  adapterApiVersion?: string;
+  adapterApiVersion?: WalletAdapterApiVersion;
   metadata: WalletMetadata;
   capabilities: WalletCapabilities;
   isAvailable?: () => boolean | Promise<boolean>;
@@ -245,6 +246,12 @@ export interface WalletManagerConfig {
   recoveryRetryDelaysMs?: number[];
   accountStatus?: {
     enabled?: boolean;
+    timeoutMs?: number;
+  };
+  transactionConfirmation?: {
+    enabled?: boolean;
+    attempts?: number;
+    intervalMs?: number;
     timeoutMs?: number;
   };
   logger?: WalletKitLogger | WalletKitLoggerOptions;

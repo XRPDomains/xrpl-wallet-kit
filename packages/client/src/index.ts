@@ -16,11 +16,12 @@ import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
 import { createWalletConnectAdapters, createWalletConnectMetadata } from "@xrpl-wallet-kit/adapter-walletconnect";
 import { createXamanAdapter } from "@xrpl-wallet-kit/adapter-xaman";
 import { createXrplSnapAdapter } from "@xrpl-wallet-kit/adapter-xrpl-snap";
-import { createDefaultWalletUiConfig, createWalletButton, createWalletModal, resolveWalletButtonOptions as resolveUiWalletButtonOptions } from "@xrpl-wallet-kit/ui";
+import { createDefaultWalletUiConfig, createWalletButton, createWalletModal, createWalletToast, resolveWalletButtonOptions as resolveUiWalletButtonOptions } from "@xrpl-wallet-kit/ui";
 import type {
   WalletButtonConfig,
   WalletButtonTarget,
   WalletConnectUiMode,
+  WalletToastConfig,
   WalletUiConfig,
   WalletUiOptions
 } from "@xrpl-wallet-kit/ui";
@@ -89,6 +90,9 @@ export function createWalletKit(options: CreateWalletKitOptions) {
   const manager = createWalletClient(options);
   const modalOptions = resolveModalOptions(options);
   const modal = options.modal === false ? undefined : createWalletModal({ manager, ...modalOptions.ui });
+  const toastOptions = resolveToastOptions(options, modalOptions.ui);
+  const toast = toastOptions ? createWalletToast({ manager, ...toastOptions }) : undefined;
+  toast?.mount();
   const buttonOptions = resolveButtonOptions(options);
   const button = modal && buttonOptions
     ? createWalletButton({
@@ -113,6 +117,7 @@ export function createWalletKit(options: CreateWalletKitOptions) {
     openModal: () => modal?.open(),
     closeModal: () => modal?.close(),
     disconnect: () => manager.disconnect(),
+    toast,
     refreshIdentity: () => button?.refreshIdentity(),
     refreshBalance: () => button?.refreshBalance(),
     refreshAccount: () => button?.refreshAccount(),
@@ -120,6 +125,20 @@ export function createWalletKit(options: CreateWalletKitOptions) {
     signAndSubmit: manager.signAndSubmit.bind(manager),
     signTransaction: manager.signTransaction.bind(manager),
     signMessage: manager.signMessage.bind(manager)
+  };
+}
+
+function resolveToastOptions(options: CreateWalletKitOptions, modalUi: Partial<Omit<WalletUiOptions, "manager" | "mount">>): WalletToastConfig | undefined {
+  const modalConfig = typeof options.modal === "object" ? options.modal : {};
+  const raw = modalConfig.toast ?? options.ui?.toast;
+  if (!raw) return undefined;
+  const toast = raw === true ? {} : raw;
+  return {
+    language: modalUi.language,
+    messages: modalUi.messages,
+    themeMode: modalUi.themeMode,
+    theme: modalUi.theme,
+    ...toast
   };
 }
 

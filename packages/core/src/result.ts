@@ -21,7 +21,41 @@ export function normalizeTxResult(raw: unknown): TxResult {
     };
   }
 
-  const hash = pickPath(raw, ["hash", "txid", "tx_json.hash", "result.hash", "result.tx_json.hash", "response.data.resp.result.hash"]);
+  const hash = pickPath(raw, [
+    "hash",
+    "txid",
+    "txHash",
+    "tx_hash",
+    "transactionHash",
+    "transaction_hash",
+    "tx_json.hash",
+    "result.hash",
+    "result.txid",
+    "result.txHash",
+    "result.tx_hash",
+    "result.transactionHash",
+    "result.transaction_hash",
+    "result.tx_json.hash",
+    "payload.hash",
+    "payload.txid",
+    "payload.txHash",
+    "payload.tx_hash",
+    "payload.transactionHash",
+    "payload.transaction_hash",
+    "response.hash",
+    "response.txid",
+    "response.txHash",
+    "response.tx_hash",
+    "response.transactionHash",
+    "response.transaction_hash",
+    "response.data.hash",
+    "response.data.txid",
+    "response.data.txHash",
+    "response.data.tx_hash",
+    "response.data.transactionHash",
+    "response.data.transaction_hash",
+    "response.data.resp.result.hash"
+  ]);
   const status = pickPath(raw, ["status", "result", "engine_result", "result.engine_result", "result.meta.TransactionResult", "response.data.resp.result.meta.TransactionResult"]);
   const signed = pickPath(raw, ["signed"]);
   const rejected = pickPath(raw, ["rejected"]);
