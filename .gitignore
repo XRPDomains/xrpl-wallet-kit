@@ -5,6 +5,8 @@ dist/
 .codegraph/
 tmp/
 PROJECT_MEMORY.md
+docs/*_VI.md
+docs/*_vi.md
 
 .env
 .env.*
