@@ -29,7 +29,6 @@ The package publishes:
       layout: "list",
       themeMode: "light",
       walletConnectMode: "group",
-      accountPanelMode: "modal",
       showWeb3Name: true,
       showBalance: true
     }

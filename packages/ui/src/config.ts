@@ -53,6 +53,7 @@ export function resolveWalletButtonOptions(ui: WalletUiConfig = {}, overrides: W
   const connectButton = ui.connectButton ?? {};
   const accountPanel = ui.accountPanel ?? {};
   const identity = ui.identity ?? {};
+  const { accountPanelMode: overrideAccountPanelMode, ...restOverrides } = overrides;
   const theme = {
     accent: "#0078ae",
     radius: "14px",
@@ -72,7 +73,6 @@ export function resolveWalletButtonOptions(ui: WalletUiConfig = {}, overrides: W
     showBalance: connectButton.showBalance,
     size: connectButton.size,
     variant: connectButton.variant,
-    accountPanelMode: accountPanel.mode,
     copyAddress: accountPanel.copyAddress,
     disconnect: accountPanel.disconnect,
     explorer: accountPanel.explorer,
@@ -80,7 +80,8 @@ export function resolveWalletButtonOptions(ui: WalletUiConfig = {}, overrides: W
     fallbackToAddress: identity.fallbackToAddress,
     identityResolver: identity.resolver,
     themeMode: ui.mode,
-    ...overrides,
+    ...restOverrides,
+    accountPanelMode: overrideAccountPanelMode ?? accountPanel.mode ?? "modal",
     theme
   });
 }

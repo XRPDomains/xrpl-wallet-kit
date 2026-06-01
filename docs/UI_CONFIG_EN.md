@@ -346,7 +346,7 @@ accountPanel: {
 
 Fields:
 
-- `mode`: panel presentation.
+- `mode`: panel presentation. Omit it to use the default modal account panel.
 - `showAvatar`: avatar display direction. The current UI renders a deterministic avatar or identity avatar when available.
 - `copyAddress`: shows Copy address action.
 - `disconnect`: shows Disconnect action.
@@ -421,7 +421,7 @@ or a string name, or `null`.
 
 ## Direct Connect Button Config
 
-When using `createWalletButton()` directly or the React `WalletButton`, the button also supports these fields:
+Prefer `ui.accountPanel.mode` for the account panel presentation. `connectButton` is only responsible for the button display itself:
 
 ```ts
 {
@@ -431,7 +431,6 @@ When using `createWalletButton()` directly or the React `WalletButton`, the butt
   explorer: false,
   disconnect: true,
   accountPanel: true,
-  accountPanelMode: "modal",
   showBalance: false,
   identityResolver,
   balanceResolver,

@@ -79,7 +79,6 @@ Use the IIFE bundle when an app cannot use a build step.
     autoConnect: true,
     walletConnectProjectId: "YOUR_PROJECT_ID",
     ui: {
-      accountPanelMode: "modal",
       showWeb3Name: true,
       showBalance: true
     }

@@ -45,7 +45,7 @@ export type WalletAccountStatus = "full" | "address" | "icon";
 
 export type WalletKitUiConfig = WalletUiConfig;
 
-export interface WalletKitConnectButtonConfig extends Omit<WalletButtonConfig, "showBalance"> {
+export interface WalletKitConnectButtonConfig extends Omit<WalletButtonConfig, "accountPanelMode" | "showBalance"> {
   target?: WalletButtonTarget;
   accountStatus?: ResponsiveValue<WalletAccountStatus>;
   showBalance?: ResponsiveValue<boolean>;
@@ -215,20 +215,37 @@ function resolveButtonOptions(options: CreateWalletKitOptions): (WalletButtonCon
   const raw = isConnectButtonTarget(options.connectButton)
     ? { target: options.connectButton }
     : options.connectButton;
-  if (!raw.target) return undefined;
+  const buttonInput = raw as WalletKitConnectButtonConfig & { accountPanelMode?: WalletButtonConfig["accountPanelMode"] };
+  if (!buttonInput.target) return undefined;
   const {
     accountStatus: _accountStatus,
+    accountPanelMode: _accountPanelMode,
     showBalance,
     target,
     ...buttonConfig
-  } = raw;
+  } = buttonInput;
   const identity = options.identity ?? {};
+  const modalConfig = typeof options.modal === "object" ? options.modal : {};
   const ui: WalletUiConfig = {
     ...options.ui,
+    ...modalConfig,
+    modal: {
+      ...options.ui?.modal,
+      ...modalConfig.modal
+    },
+    accountPanel: {
+      ...options.ui?.accountPanel,
+      ...modalConfig.accountPanel
+    },
+    connectButton: {
+      ...options.ui?.connectButton,
+      ...modalConfig.connectButton
+    },
     identity: {
       ...options.ui?.identity,
-      enabled: options.ui?.identity?.enabled ?? identity.web3Name,
-      fallbackToAddress: options.ui?.identity?.fallbackToAddress ?? identity.fallbackToAddress
+      ...modalConfig.identity,
+      enabled: options.ui?.identity?.enabled ?? modalConfig.identity?.enabled ?? identity.web3Name,
+      fallbackToAddress: options.ui?.identity?.fallbackToAddress ?? modalConfig.identity?.fallbackToAddress ?? identity.fallbackToAddress
     }
   };
 

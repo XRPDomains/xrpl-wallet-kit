@@ -1,7 +1,7 @@
 import SignClient from "@walletconnect/sign-client";
 import { WalletConnectModal } from "@walletconnect/modal";
 import type { SessionTypes, SignClientTypes } from "@walletconnect/types";
-import { BaseWalletAdapter, createBrowserWalletStorage, normalizeTxResult, pickPath } from "@xrpl-wallet-kit/core";
+import { BaseWalletAdapter, createBrowserWalletStorage, normalizeTxResult, pickPath, utf8ToHex } from "@xrpl-wallet-kit/core";
 import { WALLETCONNECT_ICON } from "./icons";
 import { XRPL_WALLETCONNECT_WALLETS } from "./wallets";
 import type { WalletConnectWalletConfig } from "./types";
@@ -720,7 +720,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
       Destination: destination,
       Amount: "1",
       Fee: "15",
-      Memos: [{ Memo: { MemoData: this.toHex(request.message) } }]
+      Memos: [{ Memo: { MemoData: utf8ToHex(request.message) } }]
     };
   }
 
@@ -753,11 +753,6 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   private requireSession(): SessionTypes.Struct {
     if (!this.session) throw new Error("WalletConnect session not found");
     return this.session;
-  }
-
-  private toHex(value: string): string {
-    const encoder = new TextEncoder();
-    return [...encoder.encode(value)].map((byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
   }
 
   private async withRequestTimeout<T>(request: Promise<T>, method: XRPLWalletConnectMethod): Promise<T> {

@@ -85,7 +85,7 @@ wallets: ['xaman', 'gemwallet', 'crossmark', 'dropfi', 'xrplsnap', 'walletconnec
 showWeb3Name: true
 showBalance: true
 buttonSize: 'lg'
-accountPanelMode: 'modal'
+accountPanel.mode: 'modal'
 walletConnect.mode: 'group'
 reloadOnDisconnect: false
 ```
@@ -111,7 +111,6 @@ window.walletKit = XRPLWalletKitLegacyBridge.mount({
   showWeb3Name: true,
   showBalance: true,
   buttonSize: 'lg',
-  accountPanelMode: 'modal',
   reloadOnDisconnect: true,
 
   identityEndpoint: '/api/xrplnft/getName',

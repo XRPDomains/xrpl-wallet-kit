@@ -438,7 +438,6 @@ function getWalletUiOptions() {
 function getWalletButtonOptions() {
   return createDefaultWalletButtonConfig({
     themeMode: uiTheme.value as WalletUiThemeMode,
-    accountPanelMode: "modal",
     showBalance: true
   });
 }

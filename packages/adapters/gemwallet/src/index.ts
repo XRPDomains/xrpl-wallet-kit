@@ -13,6 +13,7 @@ export interface GemWalletProvider {
   createNFTOffer?(payload: unknown): Promise<unknown>;
   acceptNFTOffer?(payload: unknown): Promise<unknown>;
   cancelNFTOffer?(payload: unknown): Promise<unknown>;
+  signAndSubmit?(payload: unknown): Promise<unknown>;
 }
 
 export class GemWalletAdapter extends BaseWalletAdapter {
@@ -60,6 +61,7 @@ export class GemWalletAdapter extends BaseWalletAdapter {
       request.methodHint === "createNFTOffer" && provider.createNFTOffer ? await provider.createNFTOffer(payload) :
       request.methodHint === "acceptNFTOffer" && provider.acceptNFTOffer ? await provider.acceptNFTOffer(payload) :
       request.methodHint === "cancelNFTOffer" && provider.cancelNFTOffer ? await provider.cancelNFTOffer(payload) :
+      provider.signAndSubmit ? await provider.signAndSubmit(payload) :
       this.unsupported(`GemWallet method: ${request.methodHint ?? "generic"}`);
     return normalizeTxResult(raw);
   }

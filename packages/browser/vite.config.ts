@@ -16,39 +16,11 @@ function emitLegacyBridge(): Plugin {
   };
 }
 
-function exposeBufferBeforeAdapters(): Plugin {
-  return {
-    name: "expose-buffer-before-adapters",
-    enforce: "post",
-    generateBundle(_options, bundle) {
-      for (const asset of Object.values(bundle)) {
-        if (asset.type !== "chunk") continue;
-        if (asset.code.includes("__xwk_buffer_ready__")) continue;
-        const minifiedBufferEnd = asset.code.match(/\}\}\)\(([$A-Za-z_][$\w]*)\),ve\.WalletKitErrorCode=/);
-        if (minifiedBufferEnd) {
-          const bufferVar = minifiedBufferEnd[1];
-          asset.code = asset.code.replace(
-            minifiedBufferEnd[0],
-            `}})(${bufferVar}),typeof globalThis<"u"&&(globalThis.__xwk_buffer_ready__=!0,globalThis.Buffer||(globalThis.Buffer=${bufferVar}.Buffer)),ve.WalletKitErrorCode=`
-          );
-          continue;
-        }
-        if (asset.code.includes("  })(buffer);\n")) {
-          asset.code = asset.code.replace(
-            "  })(buffer);\n",
-            `  })(buffer);\n  typeof globalThis !== "undefined" && (globalThis.__xwk_buffer_ready__ = true, globalThis.Buffer || (globalThis.Buffer = buffer.Buffer));\n`
-          );
-        }
-      }
-    }
-  };
-}
-
 export default defineConfig(({ mode }) => {
   const minified = mode === "minified";
 
   return {
-    plugins: [exposeBufferBeforeAdapters(), emitLegacyBridge()],
+    plugins: [emitLegacyBridge()],
     build: {
       outDir: "dist",
       emptyOutDir: !minified,
