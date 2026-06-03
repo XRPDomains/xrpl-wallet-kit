@@ -151,12 +151,65 @@ test("WalletManager can restore legacy unversioned sessions", async () => {
     autoReconnect: true,
     logger: { level: "silent" }
   });
+  const connectedAddresses: string[] = [];
+  const restoredAddresses: string[] = [];
+
+  manager.on("connected", (event) => connectedAddresses.push(event.account.address));
+  manager.on("session_restored", (event) => restoredAddresses.push(event.account.address));
 
   const restored = await manager.autoReconnect();
 
   assert.equal(adapter.restoreCalls, 1);
   assert.equal(restored?.account.address, "rLegacyAddress");
   assert.equal(manager.getSession()?.wallet?.name, "Mock Wallet");
+  assert.deepEqual(restoredAddresses, ["rLegacyAddress"]);
+  assert.deepEqual(connectedAddresses, ["rLegacyAddress"]);
+});
+
+test("WalletManager emits connected for stale auto reconnect without adapter restoreSession", async () => {
+  class StoredOnlyAdapter extends BaseWalletAdapter {
+    metadata = { id: "stored-only", name: "Stored Only", type: "extension" } as const;
+    capabilities = { connect: true };
+
+    async isAvailable() {
+      return true;
+    }
+
+    async connect() {
+      return { account: { address: "rStoredOnly", network } };
+    }
+  }
+
+  const storage = new MemoryWalletStorage();
+  const session = {
+    adapterId: "stored-only",
+    account: { address: "rStoredOnly", network },
+    connectedAt: 1
+  };
+  await storage.setItem("session", JSON.stringify({
+    version: WALLET_STORAGE_VERSION,
+    session,
+    updatedAt: Date.now()
+  }));
+
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new StoredOnlyAdapter()],
+    storage,
+    autoReconnect: true,
+    logger: { level: "silent" }
+  });
+  const connectedAddresses: string[] = [];
+  const restoredEvents: Array<{ address: string; stale?: boolean }> = [];
+
+  manager.on("connected", (event) => connectedAddresses.push(event.account.address));
+  manager.on("session_restored", (event) => restoredEvents.push({ address: event.account.address, stale: event.stale }));
+
+  const restored = await manager.autoReconnect();
+
+  assert.equal(restored?.account.address, "rStoredOnly");
+  assert.deepEqual(restoredEvents, [{ address: "rStoredOnly", stale: true }]);
+  assert.deepEqual(connectedAddresses, ["rStoredOnly"]);
 });
 
 test("WalletManager throws typed errors for missing adapters", async () => {
@@ -348,6 +401,11 @@ test("WalletManager recovers pending return sessions once and stores them", asyn
     autoReconnect: true,
     logger: { level: "silent" }
   });
+  const connectedAddresses: string[] = [];
+  const restoredAddresses: string[] = [];
+
+  manager.on("connected", (event) => connectedAddresses.push(event.account.address));
+  manager.on("session_restored", (event) => restoredAddresses.push(event.account.address));
 
   const [first, second] = await Promise.all([manager.autoReconnect(), manager.autoReconnect()]);
   const stored = JSON.parse(await storage.getItem("session") ?? "{}") as {
@@ -360,6 +418,8 @@ test("WalletManager recovers pending return sessions once and stores them", asyn
   assert.equal(second?.account.address, "rRecovered");
   assert.equal(stored.session?.adapterId, "recover");
   assert.equal(stored.session?.account?.address, "rRecovered");
+  assert.deepEqual(restoredAddresses, ["rRecovered"]);
+  assert.deepEqual(connectedAddresses, ["rRecovered"]);
 });
 
 test("WalletConnect detail adapters can use marker-gated pending return recovery", () => {

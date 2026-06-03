@@ -139,6 +139,8 @@ customTheme: {
   overlay: "rgba(15,23,42,.46)",
   surface: "#f8fafc",
   surfaceHover: "#f1f5f9",
+  fallbackIconBackground: "rgba(15,23,42,.06)",
+  fallbackIconColor: "#111827",
   shadow: "none",
   radius: "14px",
   walletRadius: "10px",
@@ -156,10 +158,14 @@ Token meanings:
 - `overlay`: modal overlay background.
 - `surface`: wallet item, account action, and QR card background.
 - `surfaceHover`: hover/tap background without layout shift.
+- `fallbackIconBackground`: background for generated/fallback icons when no wallet icon is available.
+- `fallbackIconColor`: foreground color for generated/fallback icons.
 - `shadow`: modal/panel shadow. Current UI prefers `none`.
 - `radius`: modal/account panel radius.
 - `walletRadius`: wallet item/action button radius.
 - `fontFamily`: UI font stack.
+
+When using a custom dark theme, provide at least `background`, `foreground`, `accent`, `border`, `surface`, `surfaceHover`, and `muted`. If `fallbackIconBackground` / `fallbackIconColor` are omitted, the kit uses dark/light defaults designed to keep generated icons visible.
 
 ## `ui.modal`
 
@@ -359,6 +365,10 @@ Fields:
 
 Current default: `modal`.
 
+`modal` is the recommended default for most dApps. The account panel overlay is mounted at `document.body`, which avoids common containing-block traps caused by host containers using `transform`, `filter`, `backdrop-filter`, `contain`, or `will-change`. These CSS properties can cause `position: fixed` children to behave as if they are positioned relative to the host container instead of the viewport.
+
+Use `dropdown` only when the connect button lives in a stable layout area and the host app controls the surrounding stacking context. Dropdown mode is useful for compact desktop toolbars, but integrators should test it inside sticky headers, glass panels, transformed containers, and mobile webviews before shipping.
+
 ## `ui.toast`
 
 Optional transaction toast notifications.
@@ -411,6 +421,26 @@ Fields:
 - `fallbackToAddress`: shows a shortened address when no name is resolved.
 - `resolver`: custom identity resolver.
 
+Resolver signature:
+
+```ts
+type IdentityResolver = (
+  address: string,
+  session: WalletSession
+) => WalletIdentity | string | null | Promise<WalletIdentity | string | null>;
+```
+
+`WalletIdentity` shape:
+
+```ts
+{
+  name: string;
+  avatar?: string;
+  source?: string;
+  verified?: boolean;
+}
+```
+
 A resolver can return:
 
 ```ts
@@ -418,6 +448,42 @@ A resolver can return:
 ```
 
 or a string name, or `null`.
+
+Resolver behavior:
+
+- The resolver may be synchronous or asynchronous.
+- It is called with the connected XRPL address and the current `WalletSession`.
+- Returning a string is treated as `{ name: string }`.
+- Returning `null` means no identity was found.
+- If `fallbackToAddress` is `true`, the button/account panel displays a shortened address when no identity is available.
+- If no resolver is provided, the kit uses the default XRP Domains resolver when identity is enabled.
+- The kit caches identity results per network/address while the button controller is mounted to reduce visible label churn after reconnect or restore.
+
+Default resolver helper:
+
+```ts
+import { createXrpDomainsResolver } from "@xrpl-wallet-kit/ui";
+
+createWalletKit({
+  ui: {
+    identity: {
+      enabled: true,
+      resolver: createXrpDomainsResolver()
+    }
+  }
+});
+```
+
+Disable identity resolution if the dApp wants to fully own account naming:
+
+```ts
+ui: {
+  identity: {
+    enabled: false,
+    fallbackToAddress: true
+  }
+}
+```
 
 ## Direct Connect Button Config
 

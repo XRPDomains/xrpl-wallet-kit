@@ -20,7 +20,12 @@
 
 - `connect()` returns `account.address`, network when known, and a `WalletSession` when useful.
 - `connect(options)` honors `options.signal` when the provider/SDK supports abort or cancellation.
-- `restoreSession()` returns `null` for normal stale/unavailable sessions.
+- `restoreSession()` is passive-only and never calls connect/sign-in/QR/deeplink/popup/hardware approval APIs.
+- `restoreSession()` verifies a current passive provider account signal before returning a restored session.
+- `restoreSession()` compares the current provider address with `session.account.address`.
+- `restoreSession()` returns `null` for normal stale/unavailable/locked/not-yet-hydrated sessions.
+- `restoreSession()` returns `null` for wrong-address sessions.
+- Adapter README documents the provider API used for passive restore, or documents that restore is unsupported.
 - `disconnect()` clears provider session where possible and always runs cleanup.
 - Events/listeners/timers are cleaned on disconnect/destroy.
 - Redirect/mobile recovery markers use `WalletStorage` or core storage helpers, not direct `window.localStorage`.

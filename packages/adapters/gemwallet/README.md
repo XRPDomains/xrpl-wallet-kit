@@ -36,12 +36,20 @@ When using `@xrpl-wallet-kit/client` defaults, GemWallet is already included.
 - Requires the GemWallet browser extension.
 - Availability is detected with `provider.isInstalled()`.
 - `connect()` reads the active extension address and network.
+- `restoreSession()` is passive-only. It reads the current extension address with `getAddress()` and restores only when that address matches the stored session address.
+- If GemWallet cannot provide a current address during restore, the adapter returns `null` instead of reviving the stored session blindly.
 - `signAndSubmit()` routes by `methodHint`:
   - `payment` -> `sendPayment`
   - `createNFTOffer` -> `createNFTOffer`
   - `acceptNFTOffer` -> `acceptNFTOffer`
   - `cancelNFTOffer` -> `cancelNFTOffer`
 - Transaction responses are normalized with `normalizeTxResult()` so submitted hashes can drive lifecycle events and WalletToast.
+
+## Auto Reconnect
+
+GemWallet restore is intentionally conservative. The stored dApp session is not treated as proof that the extension is still connected. On reload, the adapter must read the active GemWallet address and compare it with the stored XRPL address.
+
+`restoreSession()` does not call connect, open extension UI, ask the user to sign in, or submit any wallet request beyond passive address inspection. Normal stale or unavailable states return `null` so the manager can emit stale/expired session events and let the user reconnect manually.
 
 ## Testing
 

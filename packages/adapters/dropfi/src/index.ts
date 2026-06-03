@@ -14,7 +14,7 @@ export interface DropFiProvider {
   connect?: (data?: unknown) => Promise<boolean | string | DropFiState | { address?: string; selectedAddress?: string; connectedAccounts?: string[]; accounts?: string[] }>;
   disconnect?(address?: string): Promise<void>;
   initialize?(): Promise<DropFiState | null>;
-  getAddress?: () => string | null | Promise<string | null>;
+  getAddress?: () => string | null | { address?: string; selectedAddress?: string; result?: { address?: string } } | Promise<string | null | { address?: string; selectedAddress?: string; result?: { address?: string } }>;
   getAccounts?: () => string[] | { accounts?: string[] } | Promise<string[] | { accounts?: string[] }>;
   signMessage?: (message: string) => Promise<string>;
   sendTransaction?: (tx: unknown) => Promise<string>;
@@ -68,25 +68,27 @@ export class DropFiAdapter extends BaseWalletAdapter {
   }
 
   async restoreSession(session: WalletSession) {
+    if (!this.hasInjectedProvider() && !await this.waitForAvailability(2500)) return null;
     const provider = this.provider(false);
     if (!provider) return null;
-    if (!this.isAvailable()) return null;
+    const state = await this.initialize(provider);
+    let connected: boolean | undefined;
     if (typeof provider.isConnected === "function") {
       try {
-        if (!await provider.isConnected()) return null;
+        connected = await provider.isConnected();
       } catch {
-        return null;
+        connected = undefined;
       }
     }
 
-    const address = await this.resolvePassiveAddress(provider);
+    const address = await this.resolvePassiveAddress(provider, state);
     if (!address || address !== session.account.address) return null;
 
     this.activeAddress = address;
     return {
       account: { ...session.account, address },
       session: { ...session, account: { ...session.account, address } },
-      raw: { address }
+      raw: { address, connected }
     };
   }
 
@@ -133,9 +135,34 @@ export class DropFiAdapter extends BaseWalletAdapter {
   private provider(required?: true): DropFiProvider;
   private provider(required: false): DropFiProvider | undefined;
   private provider(required = true): DropFiProvider | undefined {
-    const provider = this.options.provider ?? (globalThis as unknown as { xrpl?: DropFiProvider }).xrpl;
+    const host = globalThis as unknown as { __xwk_dropfi?: DropFiProvider; dropfi?: DropFiProvider; xrpl?: DropFiProvider };
+    const provider = this.options.provider ?? host.__xwk_dropfi ?? host.dropfi ?? this.resolveLegacyXrplProvider(host.xrpl);
     if (!provider && required) throw new Error("Please install DropFi Wallet");
     return provider;
+  }
+
+  private hasInjectedProvider(): boolean {
+    return Object.prototype.hasOwnProperty.call(this.options, "provider");
+  }
+
+  private resolveLegacyXrplProvider(provider?: DropFiProvider): DropFiProvider | undefined {
+    if (!provider) return undefined;
+    return this.isDropFiProvider(provider) ? provider : undefined;
+  }
+
+  private isDropFiProvider(provider: DropFiProvider): boolean {
+    return Boolean(
+      provider.isDropFi
+      || provider.connect
+      || provider.getAddress
+      || provider.getAccounts
+      || provider.selectedAddress
+      || provider.connectedAccounts?.length
+      || provider.accounts?.length
+      || provider.initialize
+      || provider.isConnected
+      || provider.sendTransaction
+    );
   }
 
   private async initialize(provider: DropFiProvider): Promise<DropFiState | null> {
@@ -162,7 +189,8 @@ export class DropFiAdapter extends BaseWalletAdapter {
     }
     if (typeof provider.getAddress === "function") {
       const address = await provider.getAddress();
-      if (address) return address;
+      const normalized = this.normalizeAddressResult(address);
+      if (normalized) return normalized;
     }
     if (typeof provider.getAccounts === "function") {
       const accounts = await provider.getAccounts();
@@ -178,19 +206,32 @@ export class DropFiAdapter extends BaseWalletAdapter {
       ?? state?.accounts?.[0];
   }
 
-  private async resolvePassiveAddress(provider: DropFiProvider): Promise<string | undefined> {
+  private async resolvePassiveAddress(provider: DropFiProvider, state?: DropFiState | null): Promise<string | undefined> {
     if (typeof provider.getAddress === "function") {
       try {
         const address = await provider.getAddress();
-        if (address) return address;
+        const normalized = this.normalizeAddressResult(address);
+        if (normalized) return normalized;
       } catch {
-        return undefined;
+        // Fall back to already-hydrated passive properties below.
+      }
+    }
+    if (typeof provider.getAccounts === "function") {
+      try {
+        const accounts = await provider.getAccounts();
+        const first = Array.isArray(accounts) ? accounts[0] : accounts.accounts?.[0];
+        if (first) return first;
+      } catch {
+        // Fall back to passive properties below.
       }
     }
 
     return provider.selectedAddress
       ?? provider.connectedAccounts?.[0]
-      ?? provider.accounts?.[0];
+      ?? provider.accounts?.[0]
+      ?? state?.selectedAddress
+      ?? state?.connectedAccounts?.[0]
+      ?? state?.accounts?.[0];
   }
 
   private async resolveConnected(provider: DropFiProvider, state: DropFiState | null) {
@@ -199,6 +240,12 @@ export class DropFiAdapter extends BaseWalletAdapter {
     if (existingAddress) return true;
     if (typeof provider.connect === "function") return provider.connect();
     return false;
+  }
+
+  private normalizeAddressResult(value: Awaited<ReturnType<NonNullable<DropFiProvider["getAddress"]>>>): string | undefined {
+    if (typeof value === "string") return value;
+    if (!value || typeof value !== "object") return undefined;
+    return value.address ?? value.selectedAddress ?? value.result?.address;
   }
 }
 

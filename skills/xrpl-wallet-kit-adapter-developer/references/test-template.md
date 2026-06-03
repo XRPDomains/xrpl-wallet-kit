@@ -28,6 +28,7 @@ import { MyWalletAdapter } from "../packages/adapters/mywallet/src/index";
 
 interface MockMyWalletProvider {
   connect: () => Promise<string>;
+  getAddress?: () => Promise<string | undefined>;
   disconnect?: () => Promise<void>;
   signMessage?: (message: string) => Promise<{ signature: string }>;
   signTransaction?: (txJson: Record<string, unknown>) => Promise<{ txBlob: string; signed: boolean }>;
@@ -37,6 +38,7 @@ interface MockMyWalletProvider {
 function makeMockProvider(overrides: Partial<MockMyWalletProvider> = {}): MockMyWalletProvider {
   return {
     connect: async () => "rMockAddress1234",
+    getAddress: async () => "rMockAddress1234",
     disconnect: async () => {},
     signMessage: async (message) => ({ signature: "mock-sig-" + message.slice(0, 4) }),
     signTransaction: async () => ({ txBlob: "12000022800000002400000001", signed: true }),
@@ -132,7 +134,7 @@ test("disconnect does not throw when provider.disconnect is missing", async () =
 
 // ─── restoreSession ─────────────────────────────────────────────────────────
 
-test("restoreSession returns result when provider is available", async () => {
+test("restoreSession returns result when passive provider address matches stored session", async () => {
   const adapter = new MyWalletAdapter({ provider: makeMockProvider() });
   const session = {
     adapterId: "mywallet",
@@ -144,6 +146,20 @@ test("restoreSession returns result when provider is available", async () => {
 
   assert.ok(result !== null);
   assert.equal(result?.account.address, "rMockAddress1234");
+});
+
+test("restoreSession returns null when passive provider address differs from stored session", async () => {
+  const adapter = new MyWalletAdapter({
+    provider: makeMockProvider({ getAddress: async () => "rDifferentAddress" })
+  });
+  const session = {
+    adapterId: "mywallet",
+    account: { address: "rMockAddress1234", network: testNetwork },
+    connectedAt: Date.now()
+  };
+
+  const result = await adapter.restoreSession(session);
+  assert.equal(result, null);
 });
 
 test("restoreSession returns null when provider is missing", async () => {

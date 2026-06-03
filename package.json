@@ -22,6 +22,7 @@
     "check:duplicates:report": "jscpd --config .jscpd.json --exitCode 0 packages examples tests",
     "check:deps": "depcruise --config .dependency-cruiser.cjs packages examples tests",
     "check:quality": "npm run typecheck && npm run check:deps && npm run check:unused:report && npm run check:duplicates:report",
+    "build:vanilla": "node scripts/build-vanilla.mjs",
     "dev:vanilla": "node scripts/serve-vanilla.mjs",
     "dev:react": "node scripts/serve-react.mjs",
     "dev:html-jquery": "npm --workspace @xrpl-wallet-kit/example-html-jquery run dev"

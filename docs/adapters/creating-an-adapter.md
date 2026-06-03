@@ -65,7 +65,16 @@ export class MyWalletAdapter extends BaseWalletAdapter {
 
   async restoreSession(session: WalletSession): Promise<ConnectResult | null> {
     if (!await this.isAvailable()) return null;
-    return { account: session.account, session };
+
+    const provider = this.getProvider();
+    const currentAddress = await provider?.getAddress?.();
+    if (!currentAddress || currentAddress !== session.account.address) return null;
+
+    return {
+      account: { ...session.account, address: currentAddress },
+      session: { ...session, account: { ...session.account, address: currentAddress } },
+      raw: { restoredFrom: "passive-address" }
+    };
   }
 
   private getProvider() {
@@ -93,6 +102,31 @@ Important capabilities:
 - `payments`: payment flow is supported and tested.
 - `nftOffers`: NFT offer create/accept/cancel is supported and tested.
 - `qr` and `deeplink`: adapter emits URI/deeplink flows to the manager/UI.
+
+## Auto reconnect rules
+
+`restoreSession()` is a passive verification hook. It is called by `WalletManager.autoReconnect()` after reading a stored session. It must prove that the currently available wallet provider still represents the same account as the stored session.
+
+Safe `restoreSession()` behavior:
+
+- read only passive provider state that is already available after reload;
+- compare the current wallet address with `session.account.address`;
+- return `null` when the wallet is missing, locked, stale, not hydrated, or on a different account;
+- avoid throwing for normal stale/unavailable states;
+- avoid calling `connect()`, sign-in, QR, deeplink, popup, hardware confirmation, or approval APIs.
+
+Unsafe behavior:
+
+```ts
+async restoreSession(session: WalletSession) {
+  if (!await this.isAvailable()) return null;
+  return { account: session.account, session };
+}
+```
+
+This only proves that the provider exists. It does not prove that the wallet is still connected to the same account, so new adapters should not use this pattern.
+
+If a wallet has no reliable passive account API, prefer returning `null` from `restoreSession()` or omitting the method. The user can reconnect manually, and the manager will emit stale/expired session events as appropriate.
 
 ## Contract validation
 

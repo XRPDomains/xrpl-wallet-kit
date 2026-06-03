@@ -13,6 +13,9 @@ export class WalletButtonController {
   private identityName: string | null = null;
   private identityAvatar: string | null = null;
   private identityRequest = 0;
+  private identityResolvingKey?: string;
+  private identitySettleTimer?: number;
+  private readonly identityCache = new Map<string, WalletIdentity | null>();
   private balance: WalletBalance | null = null;
   private activationStatus: "active" | "unfunded" | "unknown" = "unknown";
   private balanceRequest = 0;
@@ -20,8 +23,10 @@ export class WalletButtonController {
   private panelScrollLocked = false;
   private connecting = false;
   private copied = false;
+  private copyInProgress = false;
   private accountAction: "copy" | "disconnect" | null = null;
   private copyResetTimer?: number;
+  private accountPanelPortal?: HTMLElement;
   private readonly offEvents: Array<() => void> = [];
   private readonly onDocumentPointerDown = (event: PointerEvent) => this.handleDocumentPointerDown(event);
   private readonly onDocumentKeyDown = (event: KeyboardEvent) => this.handleDocumentKeyDown(event);
@@ -61,15 +66,13 @@ export class WalletButtonController {
     this.offEvents.push(options.manager.on("connected", ({ session }) => {
       this.connecting = false;
       this.panelOpen = false;
-      void this.resolveIdentity(session ?? options.manager.getSession());
+      this.renderConnectedState(session ?? options.manager.getSession());
       void this.resolveBalance(session ?? options.manager.getSession());
-      this.render();
     }));
     this.offEvents.push(options.manager.on("session_restored", ({ session }) => {
       this.connecting = false;
-      void this.resolveIdentity(session);
+      this.renderConnectedState(session);
       void this.resolveBalance(session);
-      this.render();
     }));
     this.offEvents.push(options.manager.on("session_stale", () => {
       this.connecting = false;
@@ -84,6 +87,9 @@ export class WalletButtonController {
       this.panelOpen = false;
       this.identityName = null;
       this.identityAvatar = null;
+      this.identityRequest += 1;
+      this.identityResolvingKey = undefined;
+      this.clearIdentitySettleTimer();
       this.balance = null;
       this.activationStatus = "unknown";
       this.render();
@@ -142,8 +148,12 @@ export class WalletButtonController {
 
   destroy(): void {
     this.removePanelListeners();
+    this.removeAccountPanelPortal();
     this.syncPanelScrollLock(false);
+    this.identityRequest += 1;
+    this.identityResolvingKey = undefined;
     if (this.copyResetTimer) window.clearTimeout(this.copyResetTimer);
+    if (this.identitySettleTimer) window.clearTimeout(this.identitySettleTimer);
     this.offEvents.splice(0).forEach((off) => off());
     if (this.target) this.target.innerHTML = "";
     this.target = undefined;
@@ -153,20 +163,21 @@ export class WalletButtonController {
     if (!this.target) return;
     this.target.innerHTML = "";
     this.target.appendChild(this.createRoot());
+    this.syncAccountPanelPortal();
     this.syncPanelListeners();
   }
 
   private createRoot(): HTMLElement {
     const root = document.createElement("div");
     root.className = "xwk-button-root";
-    root.innerHTML = `<style>${this.renderStyles()}</style>${this.renderButton()}${this.panelOpen ? this.renderPanel() : ""}`;
-    root.querySelector<HTMLButtonElement>("[data-xwk-wallet-button]")?.addEventListener("click", () => this.onButtonClick());
-    root.querySelector<HTMLButtonElement>("[data-xwk-account-close]")?.addEventListener("click", () => this.closePanel());
-    root.querySelector<HTMLElement>("[data-xwk-account-overlay]")?.addEventListener("click", (event) => {
-      if (event.target === event.currentTarget) this.closePanel();
+    const inlinePanel = this.panelOpen && this.options.accountPanelMode !== "modal" ? this.renderPanel() : "";
+    root.innerHTML = `<style>${this.renderStyles()}</style>${this.renderButton()}${inlinePanel}`;
+    this.repairFallbackIcon(root);
+    root.querySelector<HTMLButtonElement>("[data-xwk-wallet-button]")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.onButtonClick();
     });
-    root.querySelector<HTMLButtonElement>("[data-xwk-copy-address]")?.addEventListener("click", () => this.copyAddress());
-    root.querySelector<HTMLButtonElement>("[data-xwk-disconnect]")?.addEventListener("click", () => void this.disconnect());
+    this.bindPanelActions(root);
     return root;
   }
 
@@ -189,6 +200,7 @@ export class WalletButtonController {
   private handleDocumentPointerDown(event: PointerEvent): void {
     if (!this.panelOpen || !this.target) return;
     if (event.target instanceof Node && this.target.contains(event.target)) return;
+    if (event.target instanceof Node && this.accountPanelPortal?.contains(event.target)) return;
     this.panelOpen = false;
     this.render();
   }
@@ -228,9 +240,38 @@ export class WalletButtonController {
     document.addEventListener("keydown", this.onDocumentKeyDown);
     if (this.options.accountPanelMode === "modal") {
       window.setTimeout(() => {
-        this.target?.querySelector<HTMLElement>(".xwk-account-panel-modal")?.focus({ preventScroll: true });
+        this.getAccountPanelRoot()?.focus({ preventScroll: true });
       }, 0);
     }
+  }
+
+  private syncAccountPanelPortal(): void {
+    if (!this.panelOpen || this.options.accountPanelMode !== "modal") {
+      this.removeAccountPanelPortal();
+      return;
+    }
+    const portal = this.accountPanelPortal ?? document.createElement("div");
+    const entering = !this.accountPanelPortal;
+    portal.className = "xwk-account-portal";
+    portal.dataset.xwkEntering = entering ? "true" : "false";
+    portal.innerHTML = `<style>${this.renderStyles()}</style>${this.renderPanel()}`;
+    if (entering) document.body.appendChild(portal);
+    this.accountPanelPortal = portal;
+    this.bindPanelActions(portal);
+  }
+
+  private removeAccountPanelPortal(): void {
+    this.accountPanelPortal?.remove();
+    this.accountPanelPortal = undefined;
+  }
+
+  private bindPanelActions(root: ParentNode): void {
+    root.querySelector<HTMLButtonElement>("[data-xwk-account-close]")?.addEventListener("click", () => this.closePanel());
+    root.querySelector<HTMLElement>("[data-xwk-account-overlay]")?.addEventListener("click", (event) => {
+      if (event.target === event.currentTarget) this.closePanel();
+    });
+    root.querySelector<HTMLButtonElement>("[data-xwk-copy-address]")?.addEventListener("click", () => this.copyAddress());
+    root.querySelector<HTMLButtonElement>("[data-xwk-disconnect]")?.addEventListener("click", () => void this.disconnect());
   }
 
   private removePanelListeners(): void {
@@ -262,13 +303,12 @@ export class WalletButtonController {
   }
 
   private async copyAddress(): Promise<void> {
-    if (this.accountAction) return;
+    if (this.copyInProgress || this.accountAction) return;
     const address = this.options.manager.getSession()?.account.address;
     if (!address) return;
-    this.accountAction = "copy";
-    this.render();
+    this.copyInProgress = true;
     try {
-      await Promise.all([this.copyText(address), this.delay(220)]);
+      await this.copyText(address);
       this.copied = true;
       if (this.copyResetTimer) window.clearTimeout(this.copyResetTimer);
       this.copyResetTimer = window.setTimeout(() => {
@@ -276,7 +316,7 @@ export class WalletButtonController {
         this.render();
       }, 1400);
     } finally {
-      this.accountAction = null;
+      this.copyInProgress = false;
       this.render();
     }
   }
@@ -313,25 +353,78 @@ export class WalletButtonController {
     if (!session || !this.shouldShowWeb3Name() || !this.options.identityResolver) {
       this.identityName = null;
       this.identityAvatar = null;
+      this.identityResolvingKey = undefined;
       this.options.onIdentityChange?.(null, session);
+      this.clearIdentitySettleTimer();
       return;
     }
     const requestId = ++this.identityRequest;
+    const cacheKey = this.identityCacheKey(session);
+    this.identityResolvingKey = cacheKey;
     try {
       const result = await this.options.identityResolver(session.account.address, session);
       if (requestId !== this.identityRequest) return;
       const identity = typeof result === "string" ? { name: result } : result ?? null;
       this.identityName = identity?.name ?? null;
       this.identityAvatar = identity?.avatar ?? null;
+      this.identityCache.set(cacheKey, identity);
       this.options.onIdentityChange?.(identity, session);
+      this.clearIdentitySettleTimer();
       this.render();
     } catch {
       if (requestId === this.identityRequest) {
         this.identityName = null;
         this.identityAvatar = null;
+        this.identityCache.set(cacheKey, null);
         this.options.onIdentityChange?.(null, session);
+        this.clearIdentitySettleTimer();
+        this.render();
+      }
+    } finally {
+      if (requestId === this.identityRequest && this.identityResolvingKey === cacheKey) {
+        this.identityResolvingKey = undefined;
       }
     }
+  }
+
+  private renderConnectedState(session: WalletSession | null): void {
+    if (!session || !this.shouldShowWeb3Name() || !this.options.identityResolver) {
+      this.clearIdentitySettleTimer();
+      this.identityName = null;
+      this.identityAvatar = null;
+      this.render();
+      return;
+    }
+
+    const cacheKey = this.identityCacheKey(session);
+    const cached = this.identityCache.get(cacheKey);
+    if (cached !== undefined) {
+      this.identityName = cached?.name ?? null;
+      this.identityAvatar = cached?.avatar ?? null;
+      this.clearIdentitySettleTimer();
+      this.render();
+      if (this.identityResolvingKey !== cacheKey) void this.resolveIdentity(session);
+      return;
+    }
+
+    this.identityName = null;
+    this.identityAvatar = null;
+    if (this.identityResolvingKey !== cacheKey) void this.resolveIdentity(session);
+    this.clearIdentitySettleTimer();
+    this.identitySettleTimer = window.setTimeout(() => {
+      this.identitySettleTimer = undefined;
+      this.render();
+    }, 260);
+  }
+
+  private clearIdentitySettleTimer(): void {
+    if (!this.identitySettleTimer) return;
+    window.clearTimeout(this.identitySettleTimer);
+    this.identitySettleTimer = undefined;
+  }
+
+  private identityCacheKey(session: WalletSession): string {
+    return `${session.account.network?.id ?? session.account.networkType ?? "unknown"}:${session.account.address}`;
   }
 
   private async resolveBalance(session: WalletSession | null): Promise<void> {
@@ -405,13 +498,12 @@ export class WalletButtonController {
     const address = session.account.address;
     const label = this.getAccountLabel(session);
     const explorerUrl = this.getExplorerUrl(session);
-    const copyBusy = this.accountAction === "copy";
     const disconnectBusy = this.accountAction === "disconnect";
-    const copyFeedbackIcon = copyBusy ? this.spinnerIcon() : this.copied ? this.copiedIcon() : this.copyIcon();
+    const copyFeedbackIcon = this.copied ? this.copiedIcon() : this.copyIcon();
     const disconnectIcon = disconnectBusy ? this.spinnerIcon() : this.logoutIcon();
-    const copy = this.options.copyAddress ? `<button type="button" data-xwk-copy-address${copyBusy || disconnectBusy ? " disabled" : ""}>${copyFeedbackIcon}<span>${copyBusy ? this.escapeHtml(messages.copying) : this.copied ? this.escapeHtml(messages.copied) : this.escapeHtml(messages.copyAddress)}</span></button>` : "";
+    const copy = this.options.copyAddress ? `<button type="button" data-xwk-copy-address${disconnectBusy ? " disabled" : ""}>${copyFeedbackIcon}<span>${this.copied ? this.escapeHtml(messages.copied) : this.escapeHtml(messages.copyAddress)}</span></button>` : "";
     const explorer = this.options.explorer && explorerUrl ? `<a href="${this.escapeHtml(explorerUrl)}" target="_blank" rel="noreferrer">${this.externalIcon()}<span>${this.escapeHtml(messages.viewExplorer)}</span></a>` : "";
-    const disconnect = this.options.disconnect ? `<button type="button" data-xwk-disconnect${copyBusy || disconnectBusy ? " disabled" : ""}>${disconnectIcon}<span>${disconnectBusy ? this.escapeHtml(messages.disconnecting) : this.escapeHtml(messages.disconnect)}</span></button>` : "";
+    const disconnect = this.options.disconnect ? `<button type="button" data-xwk-disconnect${this.copyInProgress || disconnectBusy ? " disabled" : ""}>${disconnectIcon}<span>${disconnectBusy ? this.escapeHtml(messages.disconnecting) : this.escapeHtml(messages.disconnect)}</span></button>` : "";
     const nativeAsset = getNativeAsset(session.account.network);
     const notActivated = this.options.showBalance && this.activationStatus === "unfunded"
       ? `<div class="xwk-account-warning">${this.escapeHtml(messages.accountNotActivated(nativeAsset))}</div>`
@@ -461,13 +553,20 @@ export class WalletButtonController {
   private renderWalletIcon(wallet?: WalletMetadata, fallbackIcon?: string): string {
     const icon = wallet?.icon ?? fallbackIcon;
     if (icon) return `<img class="xwk-button-icon" src="${this.escapeHtml(icon)}" alt="">`;
-    if (!wallet) return `<span class="xwk-button-icon xwk-button-icon-fallback">${this.walletIcon()}</span>`;
+    if (!wallet) return `<span class="xwk-button-icon xwk-button-icon-fallback xwk-button-icon-svg-fallback" aria-hidden="true">${this.walletIcon()}</span>`;
     const label = wallet.name.slice(0, 1).toUpperCase();
-    return `<span class="xwk-button-icon xwk-button-icon-fallback">${this.escapeHtml(label)}</span>`;
+    return `<span class="xwk-button-icon xwk-button-icon-fallback xwk-button-icon-initial" aria-hidden="true">${this.escapeHtml(label)}</span>`;
+  }
+
+  private repairFallbackIcon(root: HTMLElement): void {
+    root.querySelectorAll<HTMLElement>(".xwk-button-icon-svg-fallback").forEach((icon) => {
+      if (icon.querySelector("svg")) return;
+      icon.innerHTML = this.walletIcon();
+    });
   }
 
   private getAccountPanelFocusableElements(): HTMLElement[] {
-    const panel = this.target?.querySelector<HTMLElement>(".xwk-account-panel-modal");
+    const panel = this.getAccountPanelRoot();
     if (!panel) return [];
     const selectors = [
       "button:not([disabled])",
@@ -479,6 +578,12 @@ export class WalletButtonController {
     ].join(",");
     return Array.from(panel.querySelectorAll<HTMLElement>(selectors))
       .filter((element) => element.offsetParent !== null);
+  }
+
+  private getAccountPanelRoot(): HTMLElement | null {
+    return this.accountPanelPortal?.querySelector<HTMLElement>(".xwk-account-panel-modal")
+      ?? this.target?.querySelector<HTMLElement>(".xwk-account-panel-modal")
+      ?? null;
   }
 
   private walletIcon(): string {
@@ -531,17 +636,26 @@ export class WalletButtonController {
     const background = this.options.variant === "default" || this.options.variant === "pill" ? theme.surface : theme.background;
     const hoverBackground = this.options.variant === "default" || this.options.variant === "pill" ? theme.surfaceHover : theme.surface;
     const border = this.options.variant === "minimal" ? "transparent" : theme.border;
+    const iconBorder = this.resolveVisibleBorder(theme.border);
     const actionBorder = themeMode === "dark" ? "rgba(255,255,255,.10)" : "rgba(15,23,42,.08)";
-    const fallbackIconBackground = theme.surfaceHover;
-    const fallbackIconColor = theme.muted;
+    const fallbackIconBackground = theme.fallbackIconBackground;
+    const fallbackIconColor = theme.fallbackIconColor;
 
-    return `.xwk-button-root{display:inline-block;max-width:100%;position:relative;font-family:${theme.fontFamily};font-size:14px}.xwk-account-button{align-items:center;background:${background};border:1px solid ${border};border-radius:${radius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:inline-flex;gap:8px;font:inherit;font-weight:560;max-width:100%;min-height:${height};padding:0 12px 0 10px;touch-action:manipulation;transition:background-color .16s ease,border-color .16s ease;white-space:nowrap;-webkit-tap-highlight-color:transparent;transform:none}.xwk-account-button:hover{background:${hoverBackground};box-shadow:none;opacity:1;transform:none}.xwk-account-button:active{background:${hoverBackground};opacity:1;transform:none}.xwk-account-button:focus-visible,.xwk-button-chevron:focus-visible,.xwk-account-panel-actions button:focus-visible,.xwk-account-panel-actions a:focus-visible{outline:2px solid ${theme.accent};outline-offset:2px;text-decoration:none}.xwk-button-icon{background:${theme.background};border:1px solid ${theme.border};border-radius:10px;box-sizing:border-box;display:inline-flex;flex:0 0 auto;height:28px;object-fit:contain;overflow:hidden;width:28px}.xwk-button-icon-fallback{align-items:center;background:${fallbackIconBackground};color:${fallbackIconColor};font-size:12px;justify-content:center}.xwk-button-label{display:inline-block;font-size:13px;font-weight:560;line-height:1.1;max-width:220px;min-width:0;overflow:hidden;padding-right:2px;text-overflow:ellipsis;white-space:nowrap}.xwk-button-balance{color:${theme.muted};font-weight:500;margin-left:4px}.xwk-button-chevron{align-items:center;background:${theme.background};border:1px solid ${theme.border};border-radius:999px;color:${theme.muted};display:inline-flex;flex:0 0 auto;height:26px;justify-content:center;line-height:1;touch-action:manipulation;width:26px}.xwk-button-chevron:hover{background:${theme.surfaceHover};color:${theme.foreground}}.xwk-account-overlay{align-items:center;background:${theme.overlay};display:flex;inset:0;justify-content:center;overscroll-behavior:contain;padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));position:fixed;z-index:2147483647}.xwk-account-panel{background:${theme.background};border:1px solid ${theme.border};border-radius:${theme.radius};box-shadow:${theme.shadow};color:${theme.foreground};display:grid;gap:12px;overflow:hidden;z-index:2147483647}.xwk-account-panel:focus{outline:none}.xwk-account-panel-dropdown{box-shadow:none;justify-items:center;margin-top:10px;min-width:320px;padding:18px;position:absolute;right:0;top:100%;width:min(360px,calc(100vw - 32px))}.xwk-account-panel-modal{gap:0;max-height:calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));max-width:520px;position:relative;width:min(520px,100%)}.xwk-account-modal-header{align-items:center;border-bottom:1px solid ${theme.border};display:grid;grid-template-columns:44px minmax(0,1fr) 44px;column-gap:8px;padding:8px 18px}.xwk-account-modal-header h2{color:${theme.foreground};font-size:16px;font-weight:500;line-height:1.2;margin:0;min-width:0;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap}.xwk-account-modal-body{-webkit-overflow-scrolling:touch;display:grid;gap:12px;justify-items:center;min-height:390px;overflow:auto;overscroll-behavior:contain;padding:22px 28px 28px}.xwk-account-close{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:transparent!important;border:0!important;border-radius:999px;box-shadow:none!important;color:${theme.muted};cursor:pointer;display:inline-flex;font-size:26px;font-weight:500;height:44px;justify-content:center;line-height:1;margin:0;min-height:0;outline:none!important;padding:0;touch-action:manipulation;transform:none;width:44px}.xwk-account-close:hover{background:${theme.surfaceHover}!important;box-shadow:none!important;color:${theme.foreground};transform:none}.xwk-account-close:focus-visible{outline:2px solid ${theme.border}!important;outline-offset:0}.xwk-account-hero{height:154px;margin-top:4px;position:relative;width:180px}.xwk-account-panel-dropdown .xwk-account-hero{height:132px;width:160px}.xwk-account-art,.xwk-account-avatar{border-radius:999px;height:118px;left:31px;position:absolute;top:8px;width:118px}.xwk-account-panel-dropdown .xwk-account-art,.xwk-account-panel-dropdown .xwk-account-avatar{height:104px;left:28px;width:104px}.xwk-account-art{align-items:center;background:radial-gradient(circle at 58% 38%,var(--xwk-avatar-spot),transparent 0 22%,transparent 23%),linear-gradient(160deg,var(--xwk-avatar-from),var(--xwk-avatar-to));display:flex;justify-content:center}.xwk-account-art span{background:rgba(255,255,255,.18);border-radius:999px;height:50px;width:50px}.xwk-account-panel-dropdown .xwk-account-art span{height:42px;width:42px}.xwk-account-avatar{background:${theme.surface};border:1px solid ${theme.border};box-sizing:border-box;display:block;object-fit:cover;overflow:hidden}.xwk-account-name{color:${theme.foreground};font-size:21px;font-weight:650;line-height:1.2;max-width:100%;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap}.xwk-account-panel-dropdown .xwk-account-name{font-size:18px}.xwk-account-address{background:${theme.surface};border:1px solid ${theme.border};border-radius:12px;color:${theme.muted};font-size:14px;font-weight:520;line-height:1.25;max-width:100%;overflow:hidden;padding:8px 12px;text-align:center;text-overflow:ellipsis;white-space:nowrap}.xwk-account-balance{background:${theme.surface};border:1px solid ${theme.border};border-radius:999px;color:${theme.foreground};font-size:13px;font-weight:560;line-height:1.2;padding:7px 12px;text-align:center}.xwk-account-warning{background:${theme.surface};border:1px solid ${actionBorder};border-radius:12px;box-sizing:border-box;color:${theme.muted};font-size:13px;font-weight:520;line-height:1.35;padding:9px 12px;text-align:center;width:100%}.xwk-account-panel-actions{display:grid;gap:10px;grid-template-columns:1fr;width:100%}.xwk-account-modal-body .xwk-account-panel-actions{margin-top:auto}.xwk-account-panel-actions button,.xwk-account-panel-actions a{align-items:center;background:${theme.surface};border:1px solid ${actionBorder};border-radius:${theme.walletRadius};box-shadow:none;color:${theme.foreground};cursor:pointer;display:flex;font:inherit;font-size:14px;font-weight:560;gap:8px;justify-content:center;min-height:46px;padding:0 12px;text-decoration:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transform:none;transition:background-color .16s ease,border-color .16s ease}.xwk-account-panel-actions button:disabled{cursor:wait;opacity:1}.xwk-account-panel-actions svg{flex:0 0 auto;opacity:.58}.xwk-account-panel-actions button:hover,.xwk-account-panel-actions a:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;text-decoration:none;transform:none}.xwk-account-panel-actions button:active,.xwk-account-panel-actions a:active{background:${theme.surfaceHover};opacity:1;text-decoration:none;transform:none}.xwk-copied-icon{opacity:1!important}.xwk-action-spinner{animation:xwk-action-spin .8s linear infinite;border:2px solid ${theme.border};border-top-color:${theme.muted};border-radius:999px;box-sizing:border-box;display:inline-block;height:17px;width:17px}@keyframes xwk-action-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.xwk-account-button,.xwk-account-panel-actions button,.xwk-account-panel-actions a{transition:none}.xwk-action-spinner{animation:none}}@media(max-width:520px){.xwk-account-panel-dropdown{bottom:0;left:0;margin-top:0;min-width:0;position:fixed;right:0;top:auto;width:100vw}.xwk-account-overlay{align-items:flex-end;padding:max(12px,env(safe-area-inset-top)) 0 0}.xwk-account-panel-modal{align-self:flex-end;border-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0;border-left:0;border-right:0;border-top-left-radius:${theme.radius};border-top-right-radius:${theme.radius};height:auto;max-height:calc(100dvh - env(safe-area-inset-top));max-width:none;width:100vw}.xwk-account-modal-header{border-top-left-radius:${theme.radius};border-top-right-radius:${theme.radius};grid-template-columns:44px minmax(0,1fr) 44px;padding:10px 16px}.xwk-account-modal-body{min-height:340px;padding:18px 20px max(22px,calc(22px + env(safe-area-inset-bottom)))}.xwk-button-label{max-width:min(150px,calc(100vw - 140px))}}`;
+    return `.xwk-button-root{display:inline-block;max-width:100%;position:relative;font-family:${theme.fontFamily};font-size:14px}.xwk-account-button{align-items:center;background:${background};border:1px solid ${border};border-radius:${radius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:inline-flex;gap:8px;font:inherit;font-weight:560;max-width:100%;min-height:${height};overflow:hidden;padding:0 12px 0 10px;touch-action:manipulation;transition:background-color .16s ease,border-color .16s ease;white-space:nowrap;-webkit-tap-highlight-color:transparent;transform:none}.xwk-account-button:hover{background:${hoverBackground};box-shadow:none;opacity:1;transform:none}.xwk-account-button:active{background:${hoverBackground};opacity:1;transform:none}.xwk-account-button:focus-visible,.xwk-button-chevron:focus-visible,.xwk-account-panel-actions button:focus-visible,.xwk-account-panel-actions a:focus-visible{outline:2px solid ${theme.accent};outline-offset:2px;text-decoration:none}.xwk-button-icon{background:${theme.background};border:1px solid ${iconBorder};border-radius:10px;box-sizing:border-box;display:inline-flex;flex:0 0 28px;height:28px;isolation:isolate;line-height:0;max-width:28px;min-width:28px;object-fit:contain;overflow:hidden;position:relative;width:28px}.xwk-button-icon-fallback{align-items:center;background:${fallbackIconBackground};color:${fallbackIconColor};justify-content:center}.xwk-button-icon-initial{font-size:12px;line-height:1}.xwk-button-icon-svg-fallback{font-size:0}.xwk-button-icon-svg-fallback svg{display:block;flex:0 0 17px;height:17px;max-height:17px;max-width:17px;min-height:17px;min-width:17px;width:17px}.xwk-button-label{display:inline-block;flex:1 1 0;font-size:13px;font-weight:560;line-height:1.1;max-width:220px;min-width:0;overflow:hidden;padding-right:2px;text-overflow:ellipsis;white-space:nowrap}.xwk-button-balance{color:${theme.muted};font-weight:500;margin-left:4px}.xwk-button-chevron{align-items:center;background:${theme.background};border:1px solid ${iconBorder};border-radius:999px;color:${theme.muted};display:inline-flex;flex:0 0 26px;height:26px;justify-content:center;line-height:1;touch-action:manipulation;width:26px}.xwk-button-chevron:hover{background:${theme.surfaceHover};color:${theme.foreground}}.xwk-account-overlay{align-items:center;background:${theme.overlay};display:flex;inset:0;justify-content:center;overscroll-behavior:contain;padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));position:fixed;z-index:2147483647}.xwk-account-portal[data-xwk-entering="true"] .xwk-account-overlay{animation:xwk-account-overlay-in .18s ease-out}.xwk-account-panel{background:${theme.background};border:1px solid ${theme.border};border-radius:${theme.radius};box-shadow:${theme.shadow};color:${theme.foreground};display:grid;gap:12px;overflow:hidden;z-index:2147483647}.xwk-account-panel:focus{outline:none}.xwk-account-panel-dropdown{box-shadow:none;justify-items:center;margin-top:10px;min-width:320px;padding:18px;position:absolute;right:0;top:100%;width:min(360px,calc(100vw - 32px))}.xwk-account-panel-modal{gap:0;max-height:calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));max-width:520px;position:relative;transform-origin:center bottom;width:min(520px,100%)}.xwk-account-portal[data-xwk-entering="true"] .xwk-account-panel-modal{animation:xwk-account-panel-in .22s cubic-bezier(.22,1,.36,1)}.xwk-account-modal-header{align-items:center;border-bottom:1px solid ${theme.border};display:grid;grid-template-columns:44px minmax(0,1fr) 44px;column-gap:8px;padding:8px 18px}.xwk-account-modal-header h2{color:${theme.foreground};font-size:16px;font-weight:500;line-height:1.2;margin:0;min-width:0;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap}.xwk-account-modal-body{-webkit-overflow-scrolling:touch;display:grid;gap:12px;justify-items:center;min-height:390px;overflow:auto;overscroll-behavior:contain;padding:22px 28px 28px}.xwk-account-close{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:transparent!important;border:0!important;border-radius:999px;box-shadow:none!important;color:${theme.muted};cursor:pointer;display:inline-flex;font-size:26px;font-weight:500;height:44px;justify-content:center;line-height:1;margin:0;min-height:0;outline:none!important;padding:0;touch-action:manipulation;transform:none;width:44px}.xwk-account-close:hover{background:${theme.surfaceHover}!important;box-shadow:none!important;color:${theme.foreground};transform:none}.xwk-account-close:focus-visible{outline:2px solid ${iconBorder}!important;outline-offset:0}.xwk-account-hero{height:154px;margin-top:4px;position:relative;width:180px}.xwk-account-panel-dropdown .xwk-account-hero{height:132px;width:160px}.xwk-account-art,.xwk-account-avatar{border-radius:999px;height:118px;left:31px;position:absolute;top:8px;width:118px}.xwk-account-panel-dropdown .xwk-account-art,.xwk-account-panel-dropdown .xwk-account-avatar{height:104px;left:28px;width:104px}.xwk-account-art{align-items:center;background:radial-gradient(circle at 58% 38%,var(--xwk-avatar-spot),transparent 0 22%,transparent 23%),linear-gradient(160deg,var(--xwk-avatar-from),var(--xwk-avatar-to));display:flex;justify-content:center}.xwk-account-art span{background:rgba(255,255,255,.18);border-radius:999px;height:50px;width:50px}.xwk-account-panel-dropdown .xwk-account-art span{height:42px;width:42px}.xwk-account-avatar{background:${theme.surface};border:1px solid ${iconBorder};box-sizing:border-box;display:block;object-fit:cover;overflow:hidden}.xwk-account-name{color:${theme.foreground};font-size:21px;font-weight:650;line-height:1.2;max-width:100%;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap}.xwk-account-panel-dropdown .xwk-account-name{font-size:18px}.xwk-account-address{background:${theme.surface};border:1px solid ${theme.border};border-radius:12px;color:${theme.muted};font-size:14px;font-weight:520;line-height:1.25;max-width:100%;overflow:hidden;padding:8px 12px;text-align:center;text-overflow:ellipsis;white-space:nowrap}.xwk-account-balance{background:${theme.surface};border:1px solid ${theme.border};border-radius:999px;color:${theme.foreground};font-size:13px;font-weight:560;line-height:1.2;padding:7px 12px;text-align:center}.xwk-account-warning{background:${theme.surface};border:1px solid ${actionBorder};border-radius:12px;box-sizing:border-box;color:${theme.muted};font-size:13px;font-weight:520;line-height:1.35;padding:9px 12px;text-align:center;width:100%}.xwk-account-panel-actions{display:grid;gap:10px;grid-template-columns:1fr;width:100%}.xwk-account-modal-body .xwk-account-panel-actions{margin-top:auto}.xwk-account-panel-actions button,.xwk-account-panel-actions a{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:${theme.surface};border:1px solid ${actionBorder};border-radius:${theme.walletRadius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:flex;font:inherit;font-size:14px;font-weight:560;gap:8px;justify-content:center;line-height:1.2;min-height:46px;min-width:0;outline:none;overflow:hidden;padding:0 12px;text-decoration:none;touch-action:manipulation;transform:none;transition:background-color .16s ease,border-color .16s ease;width:100%}.xwk-account-panel-actions button:disabled{cursor:wait;opacity:1}.xwk-account-panel-actions svg{flex:0 0 auto;opacity:.58}.xwk-account-panel-actions span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-account-panel-actions button:hover,.xwk-account-panel-actions a:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;text-decoration:none;transform:none}.xwk-account-panel-actions button:active,.xwk-account-panel-actions a:active{background:${theme.surfaceHover};opacity:1;text-decoration:none;transform:none}.xwk-copied-icon{opacity:1!important}.xwk-action-spinner{animation:xwk-action-spin .8s linear infinite;border:2px solid ${iconBorder};border-top-color:${theme.muted};border-radius:999px;box-sizing:border-box;display:inline-block;height:17px;width:17px}@keyframes xwk-action-spin{to{transform:rotate(360deg)}}@keyframes xwk-account-overlay-in{from{opacity:0}to{opacity:1}}@keyframes xwk-account-panel-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}@media(prefers-reduced-motion:reduce){.xwk-account-button,.xwk-account-panel-actions button,.xwk-account-panel-actions a{transition:none}.xwk-account-portal[data-xwk-entering="true"] .xwk-account-overlay,.xwk-account-portal[data-xwk-entering="true"] .xwk-account-panel-modal{animation-duration:1ms!important}.xwk-action-spinner{animation:none}}@media(max-width:520px){.xwk-account-panel-dropdown{bottom:0;left:0;margin-top:0;min-width:0;position:fixed;right:0;top:auto;width:100vw}.xwk-account-overlay{align-items:flex-end;padding:max(12px,env(safe-area-inset-top)) 0 0}.xwk-account-panel-modal{align-self:flex-end;border-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0;border-left:0;border-right:0;border-top-left-radius:${theme.radius};border-top-right-radius:${theme.radius};height:auto;max-height:calc(100dvh - env(safe-area-inset-top));max-width:none;width:100vw}.xwk-account-portal[data-xwk-entering="true"] .xwk-account-panel-modal{animation:xwk-account-sheet-in .28s cubic-bezier(.32,.72,0,1)}.xwk-account-modal-header{border-top-left-radius:${theme.radius};border-top-right-radius:${theme.radius};grid-template-columns:44px minmax(0,1fr) 44px;padding:10px 16px}.xwk-account-modal-body{min-height:340px;padding:18px 20px max(22px,calc(22px + env(safe-area-inset-bottom)))}.xwk-button-label{max-width:min(150px,calc(100vw - 140px))}}@keyframes xwk-account-sheet-in{from{opacity:1;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}`;
   }
 
   private resolveTheme(): ResolvedTheme {
     const mode = this.resolveThemeMode();
     const base = mode === "dark" ? darkTheme : lightTheme;
     return { ...base, ...this.options.theme };
+  }
+
+  private resolveVisibleBorder(border: string | undefined): string {
+    const value = typeof border === "string" ? border.trim().toLowerCase() : "";
+    if (!value || value === "transparent" || value === "none") {
+      return this.resolveThemeMode() === "dark" ? "rgba(255,255,255,.12)" : "rgba(15,23,42,.08)";
+    }
+    return border ?? (this.resolveThemeMode() === "dark" ? "rgba(255,255,255,.12)" : "rgba(15,23,42,.08)");
   }
 
   private resolveThemeMode(): "light" | "dark" {

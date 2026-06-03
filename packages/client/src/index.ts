@@ -103,7 +103,7 @@ export function createWalletKit(options: CreateWalletKitOptions) {
     : undefined;
 
   if (options.autoReconnect) {
-    void manager.autoReconnect();
+    scheduleAutoReconnect(manager);
   }
 
   if (modal && modalOptions.autoOpen) {
@@ -126,6 +126,20 @@ export function createWalletKit(options: CreateWalletKitOptions) {
     signTransaction: manager.signTransaction.bind(manager),
     signMessage: manager.signMessage.bind(manager)
   };
+}
+
+function scheduleAutoReconnect(manager: WalletManager): void {
+  const run = () => {
+    const requestFrame = typeof globalThis.requestAnimationFrame === "function"
+      ? globalThis.requestAnimationFrame.bind(globalThis)
+      : (callback: FrameRequestCallback) => globalThis.setTimeout(() => callback(Date.now()), 16);
+    requestFrame(() => { void manager.autoReconnect(); });
+  };
+  if (typeof window !== "undefined" && typeof document !== "undefined" && document.readyState !== "complete") {
+    window.addEventListener("load", run, { once: true });
+    return;
+  }
+  run();
 }
 
 function resolveToastOptions(options: CreateWalletKitOptions, modalUi: Partial<Omit<WalletUiOptions, "manager" | "mount">>): WalletToastConfig | undefined {

@@ -152,4 +152,20 @@ export abstract class BaseWalletAdapter implements WalletAdapter {
       await handler();
     }
   }
+
+  protected async waitForAvailability(timeoutMs = 2500, pollMs = 100): Promise<boolean> {
+    const isAvailable = (this as WalletAdapter).isAvailable;
+    if (!isAvailable) return true;
+    const startedAt = Date.now();
+    do {
+      try {
+        if (await isAvailable.call(this)) return true;
+      } catch {
+        // Extension globals may be injected slightly after app startup.
+      }
+      if (timeoutMs <= 0) return false;
+      await new Promise<void>((resolve) => setTimeout(resolve, pollMs));
+    } while (Date.now() - startedAt < timeoutMs);
+    return false;
+  }
 }

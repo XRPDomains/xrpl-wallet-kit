@@ -74,7 +74,7 @@ When available, set `adapterApiVersion = WALLET_ADAPTER_API_VERSION`.
 Optional methods:
 
 - `disconnect()` if provider supports cleanup/logout;
-- `restoreSession(session)` for `autoReconnect`;
+- `restoreSession(session)` for `autoReconnect`; this must be passive-only and must verify the current provider account before restoring;
 - `signMessage(request)` only if supported;
 - `signTransaction(request)` only if the wallet can sign without submitting;
 - `signAndSubmit(request)` only if supported.
@@ -125,6 +125,10 @@ Use `createWalletError` from `@xrpl-wallet-kit/core` where possible.
 - Return `session.wallet` metadata if the adapter can provide it.
 - Honor `ConnectOptions.signal` when the provider or SDK exposes an abort/cancel API. If the provider cannot be aborted externally, `cancelPendingConnection()` must still clear local timers, markers, popups, and pending proposal references.
 - Use injected `WalletStorage` or core storage helpers for redirect/mobile recovery markers. Do not call `window.localStorage` directly in new adapter code.
+- For `restoreSession()`, never call `connect()`, sign-in, QR, deeplink, popup, hardware approval, or transaction approval APIs. Read only passive provider state that already exists after reload.
+- For `restoreSession()`, compare the current passive provider address with `session.account.address`. Return `null` when the address is missing, mismatched, locked, stale, or not yet hydrated.
+- Do not blindly return the stored session just because the provider exists. Local storage is not proof that the wallet is still connected to the same account.
+- If a wallet has no reliable passive account API, omit `restoreSession()` or implement it as `return null`.
 - For `signTransaction()`, return a signed-only result (`txBlob`, `signed`, `raw`) and never submit to the network.
 - For `signAndSubmit()`, return a normalized result with `hash` whenever the provider submitted a transaction successfully. Core transaction lifecycle events and WalletToast rely on that hash.
 - Use or mirror `normalizeTxResult()` for provider-specific response shapes such as `hash`, `txHash`, `tx_hash`, `transactionHash`, nested `result.hash`, or nested `response.data.transaction_hash`.
@@ -156,7 +160,7 @@ Manual smoke test at minimum:
 - connect success;
 - user reject/cancel;
 - disconnect;
-- autoReconnect if implemented;
+- autoReconnect if implemented, including matching-address restore, missing-address null, and wrong-address null;
 - sign message if implemented;
 - payment and NFT offer signing if claimed;
 - mobile deeplink/QR return for WalletConnect/mobile wallets.

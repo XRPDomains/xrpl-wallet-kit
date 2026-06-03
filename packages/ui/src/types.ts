@@ -19,6 +19,8 @@ export interface WalletUiTheme {
   overlay?: string;
   surface?: string;
   surfaceHover?: string;
+  fallbackIconBackground?: string;
+  fallbackIconColor?: string;
   shadow?: string;
   radius?: string;
   walletRadius?: string;

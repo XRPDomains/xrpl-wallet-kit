@@ -135,6 +135,7 @@ export class WalletManager extends WalletEventEmitter {
         const enrichedSession = await this.enrichSession(this.withWalletMetadata(restored.session, adapter));
         this.setSession(enrichedSession);
         this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
+        this.emit("connected", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
         return enrichedSession;
       }
 
@@ -146,6 +147,7 @@ export class WalletManager extends WalletEventEmitter {
       const enrichedSession = await this.enrichSession(this.withWalletMetadata(session, adapter));
       this.setSession(enrichedSession);
       this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession, stale: true });
+      this.emit("connected", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
       return enrichedSession;
     } catch (error) {
       this.logger.warn("Auto reconnect failed", error);
@@ -186,6 +188,7 @@ export class WalletManager extends WalletEventEmitter {
           this.setSession(enrichedSession);
           await this.saveSession(enrichedSession);
           this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
+          this.emit("connected", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
           return enrichedSession;
         } catch (error) {
           this.logger.warn(`Session recovery failed for ${adapter.metadata.id}`, error);
