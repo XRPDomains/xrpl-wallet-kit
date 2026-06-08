@@ -55,7 +55,7 @@ test("DropFi restoreSession accepts passive address state even when isConnected 
   });
 
   assert.equal(restored?.account.address, "rRestoreAddress");
-  assert.deepEqual(restored?.raw, { address: "rRestoreAddress", connected: false });
+  assert.deepEqual(restored?.raw, { address: "rRestoreAddress", connected: false, publicKey: undefined });
 });
 
 test("DropFi restoreSession returns null when passive address differs from stored session", async () => {

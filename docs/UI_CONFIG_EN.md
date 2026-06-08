@@ -426,7 +426,8 @@ Resolver signature:
 ```ts
 type IdentityResolver = (
   address: string,
-  session: WalletSession
+  session: WalletSession,
+  context?: { force?: boolean }
 ) => WalletIdentity | string | null | Promise<WalletIdentity | string | null>;
 ```
 
@@ -458,6 +459,7 @@ Resolver behavior:
 - If `fallbackToAddress` is `true`, the button/account panel displays a shortened address when no identity is available.
 - If no resolver is provided, the kit uses the default XRP Domains resolver when identity is enabled.
 - The kit caches identity results per network/address while the button controller is mounted to reduce visible label churn after reconnect or restore.
+- `kit.refreshIdentity()` clears the button identity cache and calls the resolver with `{ force: true }`. Use it after your app changes a user's primary XRP name.
 
 Default resolver helper:
 
@@ -472,6 +474,12 @@ createWalletKit({
     }
   }
 });
+```
+
+After changing a user's primary identity in your app:
+
+```ts
+await kit.refreshIdentity();
 ```
 
 Disable identity resolution if the dApp wants to fully own account naming:

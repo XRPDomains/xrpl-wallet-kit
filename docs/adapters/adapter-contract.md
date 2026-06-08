@@ -7,7 +7,7 @@ This document defines the stable adapter surface for XRPL Wallet Kit v1. Third-p
 Core exports:
 
 ```ts
-export const WALLET_ADAPTER_API_VERSION = "1.0";
+export const WALLET_ADAPTER_API_VERSION = "1.1";
 ```
 
 Adapters may declare:
@@ -22,7 +22,7 @@ Patch and minor releases in the `1.x` line should remain compatible with this co
 
 ```ts
 interface WalletAdapter {
-  adapterApiVersion?: "1.0" | (string & {});
+  adapterApiVersion?: "1.1" | (string & {});
   metadata: WalletMetadata;
   capabilities: WalletCapabilities;
 
@@ -40,6 +40,26 @@ interface WalletAdapter {
   signAndSubmit?: (request: SignAndSubmitRequest) => Promise<TxResult>;
 }
 ```
+
+## Message Signing Result Shape
+
+`signMessage()` must identify what kind of proof it returns. Auth and server verification code should branch on `signatureKind`, not guess from field names.
+
+```ts
+type SignatureKind = "signature" | "signedTx";
+
+interface SignMessageResult {
+  signatureKind: SignatureKind;
+  signature?: string;
+  txBlob?: string;
+  publicKey?: string;
+  raw?: unknown;
+}
+```
+
+- Use `signatureKind: "signature"` when the wallet returns a compact message signature. Include `publicKey` when the wallet exposes it; otherwise server code may need ledger lookup or wallet-specific verification.
+- Use `signatureKind: "signedTx"` when the wallet returns a signed XRPL transaction blob, such as a Xaman `SignIn` payload or a non-submitted memo transaction. Put the blob in `txBlob`; do not also copy it into `signature`.
+- Existing `signature` and `txBlob` fields remain for compatibility, but `signatureKind` is the source of truth for new adapters.
 
 ## Required Fields
 
@@ -78,6 +98,7 @@ type WalletMethodHint =
   | "createNFTOffer"
   | "acceptNFTOffer"
   | "cancelNFTOffer"
+  | "burnNFT"
   | "generic";
 ```
 
@@ -89,6 +110,7 @@ Valid values:
 - `createNFTOffer`: XRPL `NFTokenCreateOffer` flow.
 - `acceptNFTOffer`: XRPL `NFTokenAcceptOffer` flow.
 - `cancelNFTOffer`: XRPL `NFTokenCancelOffer` flow.
+- `burnNFT`: XRPL `NFTokenBurn` flow.
 - `generic`: fallback for any other transaction type.
 
 Adapter guidance:

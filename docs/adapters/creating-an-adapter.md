@@ -55,7 +55,13 @@ export class MyWalletAdapter extends BaseWalletAdapter {
 
   async signMessage(request: SignMessageRequest) {
     const provider = this.requireProvider();
-    return provider.signMessage(request.message);
+    const result = await provider.signMessage(request.message);
+    return {
+      signatureKind: "signature" as const,
+      signature: result.signature,
+      publicKey: request.account?.publicKey,
+      raw: result
+    };
   }
 
   async signAndSubmit(request: SignAndSubmitRequest) {
@@ -97,7 +103,7 @@ Important capabilities:
 
 - `connect`: required.
 - `disconnect`: provider has a meaningful disconnect/logout/session-clear method.
-- `signMessage`: wallet can sign a portable message proof or a non-submitted memo transaction.
+- `signMessage`: wallet can sign a portable message proof or a non-submitted memo transaction. Return `signatureKind: "signature"` for compact message signatures and `signatureKind: "signedTx"` for signed transaction blobs.
 - `signAndSubmit`: wallet can sign and submit a transaction.
 - `payments`: payment flow is supported and tested.
 - `nftOffers`: NFT offer create/accept/cancel is supported and tested.

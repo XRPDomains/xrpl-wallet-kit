@@ -168,6 +168,12 @@ window.walletKit = XRPLWalletKitLegacyBridge.mount({
 });
 ```
 
+When the legacy app changes the user's primary XRP name, refresh the visible identity without reloading the page:
+
+```js
+await window.walletKit.refreshIdentity();
+```
+
 ## 6. Patch a Legacy Facade
 
 If the old site already uses an object such as `xrplWalletKit.connect()`, `disconnect()`, `signAuthPayload()`, or `signAndSubmit()`, patch it so existing code routes through the new Wallet Kit:

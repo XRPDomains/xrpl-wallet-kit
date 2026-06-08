@@ -1,4 +1,4 @@
-import type { WalletManager, WalletNetwork, WalletSession } from "@xrpl-wallet-kit/core";
+import type { WalletManager, WalletNetwork, WalletSession, WalletSessionBalance } from "@xrpl-wallet-kit/core";
 import type { WalletUiLocale, WalletUiMessagesInput } from "./locales";
 export type WalletUiLayout = "list" | "card" | "grid" | "icon";
 export type WalletUiSize = "compact" | "default" | "wide";
@@ -14,6 +14,7 @@ export interface WalletUiTheme {
   accent?: string;
   background?: string;
   foreground?: string;
+  error?: string;
   muted?: string;
   border?: string;
   overlay?: string;
@@ -82,20 +83,14 @@ export interface WalletIdentity {
   verified?: boolean;
 }
 
-export type WalletIdentityResolver = (address: string, session: WalletSession) => Promise<WalletIdentity | string | null>;
+export interface WalletIdentityResolverContext {
+  force?: boolean;
+}
 
-export interface WalletBalance {
-  value: string;
-  formatted: string;
+export type WalletIdentityResolver = (address: string, session: WalletSession, context?: WalletIdentityResolverContext) => Promise<WalletIdentity | string | null>;
+
+export interface WalletBalance extends WalletSessionBalance {
   symbol: string;
-  activationStatus?: "active" | "unfunded" | "unknown";
-  available?: string;
-  availableFormatted?: string;
-  total?: string;
-  totalFormatted?: string;
-  reserve?: string;
-  ownerCount?: number;
-  raw?: unknown;
 }
 
 export type WalletBalanceResolver = (context: {

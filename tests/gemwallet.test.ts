@@ -70,3 +70,87 @@ test("GemWallet payment preserves explicit walletPayload override", async () => 
   assert.equal(capturedPayload, walletPayload);
 });
 
+test("GemWallet burnNFT routes NFTokenBurn txJson to burnNFT payload", async () => {
+  let capturedPayload: unknown;
+  const provider: GemWalletProvider = {
+    burnNFT: async (payload) => {
+      capturedPayload = payload;
+      return { result: { hash: "BURN" } };
+    }
+  };
+
+  const result = await new GemWalletAdapter({ provider }).signAndSubmit({
+    submit: true,
+    txJson: {
+      TransactionType: "NFTokenBurn",
+      Account: "rSender",
+      NFTokenID: "00080000ABC",
+      Owner: "rOwner"
+    }
+  });
+
+  assert.equal(result.hash, "BURN");
+  assert.deepEqual(capturedPayload, {
+    NFTokenID: "00080000ABC",
+    owner: "rOwner"
+  });
+});
+
+test("GemWallet burnNFT methodHint preserves explicit walletPayload override", async () => {
+  let capturedPayload: unknown;
+  const provider: GemWalletProvider = {
+    burnNFT: async (payload) => {
+      capturedPayload = payload;
+      return { result: { hash: "BURN" } };
+    }
+  };
+  const walletPayload = { NFTokenID: "CUSTOM", owner: "rOwner" };
+
+  await new GemWalletAdapter({ provider }).signAndSubmit({
+    methodHint: "burnNFT",
+    submit: true,
+    txJson: {
+      TransactionType: "NFTokenBurn",
+      NFTokenID: "00080000ABC"
+    },
+    walletPayload
+  });
+
+  assert.equal(capturedPayload, walletPayload);
+});
+
+test("GemWallet connect and signMessage include publicKey when provider exposes it", async () => {
+  const provider: GemWalletProvider = {
+    isInstalled: async () => ({ result: { isInstalled: true } }),
+    getAddress: async () => ({ result: { address: "rGemAddress" } }),
+    getPublicKey: async () => ({ result: { address: "rGemAddress", publicKey: "EDGEMPUBLICKEY" } }),
+    signMessage: async () => ({ result: { signedMessage: "GEM_SIGNATURE" } })
+  };
+  const adapter = new GemWalletAdapter({ provider });
+  const connected = await adapter.connect({});
+
+  assert.equal(connected.account.publicKey, "EDGEMPUBLICKEY");
+
+  const signed = await adapter.signMessage({
+    message: "Login",
+    account: connected.account
+  });
+
+  assert.equal(signed.signatureKind, "signature");
+  assert.equal(signed.proof, "GEM_SIGNATURE");
+  assert.equal(signed.publicKey, "EDGEMPUBLICKEY");
+});
+
+test("GemWallet signMessage fetches publicKey when request account does not have it", async () => {
+  const provider: GemWalletProvider = {
+    getPublicKey: async () => ({ result: { address: "rGemAddress", publicKey: "EDGEMPUBLICKEY" } }),
+    signMessage: async () => ({ result: { signedMessage: "GEM_SIGNATURE" } })
+  };
+
+  const signed = await new GemWalletAdapter({ provider }).signMessage({
+    message: "Login",
+    account: { address: "rGemAddress" }
+  });
+
+  assert.equal(signed.publicKey, "EDGEMPUBLICKEY");
+});

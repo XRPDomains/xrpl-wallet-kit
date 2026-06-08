@@ -37,13 +37,13 @@ export interface OtsuProvider {
    * Opens an extension notification popup for the user to approve scopes.
    * Supported scopes: 'read', 'sign', 'submit', 'switchNetwork'
    */
-  connect(params?: { scopes?: string[] }): Promise<{ address: string }>;
+  connect(params?: { scopes?: string[] }): Promise<{ address: string; publicKey?: string }>;
 
   /** Revoke the current dApp permission and close the session */
   disconnect(): Promise<void>;
 
   /** Return the address of the currently connected account */
-  getAddress(): Promise<{ address: string }>;
+  getAddress(): Promise<{ address: string; publicKey?: string }>;
 
   /**
    * Return the active network identifier.
@@ -58,7 +58,7 @@ export interface OtsuProvider {
   signAndSubmit(tx: Record<string, unknown>): Promise<{ tx_blob: string; hash: string }>;
 
   /** Sign an arbitrary UTF-8 message */
-  signMessage(message: string): Promise<{ signature: string }>;
+  signMessage(message: string): Promise<{ signature: string; publicKey?: string }>;
 
   /** Register a provider-level event listener */
   on(event: string, callback: (data: unknown) => void): void;
@@ -154,7 +154,7 @@ export class OtsuAdapter extends BaseWalletAdapter {
 
     const provider = this.requireProvider();
 
-    let response: { address: string };
+    let response: { address: string; publicKey?: string };
     try {
       response = await provider.connect({
         scopes: this.options.scopes ?? ["read", "sign", "submit", "switchNetwork"]
@@ -172,6 +172,7 @@ export class OtsuAdapter extends BaseWalletAdapter {
     return {
       account: {
         address,
+        publicKey: response.publicKey,
         network: options.network,
         networkType: options.network?.networkType ?? networkType
       },
@@ -195,12 +196,12 @@ export class OtsuAdapter extends BaseWalletAdapter {
     if (!provider.isConnected()) return null;
 
     try {
-      const { address } = await provider.getAddress();
+      const { address, publicKey } = await provider.getAddress();
       const restoredAddress = address ?? session.account.address;
       return {
-        account: { ...session.account, address: restoredAddress },
-        session: { ...session, account: { ...session.account, address: restoredAddress } },
-        raw: { address }
+        account: { ...session.account, address: restoredAddress, publicKey: session.account.publicKey ?? publicKey },
+        session: { ...session, account: { ...session.account, address: restoredAddress, publicKey: session.account.publicKey ?? publicKey } },
+        raw: { address, publicKey }
       };
     } catch {
       // If getAddress fails the session cannot be safely restored
@@ -212,13 +213,19 @@ export class OtsuAdapter extends BaseWalletAdapter {
 
   async signMessage(request: SignMessageRequest) {
     const provider = this.requireProvider();
-    let result: { signature: string };
+    let result: { signature: string; publicKey?: string };
     try {
       result = await provider.signMessage(request.message);
     } catch (error) {
       throw this.mapSignError(error);
     }
-    return { signature: result.signature, raw: result };
+    return {
+      signatureKind: "signature" as const,
+      proof: result.signature,
+      signature: result.signature,
+      publicKey: result.publicKey ?? request.account?.publicKey,
+      raw: result
+    };
   }
 
   async signTransaction(request: SignTransactionRequest) {

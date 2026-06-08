@@ -57,12 +57,29 @@ export interface WalletAccount {
   activationStatus?: "active" | "unfunded" | "unknown";
 }
 
+export interface WalletSessionBalance {
+  value: string;
+  formatted: string;
+  symbol?: string;
+  activationStatus?: "active" | "unfunded" | "unknown";
+  spendable?: boolean;
+  reserveLocked?: boolean;
+  available?: string;
+  availableFormatted?: string;
+  total?: string;
+  totalFormatted?: string;
+  reserve?: string;
+  ownerCount?: number;
+  raw?: unknown;
+}
+
 export interface WalletSession {
   adapterId: string;
   wallet?: WalletMetadata;
   account: WalletAccount;
   connectedAt: number;
   expiresAt?: number;
+  balance?: WalletSessionBalance;
   metadata?: Record<string, unknown>;
 }
 
@@ -73,9 +90,14 @@ export interface SignMessageRequest {
   account?: WalletAccount;
 }
 
+export type SignatureKind = "signature" | "signedTx";
+
 export interface SignMessageResult {
+  signatureKind: SignatureKind;
+  proof?: string;
   signature?: string;
   txBlob?: string;
+  publicKey?: string;
   raw?: unknown;
 }
 
@@ -88,8 +110,11 @@ export interface AuthenticateRequest {
 export interface AuthenticateResult {
   address: string;
   message: string;
+  signatureKind: SignatureKind;
+  proof: string;
   signature?: string;
   txBlob?: string;
+  publicKey?: string;
   issuedAt: string;
   expiresAt: string;
   statement: string;
@@ -98,7 +123,7 @@ export interface AuthenticateResult {
 
 export interface SignAndSubmitRequest {
   txJson: TransactionPayload;
-  methodHint?: "payment" | "createNFTOffer" | "acceptNFTOffer" | "cancelNFTOffer" | "generic";
+  methodHint?: "payment" | "createNFTOffer" | "acceptNFTOffer" | "cancelNFTOffer" | "burnNFT" | "generic";
   walletPayload?: unknown;
   submit?: boolean;
 }

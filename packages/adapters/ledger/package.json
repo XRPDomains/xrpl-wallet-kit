@@ -26,7 +26,12 @@
     "@ledgerhq/hw-transport-webhid": "^6.28.0",
     "@ledgerhq/hw-transport-webusb": "^6.28.0",
     "@xrpl-wallet-kit/core": "0.1.0-beta.0",
-    "buffer": "^6.0.3",
+    "buffer": "^6.0.3"
+  },
+  "peerDependencies": {
+    "xrpl": "^4.0.0"
+  },
+  "devDependencies": {
     "xrpl": "^4.0.0"
   },
   "publishConfig": {

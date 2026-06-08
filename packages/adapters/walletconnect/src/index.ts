@@ -1,8 +1,8 @@
-import SignClient from "@walletconnect/sign-client";
-import { WalletConnectModal } from "@walletconnect/modal";
+import type SignClient from "@walletconnect/sign-client";
+import type { WalletConnectModal } from "@walletconnect/modal";
 import type { SessionTypes, SignClientTypes } from "@walletconnect/types";
 import { BaseWalletAdapter, createBrowserWalletStorage, normalizeTxResult, pickPath, utf8ToHex } from "@xrpl-wallet-kit/core";
-import { WALLETCONNECT_ICON } from "./icons";
+import { WALLETCONNECT_ICON as WALLETCONNECT_PNG_ICON } from "./icons";
 import { XRPL_WALLETCONNECT_WALLETS } from "./wallets";
 import type { WalletConnectWalletConfig } from "./types";
 import type {
@@ -40,6 +40,7 @@ export interface WalletConnectAdapterOptions {
   signMessage?: boolean;
   signMessageDestination?: string;
   requestTimeoutMs?: number;
+  signRequestTimeoutMs?: number;
   recoveryStorage?: WalletStorage;
   onDebug?: (event: WalletConnectDebugEvent) => void;
 }
@@ -62,11 +63,12 @@ export interface CreateWalletConnectAdaptersConfig extends Omit<WalletConnectAda
   modalMode?: "mobile-only" | "always" | "never";
 }
 
-export const WALLETCONNECT_LOGO = WALLETCONNECT_ICON;
+export const WALLETCONNECT_ICON = WALLETCONNECT_PNG_ICON;
 
 const XRPL_NAMESPACE = "xrpl";
 const USER_DISCONNECTED = { code: 6000, message: "User disconnected" };
 const DEFAULT_REQUEST_TIMEOUT_MS = 120000;
+const DEFAULT_SIGN_REQUEST_TIMEOUT_MS = 45000;
 const PENDING_RECOVERY_TTL_MS = 180000;
 
 function isMobile(): boolean {
@@ -293,53 +295,61 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   }
 
   async signAndSubmit(request: SignAndSubmitRequest) {
-    if (!this.client || !this.session) {
-      throw new Error("WalletConnect session not found");
-    }
-
     const network = this.requireNetwork(this.activeNetwork);
+    await this.ensureReadySession(network);
     const result = await this.requestSignTransaction(network, request.txJson, request.submit ?? true);
 
     return normalizeTxResult((result as { tx_json?: unknown }).tx_json ?? result);
   }
 
   async signTransaction(request: SignTransactionRequest) {
-    if (!this.client || !this.session) {
-      throw new Error("WalletConnect session not found");
-    }
-
     const network = this.requireNetwork(this.activeNetwork);
+    await this.ensureReadySession(network);
     const result = await this.requestSignTransaction(network, request.txJson, false);
-    const txBlob = pickPath(result, ["tx_blob", "txBlob", "result.tx_blob", "result.txBlob", "tx_json", "result.tx_json"]);
+    const txBlob = await this.resolveTxBlobProof(result);
 
     return {
-      txBlob: typeof txBlob === "string" ? txBlob : undefined,
+      txBlob,
       signed: true,
       raw: result
     };
   }
 
   async signMessage(request: SignMessageRequest) {
-    if (!this.client || !this.session) {
-      throw new Error("WalletConnect session not found");
-    }
     if (!this.capabilities.signMessage) {
       throw new Error(`${this.metadata.name} does not support portable WalletConnect message signing`);
     }
 
     const network = this.requireNetwork(this.activeNetwork);
+    await this.ensureReadySession(network, request.account?.address);
     const shouldTrySignMessage = this.sessionSupportsMethod(XRPLWalletConnectMethod.SIGN_MESSAGE);
-    const result = shouldTrySignMessage
-      ? await this.signMessageWithWalletConnectMethod(network, request).catch((error) => {
+    if (shouldTrySignMessage) {
+      try {
+        const result = await this.signMessageWithWalletConnectMethod(network, request);
+        const signature = this.pickString(result, this.signatureResponsePaths());
+        if (signature) {
+          const publicKey = this.pickString(result, this.publicKeyResponsePaths());
+          return {
+            signatureKind: "signature" as const,
+            proof: signature,
+            signature,
+            publicKey: publicKey ?? request.account?.publicKey,
+            raw: result
+          };
+        }
+        const txBlob = await this.resolveTxBlobProof(result);
+        if (txBlob) return { signatureKind: "signedTx" as const, proof: txBlob, txBlob, raw: result };
+      } catch (error) {
         if (!this.isInvalidWalletConnectMethodError(error)) throw error;
-        return this.signMessageWithPaymentTransaction(network, request);
-      })
-      : await this.signMessageWithPaymentTransaction(network, request);
+      }
+    }
 
-    const signature = pickPath(result, ["signature", "signedMessage", "tx_blob", "txBlob", "result.signature", "result.signedMessage", "result.tx_blob", "response.signature", "response.signedMessage", "response.hex"]);
+    const result = await this.signMessageWithPaymentTransaction(network, request);
+    const txBlob = await this.resolveTxBlobProof(result);
     return {
-      signature: typeof signature === "string" ? signature : undefined,
-      txBlob: typeof signature === "string" ? signature : undefined,
+      signatureKind: "signedTx" as const,
+      proof: txBlob,
+      txBlob,
       raw: result
     };
   }
@@ -375,11 +385,13 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
 
 
   private findStoredWalletConnectSession(client: SignClient, topic: string | undefined, network: XrplNetwork, address: string): SessionTypes.Struct | undefined {
+    if (!this.hasSessionStore(client)) return undefined;
     if (topic) {
       try {
-        return client.session.get(topic);
+        const stored = client.session.get(topic);
+        if (this.sessionHasNetworkAccount(stored, network, address)) return stored;
       } catch {
-        return undefined;
+        // Fall back to address lookup below.
       }
     }
 
@@ -392,10 +404,22 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   }
 
   private findLatestStoredWalletConnectSession(client: SignClient, network: XrplNetwork): SessionTypes.Struct | undefined {
+    if (!this.hasSessionStore(client)) return undefined;
     const sessions = client.session.getAll()
       .filter((storedSession) => {
         if (storedSession.expiry && storedSession.expiry * 1000 <= Date.now()) return false;
         return this.sessionHasNetworkAccount(storedSession, network);
+      })
+      .sort((a, b) => (b.expiry ?? 0) - (a.expiry ?? 0));
+    return sessions[0];
+  }
+
+  private findLatestStoredWalletConnectSessionForAddress(client: SignClient, network: XrplNetwork, address?: string): SessionTypes.Struct | undefined {
+    if (!this.hasSessionStore(client)) return undefined;
+    const sessions = client.session.getAll()
+      .filter((storedSession) => {
+        if (storedSession.expiry && storedSession.expiry * 1000 <= Date.now()) return false;
+        return this.sessionHasNetworkAccount(storedSession, network, address);
       })
       .sort((a, b) => (b.expiry ?? 0) - (a.expiry ?? 0));
     return sessions[0];
@@ -408,10 +432,10 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   private async getClient(): Promise<SignClient> {
     if (this.client) return this.client;
     if (!this.initializationPromise) {
-      this.initializationPromise = SignClient.init({
+      this.initializationPromise = import("@walletconnect/sign-client").then(({ default: SignClient }) => SignClient.init({
         projectId: this.options.projectId,
         metadata: this.options.metadata ?? defaultMetadata()
-      });
+      }));
     }
     this.client = await this.initializationPromise;
     return this.client;
@@ -419,6 +443,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
 
   private async initializeModal(): Promise<WalletConnectModal> {
     if (this.modal) return this.modal;
+    const { WalletConnectModal } = await import("@walletconnect/modal");
     this.modal = new WalletConnectModal({
       projectId: this.options.projectId,
       chains: ["xrpl:0", "xrpl:1", "xrpl:2"],
@@ -660,9 +685,13 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     return controller.signal;
   }
 
-  private sessionHasNetworkAccount(session: SessionTypes.Struct, network: XrplNetwork): boolean {
+  private sessionHasNetworkAccount(session: SessionTypes.Struct, network: XrplNetwork, address?: string): boolean {
     const accounts = session.namespaces[XRPL_NAMESPACE]?.accounts ?? [];
-    return accounts.some((account) => account.startsWith(`${this.requireWalletConnectChainId(network)}:`));
+    const chainId = this.requireWalletConnectChainId(network);
+    return accounts.some((account) => {
+      if (!account.startsWith(`${chainId}:`)) return false;
+      return !address || account === `${chainId}:${address}` || account.endsWith(`:${address}`);
+    });
   }
 
   private createRequiredNamespaces(network: XrplNetwork) {
@@ -701,10 +730,124 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
         method: XRPLWalletConnectMethod.SIGN_MESSAGE,
         params: {
           message: request.message,
-          account: request.account?.address
+          account: request.account?.address,
+          address: request.account?.address,
+          from: request.account?.address
         }
       }
     }), XRPLWalletConnectMethod.SIGN_MESSAGE);
+  }
+
+  private signatureResponsePaths(): string[] {
+    return [
+      "signature",
+      "signedMessage",
+      "signed_message",
+      "result.signature",
+      "result.signedMessage",
+      "result.signed_message",
+      "response.signature",
+      "response.signedMessage",
+      "response.signed_message",
+      "response.data.signature",
+      "response.data.signedMessage",
+      "response.data.signed_message"
+    ];
+  }
+
+  private publicKeyResponsePaths(): string[] {
+    return [
+      "publicKey",
+      "public_key",
+      "result.publicKey",
+      "result.public_key",
+      "response.publicKey",
+      "response.public_key",
+      "response.data.publicKey",
+      "response.data.public_key"
+    ];
+  }
+
+  private txBlobResponsePaths(): string[] {
+    return [
+      "tx_blob",
+      "txBlob",
+      "txJson",
+      "tx_json",
+      "hex",
+      "signedTransaction",
+      "signed_transaction",
+      "result.tx_blob",
+      "result.txBlob",
+      "result.hex",
+      "result.signedTransaction",
+      "result.signed_transaction",
+      "response.tx_blob",
+      "response.txBlob",
+      "response.hex",
+      "response.signedTransaction",
+      "response.signed_transaction",
+      "response.data.tx_blob",
+      "response.data.txBlob",
+      "response.data.hex",
+      "response.data.signedTransaction",
+      "response.data.signed_transaction",
+      "response.data.resp.tx_blob",
+      "response.data.resp.txBlob",
+      "response.data.resp.hex",
+      "response.data.resp.signedTransaction",
+      "response.data.resp.signed_transaction"
+    ];
+  }
+
+  private pickString(source: unknown, paths: string[]): string | undefined {
+    const value = pickPath(source, paths);
+    return typeof value === "string" && value.trim() ? value : undefined;
+  }
+
+  private async resolveTxBlobProof(result: unknown): Promise<string | undefined> {
+    const direct = this.pickString(result, this.txBlobResponsePaths());
+    if (direct) return direct;
+
+    const txJson = pickPath(result, [
+      "tx_json",
+      "txJson",
+      "transaction",
+      "result.tx_json",
+      "result.txJson",
+      "result.transaction",
+      "response.tx_json",
+      "response.txJson",
+      "response.transaction",
+      "response.data.tx_json",
+      "response.data.txJson",
+      "response.data.transaction",
+      "response.data.resp.tx_json",
+      "response.data.resp.txJson",
+      "response.data.resp.transaction"
+    ]);
+    if (!txJson || typeof txJson !== "object") return undefined;
+    if (!this.looksSignedTxJson(txJson)) return undefined;
+
+    try {
+      const { encode } = await import("xrpl");
+      return encode(txJson as Parameters<typeof encode>[0]);
+    } catch (error) {
+      this.debug("encode_signed_tx_json_failed", "modal", {
+        wallet: this.metadata.id,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return undefined;
+    }
+  }
+
+  private looksSignedTxJson(value: unknown): boolean {
+    if (!value || typeof value !== "object") return false;
+    const tx = value as Record<string, unknown>;
+    return typeof tx.TransactionType === "string"
+      && typeof tx.Account === "string"
+      && typeof tx.SigningPubKey === "string"
+      && typeof tx.TxnSignature === "string";
   }
 
   private async signMessageWithPaymentTransaction(network: XrplNetwork, request: SignMessageRequest) {
@@ -733,6 +876,8 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
         method: XRPLWalletConnectMethod.SIGN_TRANSACTION,
         params: {
           tx_json: txJson,
+          txJson,
+          transaction: txJson,
           ...(submit ? { autofill: true } : {}),
           submit
         }
@@ -757,15 +902,36 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
 
   private async withRequestTimeout<T>(request: Promise<T>, method: XRPLWalletConnectMethod): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeoutMs = this.options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    const timeoutMs = this.options.signRequestTimeoutMs ?? this.options.requestTimeoutMs ?? DEFAULT_SIGN_REQUEST_TIMEOUT_MS;
+    this.debug("request_start", "custom", {
+      method,
+      topic: this.session?.topic,
+      wallet: this.metadata.id,
+      timeoutMs
+    });
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
+        this.debug("request_timeout", "custom", {
+          method,
+          topic: this.session?.topic,
+          wallet: this.metadata.id,
+          timeoutMs
+        });
         reject(new Error(`WalletConnect request timed out after ${timeoutMs}ms: ${method}. The wallet may have submitted the transaction but did not return a response to the dApp.`));
       }, timeoutMs);
     });
 
     try {
-      return await Promise.race([request, timeout]);
+      const result = await Promise.race([request, timeout]);
+      this.debug("request_resolved", "custom", { method, wallet: this.metadata.id });
+      return result;
+    } catch (error) {
+      this.debug("request_rejected", "custom", {
+        method,
+        wallet: this.metadata.id,
+        message: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
     } finally {
       if (timer) clearTimeout(timer);
     }
@@ -789,14 +955,80 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   private setupEventListeners(): void {
     if (!this.client) return;
     void this.runCleanup();
-    const onSessionDelete = () => this.cleanup();
-    const onSessionExpire = () => this.cleanup();
+    const onSessionDelete = (event?: { topic?: string }) => {
+      if (!event?.topic || event.topic === this.session?.topic) this.cleanup();
+    };
+    const onSessionExpire = (event?: { topic?: string }) => {
+      if (!event?.topic || event.topic === this.session?.topic) this.cleanup();
+    };
+    const onSessionUpdate = (event?: { topic?: string; params?: { namespaces?: SessionTypes.Namespaces } }) => {
+      if (!this.client || !event?.topic || event.topic !== this.session?.topic) return;
+      try {
+        this.session = this.client.session.get(event.topic);
+        this.debug("session_update", "custom", { topic: event.topic });
+      } catch {
+        if (event.params?.namespaces && this.session) {
+          this.session = { ...this.session, namespaces: event.params.namespaces };
+          this.debug("session_update_snapshot", "custom", { topic: event.topic });
+        }
+      }
+    };
     this.client.on("session_delete", onSessionDelete);
     this.client.on("session_expire", onSessionExpire);
+    this.client.on("session_update", onSessionUpdate);
     this.addCleanup(() => {
       this.client?.off("session_delete", onSessionDelete);
       this.client?.off("session_expire", onSessionExpire);
+      this.client?.off("session_update", onSessionUpdate);
     });
+  }
+
+  private async ensureReadySession(network: XrplNetwork, address?: string): Promise<void> {
+    const client = await this.getClient();
+    if (!this.hasSessionStore(client)) {
+      if (this.session && this.sessionHasNetworkAccount(this.session, network, address)) {
+        this.activeNetwork = network;
+        return;
+      }
+      throw new Error("WalletConnect session not found");
+    }
+    const currentTopic = this.session?.topic;
+    let refreshed: SessionTypes.Struct | undefined;
+    if (currentTopic) {
+      try {
+        const stored = client.session.get(currentTopic);
+        if (this.sessionHasNetworkAccount(stored, network, address)) refreshed = stored;
+      } catch {
+        refreshed = undefined;
+      }
+    }
+    refreshed ??= this.findLatestStoredWalletConnectSessionForAddress(client, network, address);
+    if (!refreshed) {
+      this.debug("request_session_missing", "custom", {
+        wallet: this.metadata.id,
+        previousTopic: currentTopic,
+        sessions: client.session.getAll().length
+      });
+      throw new Error("WalletConnect session not found");
+    }
+    if (refreshed.expiry && refreshed.expiry * 1000 <= Date.now()) {
+      this.debug("request_session_expired", "custom", { wallet: this.metadata.id, topic: refreshed.topic });
+      throw new Error("WalletConnect session expired");
+    }
+    if (refreshed.topic !== this.session?.topic) {
+      this.debug("request_session_refreshed", "custom", {
+        wallet: this.metadata.id,
+        previousTopic: currentTopic,
+        topic: refreshed.topic
+      });
+    }
+    this.session = refreshed;
+    this.activeNetwork = network;
+  }
+
+  private hasSessionStore(client: SignClient): boolean {
+    const session = (client as unknown as { session?: { getAll?: unknown; get?: unknown } }).session;
+    return typeof session?.getAll === "function" && typeof session.get === "function";
   }
 
   private cleanup(): void {
@@ -872,7 +1104,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
 export function createWalletConnectMetadata(metadata: SignClientTypes.Metadata): SignClientTypes.Metadata {
   return {
     ...metadata,
-    icons: [WALLETCONNECT_LOGO]
+    icons: [WALLETCONNECT_ICON]
   };
 }
 
@@ -915,6 +1147,6 @@ export function createWalletConnectAdapters(config: CreateWalletConnectAdaptersC
   }));
 }
 
-export * from "./icons";
+export { BIFROST_ICON, BITGET_ICON, GIRIN_ICON, JOEY_ICON, STATICBIT_ICON } from "./icons";
 export * from "./wallets";
 

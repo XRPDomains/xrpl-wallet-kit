@@ -40,3 +40,23 @@ export function unlockPageScroll(): void {
   window.scrollTo(0, savedScrollY);
   savedScrollY = 0;
 }
+
+export function getWalletStyleId(prefix: string, styles: string): string {
+  let hash = 5381;
+  for (let index = 0; index < styles.length; index += 1) {
+    hash = ((hash << 5) + hash) ^ styles.charCodeAt(index);
+  }
+  return `${prefix}-${(hash >>> 0).toString(36)}`;
+}
+
+export function ensureWalletStyle(id: string, styles: string): void {
+  if (typeof document === "undefined") return;
+  const selector = `style[data-xwk-style="${id}"]`;
+  let element = document.head.querySelector<HTMLStyleElement>(selector);
+  if (!element) {
+    element = document.createElement("style");
+    element.dataset.xwkStyle = id;
+    document.head.appendChild(element);
+  }
+  if (element.textContent !== styles) element.textContent = styles;
+}

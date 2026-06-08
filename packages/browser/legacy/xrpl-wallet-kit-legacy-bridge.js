@@ -36,12 +36,14 @@
     if (options && options.gemMethod === 'createNFTOffer') return 'createNFTOffer';
     if (options && options.gemMethod === 'acceptNFTOffer') return 'acceptNFTOffer';
     if (options && options.gemMethod === 'cancelNFTOffer') return 'cancelNFTOffer';
+    if (options && options.gemMethod === 'burnNFT') return 'burnNFT';
 
     var transactionType = txJson && txJson.TransactionType;
     if (transactionType === 'Payment') return 'payment';
     if (transactionType === 'NFTokenCreateOffer') return 'createNFTOffer';
     if (transactionType === 'NFTokenAcceptOffer') return 'acceptNFTOffer';
     if (transactionType === 'NFTokenCancelOffer') return 'cancelNFTOffer';
+    if (transactionType === 'NFTokenBurn') return 'burnNFT';
     return 'generic';
   }
 
@@ -85,6 +87,15 @@
         TransactionType: 'NFTokenCancelOffer',
         Account: address,
         NFTokenOffers: payload.NFTokenOffers || payload.offers
+      });
+    }
+
+    if (options.gemMethod === 'burnNFT' || options.methodHint === 'burnNFT') {
+      return cleanTxJson({
+        TransactionType: 'NFTokenBurn',
+        Account: address,
+        NFTokenID: payload.NFTokenID || payload.nftokenID || payload.nfTokenId,
+        Owner: payload.Owner || payload.owner
       });
     }
 
@@ -384,7 +395,7 @@
 
     facade.signAuthPayload = async function (message) {
       var result = await kit.manager.signMessage({ message: message });
-      return result.signature || result.txBlob || result.raw;
+      return result.proof || result.signature || result.txBlob || result.raw;
     };
 
     facade.signAndSubmit = async function (txJson, requestOptions) {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assertWalletAdapter, isWalletKitError, WalletKitErrorCode } from "../packages/core/src/index";
+import { assertWalletAdapter, WalletKitErrorCode } from "../packages/core/src/index";
 import { OtsuAdapter } from "../packages/adapters/otsu/src/index";
 import type { OtsuProvider } from "../packages/adapters/otsu/src/index";
 
@@ -60,22 +60,22 @@ test("connect default scopes include sign+submit", async () => {
 });
 test("connect WALLET_NOT_AVAILABLE when no provider", async () => {
   await assert.rejects(() => new OtsuAdapter({ provider: undefined }).connect({ network: testNetwork }),
-    e => isWalletKitError(e) && e.code === WalletKitErrorCode.WALLET_NOT_AVAILABLE);
+    e => (e as { code?: string }).code === WalletKitErrorCode.WALLET_NOT_AVAILABLE);
 });
 test("connect CONNECTION_REJECTED when user cancels", async () => {
   const p = makeMockProvider({ connect: async () => { throw new Error("User rejected the request"); } });
   await assert.rejects(() => new OtsuAdapter({ provider: p }).connect({ network: testNetwork }),
-    e => isWalletKitError(e) && e.code === WalletKitErrorCode.CONNECTION_REJECTED);
+    e => (e as { code?: string }).code === WalletKitErrorCode.CONNECTION_REJECTED);
 });
 test("connect CONNECTION_FAILED on unexpected error", async () => {
   const p = makeMockProvider({ connect: async () => { throw new Error("Extension internal error"); } });
   await assert.rejects(() => new OtsuAdapter({ provider: p }).connect({ network: testNetwork }),
-    e => isWalletKitError(e) && e.code === WalletKitErrorCode.CONNECTION_FAILED);
+    e => (e as { code?: string }).code === WalletKitErrorCode.CONNECTION_FAILED);
 });
 test("connect AbortSignal already aborted", async () => {
   const ctrl = new AbortController(); ctrl.abort();
   await assert.rejects(() => new OtsuAdapter({ provider: makeMockProvider() }).connect({ network: testNetwork, signal: ctrl.signal }),
-    e => isWalletKitError(e) && e.code === WalletKitErrorCode.CONNECTION_REJECTED);
+    e => (e as { code?: string }).code === WalletKitErrorCode.CONNECTION_REJECTED);
 });
 
 // ─── disconnect
@@ -113,12 +113,13 @@ test("restoreSession uses fresh address from getAddress", async () => {
 // ─── signMessage
 test("signMessage returns non-empty signature", async () => {
   const r = await new OtsuAdapter({ provider: makeMockProvider() }).signMessage({ message: "hello" });
+  assert.equal(r.signatureKind, "signature");
   assert.ok("signature" in r && r.signature.length > 0);
 });
 test("signMessage SIGN_REJECTED when user denies", async () => {
   const p = makeMockProvider({ signMessage: async () => { throw new Error("User denied message signature"); } });
   await assert.rejects(() => new OtsuAdapter({ provider: p }).signMessage({ message: "hi" }),
-    e => isWalletKitError(e) && e.code === WalletKitErrorCode.SIGN_REJECTED);
+    e => (e as { code?: string }).code === WalletKitErrorCode.SIGN_REJECTED);
 });
 
 // ─── signTransaction
@@ -130,7 +131,7 @@ test("signTransaction returns txBlob + tx_blob + hash (no submit)", async () => 
 test("signTransaction SIGN_REJECTED when user cancels", async () => {
   const p = makeMockProvider({ signTransaction: async () => { throw new Error("rejected by user"); } });
   await assert.rejects(() => new OtsuAdapter({ provider: p }).signTransaction({ methodHint: "payment", txJson: paymentTx }),
-    e => isWalletKitError(e) && e.code === WalletKitErrorCode.SIGN_REJECTED);
+    e => (e as { code?: string }).code === WalletKitErrorCode.SIGN_REJECTED);
 });
 
 // ─── signAndSubmit
@@ -153,5 +154,5 @@ test("signAndSubmit submit=false routes to signTransaction", async () => {
 test("signAndSubmit SIGN_REJECTED when user cancels", async () => {
   const p = makeMockProvider({ signAndSubmit: async () => { throw new Error("Transaction rejected by user"); } });
   await assert.rejects(() => new OtsuAdapter({ provider: p }).signAndSubmit({ methodHint: "payment", submit: true, txJson: paymentTx }),
-    e => isWalletKitError(e) && e.code === WalletKitErrorCode.SIGN_REJECTED);
+    e => (e as { code?: string }).code === WalletKitErrorCode.SIGN_REJECTED);
 });

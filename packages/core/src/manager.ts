@@ -5,7 +5,7 @@ import type { WalletKitLogger } from "./logger";
 import { DEFAULT_XRPL_NETWORKS, createNetworkRegistry, getHttpRpcUrl } from "./networks";
 import { normalizeTxResult, pickPath } from "./result";
 import { MemoryWalletStorage } from "./storage";
-import type { AddWalletTransactionRequest, AuthenticateRequest, AuthenticateResult, ConnectOptions, SignAndSubmitRequest, SignMessageRequest, SignTransactionRequest, SignTransactionResult, StoredWalletSessionEnvelope, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletCapabilities, WalletManagerConfig, WalletNetwork, WalletSession, WalletStorage, WalletTransaction } from "./types";
+import type { AddWalletTransactionRequest, AuthenticateRequest, AuthenticateResult, ConnectOptions, SignatureKind, SignAndSubmitRequest, SignMessageRequest, SignMessageResult, SignTransactionRequest, SignTransactionResult, StoredWalletSessionEnvelope, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletCapabilities, WalletManagerConfig, WalletNetwork, WalletSession, WalletStorage, WalletTransaction } from "./types";
 
 const SESSION_KEY = "session";
 export const WALLET_STORAGE_VERSION = 1;
@@ -295,7 +295,10 @@ export class WalletManager extends WalletEventEmitter {
     const adapter = this.requireActiveAdapter("signMessage");
     try {
       this.emit("signing", { adapterId: adapter.metadata.id, kind: "message" });
-      const result = await adapter.signMessage!({ ...request, account: request.account ?? this.getAccount() ?? undefined });
+      const result = this.normalizeSignMessageResult(
+        adapter.metadata.id,
+        await adapter.signMessage!({ ...request, account: request.account ?? this.getAccount() ?? undefined })
+      );
       this.emit("signed", { adapterId: adapter.metadata.id, kind: "message", result });
       return result;
     } catch (error) {
@@ -323,13 +326,43 @@ export class WalletManager extends WalletEventEmitter {
     return {
       address: account.address,
       message,
+      signatureKind: result.signatureKind,
+      proof: result.proof ?? (result.signatureKind === "signature" ? result.signature : result.txBlob) ?? "",
       signature: result.signature,
       txBlob: result.txBlob,
+      publicKey: result.publicKey,
       issuedAt: issuedAt.toISOString(),
       expiresAt: expiresAt.toISOString(),
       statement: request.statement,
       raw: result.raw
     };
+  }
+
+  private normalizeSignMessageResult(adapterId: string, result: SignMessageResult): SignMessageResult {
+    const normalized = (() => {
+      if (result.signatureKind === "signature" || result.signatureKind === "signedTx") return result;
+
+      const legacy = result as SignMessageResult & { signatureKind?: SignatureKind };
+      const inferredKind: SignatureKind = legacy.txBlob ? "signedTx" : "signature";
+      this.logger.warn(
+        `Adapter "${adapterId}" returned SignMessageResult without signatureKind. ` +
+        `Inferred "${inferredKind}" for backward compatibility; update the adapter before using auth verification.`
+      );
+      return { ...legacy, signatureKind: inferredKind };
+    })();
+
+    if (normalized.signatureKind === "signature" && !this.hasProofValue(normalized.signature)) {
+      throw createWalletError.signRejected(new Error(`Adapter "${adapterId}" did not return a message signature.`));
+    }
+    if (normalized.signatureKind === "signedTx" && !this.hasProofValue(normalized.txBlob)) {
+      throw createWalletError.signRejected(new Error(`Adapter "${adapterId}" did not return a signed transaction proof.`));
+    }
+    const proof = normalized.signatureKind === "signature" ? normalized.signature : normalized.txBlob;
+    return { ...normalized, proof };
+  }
+
+  private hasProofValue(value: unknown): value is string {
+    return typeof value === "string" && value.trim().length > 0;
   }
 
   async signAndSubmit(request: SignAndSubmitRequest) {

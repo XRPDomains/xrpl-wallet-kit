@@ -26,6 +26,17 @@
     "@walletconnect/types": "^2.23.9",
     "@walletconnect/utils": "^2.23.9"
   },
+  "peerDependencies": {
+    "xrpl": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "xrpl": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "xrpl": "^4.0.0"
+  },
   "publishConfig": {
     "access": "public"
   },

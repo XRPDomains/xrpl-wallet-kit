@@ -43,6 +43,7 @@ When using `@xrpl-wallet-kit/client` defaults, GemWallet is already included.
   - `createNFTOffer` -> `createNFTOffer`
   - `acceptNFTOffer` -> `acceptNFTOffer`
   - `cancelNFTOffer` -> `cancelNFTOffer`
+  - `burnNFT` or `NFTokenBurn` tx type -> `burnNFT`
 - Transaction responses are normalized with `normalizeTxResult()` so submitted hashes can drive lifecycle events and WalletToast.
 
 ## Auto Reconnect

@@ -68,6 +68,8 @@ kit.button.mount("#connect-wallet");
 ## Browser Bundle
 
 Use the IIFE bundle when an app cannot use a build step.
+The IIFE bundle includes all adapters and is intentionally larger than package-level imports.
+For production apps with Vite, webpack, or another bundler, prefer importing only the packages and adapters you use.
 
 ```html
 <div id="connect-wallet"></div>

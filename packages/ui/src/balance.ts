@@ -21,6 +21,8 @@ export function createXrpBalanceResolver(): WalletBalanceResolver {
         formatted: `0 ${symbol}`,
         symbol,
         activationStatus: "unfunded",
+        spendable: false,
+        reserveLocked: false,
         available: "0",
         availableFormatted: `0 ${symbol}`,
         total: "0",
@@ -42,6 +44,7 @@ export function createXrpBalanceResolver(): WalletBalanceResolver {
     }));
     const reserveDrops = reserveInfo.baseDrops + ownerCount * reserveInfo.incDrops;
     const availableDrops = Math.max(balanceDrops - reserveDrops, 0);
+    const reserveLocked = balanceDrops > 0 && availableDrops <= 0;
 
     const available = formatDrops(availableDrops);
     const total = formatDrops(balanceDrops);
@@ -52,6 +55,8 @@ export function createXrpBalanceResolver(): WalletBalanceResolver {
       formatted: `${available} ${symbol}`,
       symbol,
       activationStatus: "active",
+      spendable: availableDrops > 0,
+      reserveLocked,
       available,
       availableFormatted: `${available} ${symbol}`,
       total,

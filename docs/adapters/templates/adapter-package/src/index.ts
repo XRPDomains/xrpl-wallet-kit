@@ -78,7 +78,13 @@ export class MyWalletAdapter extends BaseWalletAdapter {
   async signMessage(request: SignMessageRequest) {
     const provider = this.requireProvider();
     if (!provider.signMessage) this.unsupported("signMessage");
-    return provider.signMessage(request.message);
+    const result = await provider.signMessage(request.message);
+    return {
+      signatureKind: "signature" as const,
+      signature: result.signature,
+      publicKey: request.account?.publicKey,
+      raw: result.raw ?? result
+    };
   }
 
   async signAndSubmit(request: SignAndSubmitRequest) {

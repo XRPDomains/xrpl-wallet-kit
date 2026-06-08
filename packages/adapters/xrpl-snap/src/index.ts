@@ -60,8 +60,33 @@ export class XrplSnapAdapter extends BaseWalletAdapter {
     for (const method of methods) {
       try {
         const result = await this.invokeSnap(method, txJson);
-        const signature = this.pickString(result, ["signature", "signedMessage", "tx_blob", "txBlob", "result.signature", "result.signedMessage", "result.tx_blob"]);
-        return { signature, txBlob: signature, raw: result };
+        const txBlob = this.pickString(result, [
+          "tx_blob",
+          "txBlob",
+          "hex",
+          "signedTransaction",
+          "signed_transaction",
+          "result.tx_blob",
+          "result.txBlob",
+          "result.hex",
+          "result.signedTransaction",
+          "result.signed_transaction",
+          "response.tx_blob",
+          "response.txBlob",
+          "response.hex",
+          "response.signedTransaction",
+          "response.signed_transaction",
+          "response.data.tx_blob",
+          "response.data.txBlob",
+          "response.data.hex",
+          "response.data.signedTransaction",
+          "response.data.signed_transaction",
+          "signature",
+          "signedMessage",
+          "result.signature",
+          "result.signedMessage"
+        ]);
+        return { signatureKind: "signedTx" as const, proof: txBlob, txBlob, raw: result };
       } catch (error) {
         errors.push({ method, error: this.formatError(error) });
       }

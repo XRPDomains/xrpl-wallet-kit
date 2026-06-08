@@ -1,7 +1,7 @@
 import type { WalletAdapter, WalletAdapterApiVersion, WalletAdapterType, WalletMetadata } from "./types";
 import { createWalletError } from "./errors";
 
-export const WALLET_ADAPTER_API_VERSION: WalletAdapterApiVersion = "1.0";
+export const WALLET_ADAPTER_API_VERSION: WalletAdapterApiVersion = "1.1";
 
 export type AdapterValidationSeverity = "error" | "warning";
 

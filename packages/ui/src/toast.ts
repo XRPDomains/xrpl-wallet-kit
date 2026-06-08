@@ -1,5 +1,6 @@
 import { getExplorerTxUrl } from "@xrpl-wallet-kit/core";
 import type { WalletNetwork, WalletTransaction } from "@xrpl-wallet-kit/core";
+import { ensureWalletStyle, getWalletStyleId } from "./dom";
 import { resolveWalletUiMessages } from "./locales";
 import { darkTheme, lightTheme } from "./themes";
 import type { ResolvedTheme } from "./themes";
@@ -49,7 +50,7 @@ export class WalletToast {
     this.root.className = `xwk-toast-root xwk-toast-root--${this.position()}`;
     this.root.setAttribute("aria-live", "polite");
     this.root.setAttribute("aria-label", "Transaction notifications");
-    this.root.innerHTML = `<style>${this.renderStyles()}</style>`;
+    this.ensureStyles();
     container.appendChild(this.root);
     this.render();
   }
@@ -104,12 +105,12 @@ export class WalletToast {
   private render(): void {
     if (!this.root) return;
     this.root.className = `xwk-toast-root xwk-toast-root--${this.position()}`;
-    const style = this.root.querySelector("style")?.outerHTML ?? `<style>${this.renderStyles()}</style>`;
+    this.ensureStyles();
     const toasts = [...this.toasts.values()]
       .sort((a, b) => this.getTimestamp(a) - this.getTimestamp(b))
       .map((transaction) => this.renderToast(transaction))
       .join("");
-    this.root.innerHTML = `${style}${toasts}`;
+    this.root.innerHTML = toasts;
     this.root.querySelectorAll<HTMLButtonElement>("[data-xwk-toast-dismiss]").forEach((button) => {
       button.addEventListener("click", () => {
         const hash = button.dataset.xwkToastDismiss;
@@ -143,6 +144,11 @@ export class WalletToast {
   private renderStyles(): string {
     const theme = this.resolveTheme();
     return `.xwk-toast-root{bottom:24px;display:flex;flex-direction:column-reverse;font-family:${theme.fontFamily};gap:10px;pointer-events:none;position:fixed;z-index:2147483646}.xwk-toast-root--bottom-right{right:24px}.xwk-toast-root--bottom-left{left:24px}.xwk-toast-root--bottom-center{left:50%;transform:translateX(-50%)}.xwk-toast{align-items:center;animation:xwk-toast-in .18s ease-out both;background:${theme.background};border:1px solid ${theme.border};border-radius:${theme.radius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};display:flex;gap:12px;max-width:420px;min-width:330px;padding:12px 12px 12px 16px;pointer-events:auto}.xwk-toast-icon{align-items:center;border-radius:999px;display:flex;flex:0 0 32px;height:32px;justify-content:center;width:32px}.xwk-toast-spinner{animation:xwk-spin .9s linear infinite;border:2px solid ${this.resolveThemeMode() === "dark" ? "rgba(74,163,255,.22)" : "rgba(0,120,174,.18)"};border-top-color:${theme.accent};border-radius:999px;display:block;height:18px;width:18px}.xwk-toast--submitted .xwk-toast-icon{background:${this.resolveThemeMode() === "dark" ? "rgba(74,163,255,.16)" : "rgba(0,120,174,.12)"};color:${theme.accent}}.xwk-toast--confirmed .xwk-toast-icon{background:${this.resolveThemeMode() === "dark" ? "rgba(16,185,129,.16)" : "rgba(16,185,129,.12)"};color:#10b981}.xwk-toast--failed .xwk-toast-icon{background:${this.resolveThemeMode() === "dark" ? "rgba(239,68,68,.16)" : "rgba(239,68,68,.12)"};color:#ef4444}.xwk-toast-icon-mark{display:inline-flex}.xwk-toast-body{display:flex;flex:1 1 auto;flex-direction:column;gap:2px;min-width:0}.xwk-toast-label{color:${theme.foreground};font-size:13px;font-weight:600;white-space:nowrap}.xwk-toast-hash{color:${theme.muted};font-family:ui-monospace,"Cascadia Code",monospace;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-toast-link{-webkit-tap-highlight-color:transparent;align-items:center;border-radius:${theme.walletRadius};box-sizing:border-box;color:${theme.accent};display:inline-flex;flex:0 0 auto;font:inherit;font-size:12px;font-weight:600;gap:4px;line-height:1.2;min-height:32px;outline:none;overflow:hidden;padding:0 6px;text-decoration:none;touch-action:manipulation;transform:none;white-space:nowrap}.xwk-toast-link:hover{background:${theme.surfaceHover};text-decoration:none}.xwk-toast-link svg{height:13px;width:13px}.xwk-toast-dismiss{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:transparent;border:1px solid ${theme.border};border-radius:${theme.walletRadius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:inline-flex;flex:0 0 44px;font:inherit;font-size:24px;font-weight:400;height:44px;justify-content:center;line-height:1;margin:0;min-height:0;outline:none;overflow:hidden;padding:0;touch-action:manipulation;transform:none;width:44px}.xwk-toast-dismiss:hover{background:${theme.surfaceHover};border-color:${theme.border};box-shadow:none;color:${theme.foreground};transform:none}.xwk-toast-dismiss:focus-visible,.xwk-toast-link:focus-visible{outline:2px solid ${theme.accent};outline-offset:2px}@keyframes xwk-toast-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}@keyframes xwk-spin{to{transform:rotate(360deg)}}@media(max-width:480px){.xwk-toast-root{bottom:max(12px,env(safe-area-inset-bottom));left:12px;right:12px;transform:none}.xwk-toast{max-width:100%;min-width:0;width:100%}}@media(prefers-reduced-motion:reduce){.xwk-toast,.xwk-toast-spinner{animation:none}}`;
+  }
+
+  private ensureStyles(): void {
+    const styles = this.renderStyles();
+    ensureWalletStyle(getWalletStyleId("xwk-toast", styles), styles);
   }
 
   private getExplorerUrl(hash: string, network?: WalletNetwork): string | undefined {

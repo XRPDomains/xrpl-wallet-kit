@@ -17,7 +17,7 @@ import {
   normalizeTxResult,
   validateWalletAdapter
 } from "../packages/core/src/index";
-import { createWalletConnectAdapter } from "../packages/adapters/walletconnect/src/index";
+import { WALLETCONNECT_ICON, XRPL_WALLETCONNECT_WALLETS, createWalletConnectAdapter } from "../packages/adapters/walletconnect/src/index";
 import { normalizeWalletUiLocale, resolveWalletUiMessages } from "../packages/ui/src/index";
 
 const network = {
@@ -55,7 +55,7 @@ class MockAdapter extends BaseWalletAdapter {
   }
 
   async signMessage() {
-    return { signature: "mock-signature" };
+    return { signatureKind: "signature" as const, signature: "mock-signature" };
   }
 
   async signAndSubmit() {
@@ -434,6 +434,14 @@ test("WalletConnect detail adapters can use marker-gated pending return recovery
   assert.equal((adapter as unknown as { shouldRecoverWithoutStoredSession(): boolean }).shouldRecoverWithoutStoredSession(), true);
 });
 
+test("WalletConnect built-in detail wallets preserve wallet-specific icons", () => {
+  assert.ok(XRPL_WALLETCONNECT_WALLETS.length > 0);
+  for (const wallet of XRPL_WALLETCONNECT_WALLETS) {
+    assert.match(wallet.icon ?? "", /^data:image\//, `${wallet.id} should ship a wallet-specific data URL icon`);
+    assert.notEqual(wallet.icon, WALLETCONNECT_ICON, `${wallet.id} should not fall back to the generic WalletConnect icon`);
+  }
+});
+
 test("WalletConnect validates missing chain id only when WalletConnect paths need it", () => {
   const adapter = createWalletConnectAdapter({
     projectId: "test-project",
@@ -465,11 +473,86 @@ test("WalletManager authenticate signs a structured login message", async () => 
 
   assert.equal(result.address, "rMockAddress");
   assert.equal(result.statement, "Sign in to Test");
+  assert.equal(result.signatureKind, "signature");
+  assert.equal(result.proof, "mock-signature");
   assert.equal(result.signature, "mock-signature");
   assert.match(result.message, /Sign in to Test/);
   assert.match(result.message, /Address: rMockAddress/);
   assert.equal(typeof result.issuedAt, "string");
   assert.equal(typeof result.expiresAt, "string");
+});
+
+test("WalletManager infers legacy signMessage result kind with a warning", async () => {
+  class LegacySignAdapter extends MockAdapter {
+    async signMessage() {
+      return { signature: "legacy-signature" } as unknown as Awaited<ReturnType<MockAdapter["signMessage"]>>;
+    }
+  }
+  const warnings: string[] = [];
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new LegacySignAdapter()],
+    logger: {
+      debug() {},
+      info() {},
+      warn(message) { warnings.push(message); },
+      error() {}
+    }
+  });
+
+  await manager.connect("mock", { network });
+  const result = await manager.signMessage({ message: "hello" });
+
+  assert.equal(result.signatureKind, "signature");
+  assert.equal(result.proof, "legacy-signature");
+  assert.equal(result.signature, "legacy-signature");
+  assert.ok(warnings.some((message) => message.includes("without signatureKind")));
+});
+
+test("WalletManager rejects empty message signature proofs", async () => {
+  class EmptySignatureAdapter extends MockAdapter {
+    async signMessage() {
+      return { signatureKind: "signature", signature: "" } as unknown as Awaited<ReturnType<MockAdapter["signMessage"]>>;
+    }
+  }
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new EmptySignatureAdapter()],
+    logger: { level: "silent" }
+  });
+  const rejected: WalletKitErrorCode[] = [];
+  const signed: string[] = [];
+
+  manager.on("rejected", (event) => rejected.push(event.error.code));
+  manager.on("signed", () => signed.push("signed"));
+
+  await manager.connect("mock", { network });
+  await assert.rejects(
+    () => manager.signMessage({ message: "hello" }),
+    { code: WalletKitErrorCode.SIGN_REJECTED }
+  );
+
+  assert.deepEqual(rejected, [WalletKitErrorCode.SIGN_REJECTED]);
+  assert.deepEqual(signed, []);
+});
+
+test("WalletManager rejects empty signed transaction proofs", async () => {
+  class EmptySignedTxAdapter extends MockAdapter {
+    async signMessage() {
+      return { signatureKind: "signedTx", txBlob: "   " } as unknown as Awaited<ReturnType<MockAdapter["signMessage"]>>;
+    }
+  }
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new EmptySignedTxAdapter()],
+    logger: { level: "silent" }
+  });
+
+  await manager.connect("mock", { network });
+  await assert.rejects(
+    () => manager.signMessage({ message: "hello" }),
+    { code: WalletKitErrorCode.SIGN_REJECTED }
+  );
 });
 
 test("WalletManager emits transaction lifecycle events and stores submitted transactions", async () => {
