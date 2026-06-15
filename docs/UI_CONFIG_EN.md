@@ -70,6 +70,7 @@ createWalletKit({
       mode: "modal",
       showAvatar: true,
       copyAddress: true,
+      showAddressQr: true,
       disconnect: true,
       explorer: false
     },
@@ -345,6 +346,7 @@ accountPanel: {
   mode: "modal",
   showAvatar: true,
   copyAddress: true,
+  showAddressQr: true,
   disconnect: true,
   explorer: false
 }
@@ -355,6 +357,7 @@ Fields:
 - `mode`: panel presentation. Omit it to use the default modal account panel.
 - `showAvatar`: avatar display direction. The current UI renders a deterministic avatar or identity avatar when available.
 - `copyAddress`: shows Copy address action.
+- `showAddressQr`: shows a small QR icon next to the displayed address. The QR modal contains only the address QR code, full address, and Copy address action.
 - `disconnect`: shows Disconnect action.
 - `explorer`: shows explorer action when `explorerUrl` is configured.
 

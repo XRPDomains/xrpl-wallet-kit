@@ -1,7 +1,9 @@
+import QRCodeStyling from "qr-code-styling";
 import { getExplorerAccountUrl, getNativeAsset, isMainnetNetwork } from "@xrpl-wallet-kit/core";
 import type { WalletSession } from "@xrpl-wallet-kit/core";
 import { createXrpBalanceResolver } from "./balance";
 import { ensureWalletStyle, getWalletStyleId, lockPageScroll, unlockPageScroll } from "./dom";
+import { QR_DARK, QR_LIGHT, QR_SIZE } from "./icons";
 import { resolveWalletUiMessages } from "./locales";
 import { darkTheme, lightTheme } from "./themes";
 import type { ResolvedTheme } from "./themes";
@@ -9,7 +11,7 @@ import type { WalletAccountPanelMode, WalletBalance, WalletButtonOptions, Wallet
 import type { WalletMetadata } from "@xrpl-wallet-kit/core";
 export class WalletButtonController {
   private target?: HTMLElement;
-  private options: WalletButtonOptions & Required<Pick<WalletButtonOptions, "label" | "showAdapterIcon" | "showChevron" | "showWeb3Name" | "fallbackToAddress" | "copyAddress" | "explorer" | "disconnect" | "accountPanel" | "accountPanelMode" | "showBalance" | "size" | "variant" | "themeMode" | "theme">>;
+  private options: WalletButtonOptions & Required<Pick<WalletButtonOptions, "label" | "showAdapterIcon" | "showChevron" | "showWeb3Name" | "fallbackToAddress" | "copyAddress" | "showAddressQr" | "explorer" | "disconnect" | "accountPanel" | "accountPanelMode" | "showBalance" | "size" | "variant" | "themeMode" | "theme">>;
   private identityName: string | null = null;
   private identityAvatar: string | null = null;
   private identityRequest = 0;
@@ -22,6 +24,7 @@ export class WalletButtonController {
   private balanceRequest = 0;
   private readonly balanceRefreshTimers = new Set<number>();
   private panelOpen = false;
+  private addressQrOpen = false;
   private panelScrollLocked = false;
   private connecting = false;
   private copied = false;
@@ -45,6 +48,7 @@ export class WalletButtonController {
       showWeb3Name: true,
       fallbackToAddress: true,
       copyAddress: true,
+      showAddressQr: true,
       explorer: false,
       disconnect: true,
       accountPanel: true,
@@ -68,6 +72,7 @@ export class WalletButtonController {
     this.offEvents.push(options.manager.on("connected", ({ session }) => {
       this.connecting = false;
       this.panelOpen = false;
+      this.addressQrOpen = false;
       this.renderConnectedState(session ?? options.manager.getSession());
       void this.resolveBalance(session ?? options.manager.getSession());
     }));
@@ -87,6 +92,7 @@ export class WalletButtonController {
     this.offEvents.push(options.manager.on("disconnected", () => {
       this.connecting = false;
       this.panelOpen = false;
+      this.addressQrOpen = false;
       this.identityName = null;
       this.identityAvatar = null;
       this.identityRequest += 1;
@@ -196,6 +202,7 @@ export class WalletButtonController {
       this.onButtonClick();
     });
     this.bindPanelActions(root);
+    this.renderAddressQrIfNeeded(root);
     return root;
   }
 
@@ -212,6 +219,7 @@ export class WalletButtonController {
 
   private closePanel(): void {
     this.panelOpen = false;
+    this.addressQrOpen = false;
     this.render();
   }
 
@@ -277,6 +285,7 @@ export class WalletButtonController {
     if (entering) document.body.appendChild(portal);
     this.accountPanelPortal = portal;
     this.bindPanelActions(portal);
+    this.renderAddressQrIfNeeded(portal);
   }
 
   private removeAccountPanelPortal(): void {
@@ -286,11 +295,35 @@ export class WalletButtonController {
 
   private bindPanelActions(root: ParentNode): void {
     root.querySelector<HTMLButtonElement>("[data-xwk-account-close]")?.addEventListener("click", () => this.closePanel());
+    root.querySelector<HTMLButtonElement>("[data-xwk-account-back]")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.closeAddressQr();
+    });
     root.querySelector<HTMLElement>("[data-xwk-account-overlay]")?.addEventListener("click", (event) => {
       if (event.target === event.currentTarget) this.closePanel();
     });
-    root.querySelector<HTMLButtonElement>("[data-xwk-copy-address]")?.addEventListener("click", () => this.copyAddress());
+    root.querySelector<HTMLButtonElement>("[data-xwk-copy-address]")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void this.copyAddress();
+    });
+    root.querySelector<HTMLButtonElement>("[data-xwk-address-qr]")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.openAddressQr();
+    });
     root.querySelector<HTMLButtonElement>("[data-xwk-disconnect]")?.addEventListener("click", () => void this.disconnect());
+  }
+
+  private openAddressQr(): void {
+    if (!this.options.manager.getSession()) return;
+    this.panelOpen = true;
+    this.addressQrOpen = true;
+    this.render();
+  }
+
+  private closeAddressQr(): void {
+    this.addressQrOpen = false;
+    this.panelOpen = true;
+    this.render();
   }
 
   private removePanelListeners(): void {
@@ -323,7 +356,7 @@ export class WalletButtonController {
 
   private async copyAddress(): Promise<void> {
     if (this.copyInProgress || this.accountAction) return;
-    const address = this.options.manager.getSession()?.account.address;
+    const address = this.getSessionAddress(this.options.manager.getSession());
     if (!address) return;
     this.copyInProgress = true;
     try {
@@ -369,7 +402,8 @@ export class WalletButtonController {
   }
 
   private async resolveIdentity(session: WalletSession | null, options: { force?: boolean } = {}): Promise<void> {
-    if (!session || !this.shouldShowWeb3Name() || !this.options.identityResolver) {
+    const address = this.getSessionAddress(session);
+    if (!session || !address || !this.shouldShowWeb3Name() || !this.options.identityResolver) {
       this.identityName = null;
       this.identityAvatar = null;
       this.identityResolvingKey = undefined;
@@ -382,7 +416,7 @@ export class WalletButtonController {
     if (options.force) this.identityCache.delete(cacheKey);
     this.identityResolvingKey = cacheKey;
     try {
-      const result = await this.options.identityResolver(session.account.address, session, { force: options.force });
+      const result = await this.options.identityResolver(address, session, { force: options.force });
       if (requestId !== this.identityRequest) return;
       const identity = typeof result === "string" ? { name: result } : result ?? null;
       this.identityName = identity?.name ?? null;
@@ -408,7 +442,7 @@ export class WalletButtonController {
   }
 
   private renderConnectedState(session: WalletSession | null): void {
-    if (!session || !this.shouldShowWeb3Name() || !this.options.identityResolver) {
+    if (!session || !this.getSessionAddress(session) || !this.shouldShowWeb3Name() || !this.options.identityResolver) {
       this.clearIdentitySettleTimer();
       this.identityName = null;
       this.identityAvatar = null;
@@ -444,7 +478,7 @@ export class WalletButtonController {
   }
 
   private identityCacheKey(session: WalletSession): string {
-    return `${session.account.network?.id ?? session.account.networkType ?? "unknown"}:${session.account.address}`;
+    return `${session.account.network?.id ?? session.account.networkType ?? "unknown"}:${this.getSessionAddress(session)}`;
   }
 
   private async resolveBalance(session: WalletSession | null): Promise<void> {
@@ -457,11 +491,20 @@ export class WalletButtonController {
       return;
     }
     const requestId = ++this.balanceRequest;
+    const address = this.getSessionAddress(session);
+    if (!address) {
+      this.balance = null;
+      this.balanceLoading = false;
+      this.activationStatus = "unknown";
+      delete session.balance;
+      this.options.onBalanceChange?.(null, session);
+      return;
+    }
     this.balanceLoading = true;
     this.render();
     try {
       const result = await this.options.balanceResolver({
-        address: session.account.address,
+        address,
         network: session.account.network,
         session
       });
@@ -521,17 +564,21 @@ export class WalletButtonController {
     const messages = this.messages();
     const session = this.options.manager.getSession();
     if (!session) return "";
-    const content = this.renderPanelContent(session);
+    const content = this.addressQrOpen ? this.renderAddressQrPanelContent(session) : this.renderPanelContent(session);
+    const title = this.addressQrOpen ? messages.addressQr : messages.connected;
+    const leading = this.addressQrOpen
+      ? `<button class="xwk-account-back" type="button" data-xwk-account-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button>`
+      : `<span></span>`;
     if (this.options.accountPanelMode === "modal") {
-      return `<div class="xwk-account-overlay" data-xwk-account-overlay role="presentation"><section class="xwk-account-panel xwk-account-panel-modal" role="dialog" aria-modal="true" aria-label="${this.escapeHtml(messages.connectedAccount)}" tabindex="-1"><div class="xwk-account-modal-header"><span></span><h2>${this.escapeHtml(messages.connected)}</h2><button class="xwk-account-close" type="button" data-xwk-account-close aria-label="${this.escapeHtml(messages.close)}">&times;</button></div><div class="xwk-account-modal-body">${content}</div></section></div>`;
+      return `<div class="xwk-account-overlay" data-xwk-account-overlay role="presentation"><section class="xwk-account-panel xwk-account-panel-modal${this.addressQrOpen ? " xwk-account-panel-address-qr" : ""}" role="dialog" aria-modal="true" aria-label="${this.escapeHtml(title)}" tabindex="-1"><div class="xwk-account-modal-header">${leading}<h2>${this.escapeHtml(title)}</h2><button class="xwk-account-close" type="button" data-xwk-account-close aria-label="${this.escapeHtml(messages.close)}">&times;</button></div><div class="xwk-account-modal-body">${content}</div></section></div>`;
     }
 
-    return `<div class="xwk-account-panel xwk-account-panel-dropdown" role="dialog" aria-label="${this.escapeHtml(messages.connectedAccount)}">${content}</div>`;
+    return `<div class="xwk-account-panel xwk-account-panel-dropdown${this.addressQrOpen ? " xwk-account-panel-address-qr" : ""}" role="dialog" aria-label="${this.escapeHtml(title)}">${content}</div>`;
   }
 
   private renderPanelContent(session: WalletSession): string {
     const messages = this.messages();
-    const address = session.account.address;
+    const address = this.getSessionAddress(session);
     const label = this.getAccountLabel(session);
     const explorerUrl = this.getExplorerUrl(session);
     const disconnectBusy = this.accountAction === "disconnect";
@@ -549,35 +596,65 @@ export class WalletButtonController {
       : this.options.showBalance && this.activationStatus !== "unfunded" && this.balance?.formatted
       ? `<div class="xwk-account-balance">${this.escapeHtml(this.balance.formatted)}</div>`
       : "";
-    const addressLabel = this.shouldShowWeb3Name() && this.identityName
-      ? `<div class="xwk-account-address">${this.escapeHtml(this.formatAddress(address))}</div>`
+    const addressQrButton = this.renderAddressQrButton(address);
+    const hasIdentity = this.shouldShowWeb3Name() && this.identityName;
+    const addressLabel = hasIdentity && address
+      ? `<div class="xwk-account-address">${this.escapeHtml(this.formatAddress(address))}${addressQrButton}</div>`
       : "";
     const actions = `<div class="xwk-account-panel-actions">${copy}${explorer}${disconnect}</div>`;
-    return `<div class="xwk-account-hero">${this.renderAccountAvatar(session)}</div><div class="xwk-account-name">${this.escapeHtml(label)}</div>${addressLabel}${balance}${notActivated}${actions}`;
+    const accountName = !hasIdentity && addressQrButton && this.options.fallbackToAddress
+      ? `<div class="xwk-account-name xwk-account-name-with-qr"><span>${this.escapeHtml(label)}</span>${addressQrButton}</div>`
+      : `<div class="xwk-account-name">${this.escapeHtml(label)}</div>`;
+    return `<div class="xwk-account-hero">${this.renderAccountAvatar(session)}</div>${accountName}${addressLabel}${balance}${notActivated}${actions}`;
+  }
+
+  private renderAddressQrPanelContent(session: WalletSession): string {
+    const messages = this.messages();
+    const address = this.getSessionAddress(session);
+    if (!address) return "";
+    const copyFeedbackIcon = this.copied ? this.copiedIcon() : this.copyIcon();
+    const copy = this.options.copyAddress ? `<button type="button" data-xwk-copy-address>${copyFeedbackIcon}<span>${this.copied ? this.escapeHtml(messages.copied) : this.escapeHtml(messages.copyAddress)}</span></button>` : "";
+    return `<div class="xwk-address-qr-content"><div class="xwk-address-qr-code" data-xwk-address-qr-code data-address="${this.escapeHtml(address)}" aria-hidden="true"></div><div class="xwk-address-qr-chip">${this.escapeHtml(address)}</div><div class="xwk-account-panel-actions">${copy}</div></div>`;
+  }
+
+  private renderAddressQrButton(address?: string): string {
+    if (!this.options.showAddressQr || !address) return "";
+    const messages = this.messages();
+    return `<button class="xwk-address-qr-trigger" type="button" data-xwk-address-qr aria-label="${this.escapeHtml(messages.showAddressQr)}" title="${this.escapeHtml(messages.showAddressQr)}">${this.qrIcon()}</button>`;
   }
 
   private getAccountLabel(session: WalletSession): string {
     if (this.shouldShowWeb3Name() && this.identityName) return this.identityName;
     if (!this.options.fallbackToAddress) return session.wallet?.name ?? session.adapterId;
-    return (this.options.formatAddress ?? this.formatAddress)(session.account.address);
+    const address = this.getSessionAddress(session);
+    return address ? (this.options.formatAddress ?? this.formatAddress)(address) : session.wallet?.name ?? session.adapterId;
   }
 
   private renderAccountAvatar(session: WalletSession): string {
     if (this.identityAvatar) {
       return `<img class="xwk-account-avatar" src="${this.escapeHtml(this.identityAvatar)}" alt="">`;
     }
-    const [from, to, spot] = this.getAddressGradient(session.account.address);
+    const [from, to, spot] = this.getAddressGradient(this.getSessionAddress(session));
     return `<div class="xwk-account-art" style="--xwk-avatar-from:${from};--xwk-avatar-to:${to};--xwk-avatar-spot:${spot}"><span></span></div>`;
   }
 
   private getExplorerUrl(session: WalletSession): string | undefined {
     if (this.options.explorerUrl) return this.options.explorerUrl(session);
-    const configured = getExplorerAccountUrl(session.account.network, session.account.address);
+    const address = this.getSessionAddress(session);
+    if (!address) return undefined;
+    const configured = getExplorerAccountUrl(session.account.network, address);
     if (configured) return configured;
     const networkType = session.account.network?.networkType ?? session.account.networkType;
-    if (networkType === "TESTNET") return `https://testnet.xrpl.org/accounts/${encodeURIComponent(session.account.address)}`;
-    if (networkType === "DEVNET") return `https://devnet.xrpl.org/accounts/${encodeURIComponent(session.account.address)}`;
-    return `https://livenet.xrpl.org/accounts/${encodeURIComponent(session.account.address)}`;
+    if (networkType === "TESTNET") return `https://testnet.xrpl.org/accounts/${encodeURIComponent(address)}`;
+    if (networkType === "DEVNET") return `https://devnet.xrpl.org/accounts/${encodeURIComponent(address)}`;
+    return `https://livenet.xrpl.org/accounts/${encodeURIComponent(address)}`;
+  }
+
+  private getSessionAddress(session: WalletSession | null | undefined): string {
+    const account = session?.account as ({ address?: unknown; classicAddress?: unknown } | undefined);
+    const address = typeof account?.address === "string" ? account.address : "";
+    if (address) return address;
+    return typeof account?.classicAddress === "string" ? account.classicAddress : "";
   }
 
   private shouldShowWeb3Name(): boolean {
@@ -626,6 +703,58 @@ export class WalletButtonController {
 
   private walletIcon(): string {
     return `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.5 7.5A2.5 2.5 0 0 1 7 5h11.5A1.5 1.5 0 0 1 20 6.5V9H7A2.5 2.5 0 0 1 4.5 6.5v1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 9h15.5A2.5 2.5 0 0 1 22 11.5v5A2.5 2.5 0 0 1 19.5 19h-13A2.5 2.5 0 0 1 4 16.5V9Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M17 13.5h5V17h-5a1.75 1.75 0 1 1 0-3.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+  }
+
+  private backIcon(): string {
+    return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+
+  private qrIcon(): string {
+    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 14h2v2h-2v-2Zm4 0h2v2h-2v-2Zm-4 4h2v2h-2v-2Zm4 0h2v2h-2v-2Z" fill="currentColor"/></svg>`;
+  }
+
+  private renderAddressQrIfNeeded(root: ParentNode): void {
+    if (!this.addressQrOpen) return;
+    const container = root.querySelector<HTMLElement>("[data-xwk-address-qr-code]");
+    const address = container?.dataset.address;
+    if (!container || !address || container.dataset.xwkRendered === address) return;
+    container.dataset.xwkRendered = address;
+    container.replaceChildren();
+    try {
+      const qrColor = this.resolveThemeMode() === "dark" ? QR_LIGHT : QR_DARK;
+      const qrCode = new QRCodeStyling({
+        width: QR_SIZE,
+        height: QR_SIZE,
+        type: "svg",
+        data: address,
+        margin: 4,
+        qrOptions: {
+          errorCorrectionLevel: "H"
+        },
+        dotsOptions: {
+          type: "dots",
+          color: qrColor,
+          roundSize: true
+        },
+        cornersSquareOptions: {
+          type: "extra-rounded",
+          color: qrColor
+        },
+        cornersDotOptions: {
+          type: "dot",
+          color: qrColor
+        },
+        backgroundOptions: {
+          color: "transparent"
+        }
+      });
+      qrCode.append(container);
+    } catch {
+      const fallback = document.createElement("div");
+      fallback.className = "xwk-address-qr-fallback";
+      fallback.textContent = address;
+      container.replaceChildren(fallback);
+    }
   }
 
   private normalizeBalance(result: WalletBalance | string | number | null): WalletBalance | null {
@@ -706,7 +835,7 @@ export class WalletButtonController {
     const fallbackIconBackground = theme.fallbackIconBackground;
     const fallbackIconColor = theme.fallbackIconColor;
 
-    return `.xwk-button-root{display:inline-block;max-width:100%;position:relative;font-family:${theme.fontFamily};font-size:14px}.xwk-account-button{align-items:center;background:${background};border:1px solid ${border};border-radius:${radius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:inline-flex;gap:8px;font:inherit;font-weight:560;max-width:100%;min-height:${height};overflow:hidden;padding:0 12px 0 10px;touch-action:manipulation;transition:background-color .16s ease,border-color .16s ease;white-space:nowrap;-webkit-tap-highlight-color:transparent;transform:none}.xwk-account-button:hover{background:${hoverBackground};box-shadow:none;opacity:1;transform:none}.xwk-account-button:active{background:${hoverBackground};opacity:1;transform:none}.xwk-account-button:focus-visible,.xwk-button-chevron:focus-visible,.xwk-account-panel-actions button:focus-visible,.xwk-account-panel-actions a:focus-visible{outline:2px solid ${theme.accent};outline-offset:2px;text-decoration:none}.xwk-button-icon{background:${theme.background};border:1px solid ${iconBorder};border-radius:10px;box-sizing:border-box;display:inline-flex;flex:0 0 28px;height:28px;isolation:isolate;line-height:0;max-width:28px;min-width:28px;object-fit:contain;overflow:hidden;position:relative;width:28px}.xwk-button-icon-fallback{align-items:center;background:${fallbackIconBackground};color:${fallbackIconColor};justify-content:center}.xwk-button-icon-initial{font-size:12px;line-height:1}.xwk-button-icon-svg-fallback{font-size:0}.xwk-button-icon-svg-fallback svg{display:block;flex:0 0 17px;height:17px;max-height:17px;max-width:17px;min-height:17px;min-width:17px;width:17px}.xwk-button-label{display:inline-block;flex:1 1 0;font-size:13px;font-weight:560;line-height:1.1;max-width:220px;min-width:0;overflow:hidden;padding-right:2px;text-overflow:ellipsis;white-space:nowrap}.xwk-button-balance{color:${theme.muted};font-weight:500;margin-left:4px}.xwk-button-balance-loading{display:inline-flex;vertical-align:-2px}.xwk-balance-spinner{animation:xwk-action-spin .8s linear infinite;border:2px solid ${iconBorder};border-top-color:${theme.muted};border-radius:999px;box-sizing:border-box;display:inline-block;flex:0 0 13px;height:13px;width:13px}.xwk-button-chevron{align-items:center;background:${theme.background};border:1px solid ${iconBorder};border-radius:999px;color:${theme.muted};display:inline-flex;flex:0 0 26px;height:26px;justify-content:center;line-height:1;touch-action:manipulation;width:26px}.xwk-button-chevron:hover{background:${theme.surfaceHover};color:${theme.foreground}}.xwk-account-overlay{align-items:center;background:${theme.overlay};display:flex;inset:0;justify-content:center;overscroll-behavior:contain;padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));position:fixed;z-index:2147483647}.xwk-account-portal[data-xwk-entering="true"] .xwk-account-overlay{animation:xwk-account-overlay-in .18s ease-out}.xwk-account-panel{background:${theme.background};border:1px solid ${theme.border};border-radius:${theme.radius};box-shadow:${theme.shadow};color:${theme.foreground};display:grid;gap:12px;overflow:hidden;z-index:2147483647}.xwk-account-panel:focus{outline:none}.xwk-account-panel-dropdown{box-shadow:none;justify-items:center;margin-top:10px;min-width:320px;padding:18px;position:absolute;right:0;top:100%;width:min(360px,calc(100vw - 32px))}.xwk-account-panel-modal{gap:0;max-height:calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));max-width:520px;position:relative;transform-origin:center bottom;width:min(520px,100%)}.xwk-account-portal[data-xwk-entering="true"] .xwk-account-panel-modal{animation:xwk-account-panel-in .22s cubic-bezier(.22,1,.36,1)}.xwk-account-modal-header{align-items:center;border-bottom:1px solid ${theme.border};display:grid;grid-template-columns:44px minmax(0,1fr) 44px;column-gap:8px;padding:8px 18px}.xwk-account-modal-header h2{color:${theme.foreground};font-size:16px;font-weight:500;line-height:1.2;margin:0;min-width:0;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap}.xwk-account-modal-body{-webkit-overflow-scrolling:touch;display:grid;gap:12px;justify-items:center;min-height:390px;overflow:auto;overscroll-behavior:contain;padding:22px 28px 28px}.xwk-account-close{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:transparent!important;border:0!important;border-radius:999px;box-shadow:none!important;color:${theme.muted};cursor:pointer;display:inline-flex;font-size:26px;font-weight:500;height:44px;justify-content:center;line-height:1;margin:0;min-height:0;outline:none!important;padding:0;touch-action:manipulation;transform:none;width:44px}.xwk-account-close:hover{background:${theme.surfaceHover}!important;box-shadow:none!important;color:${theme.foreground};transform:none}.xwk-account-close:focus-visible{outline:2px solid ${theme.accent}!important;outline-offset:0}.xwk-account-hero{height:154px;margin-top:4px;position:relative;width:180px}.xwk-account-panel-dropdown .xwk-account-hero{height:132px;width:160px}.xwk-account-art,.xwk-account-avatar{border-radius:999px;height:118px;left:31px;position:absolute;top:8px;width:118px}.xwk-account-panel-dropdown .xwk-account-art,.xwk-account-panel-dropdown .xwk-account-avatar{height:104px;left:28px;width:104px}.xwk-account-art{align-items:center;background:radial-gradient(circle at 58% 38%,var(--xwk-avatar-spot),transparent 0 22%,transparent 23%),linear-gradient(160deg,var(--xwk-avatar-from),var(--xwk-avatar-to));display:flex;justify-content:center}.xwk-account-art span{background:rgba(255,255,255,.18);border-radius:999px;height:50px;width:50px}.xwk-account-panel-dropdown .xwk-account-art span{height:42px;width:42px}.xwk-account-avatar{background:${theme.surface};border:1px solid ${iconBorder};box-sizing:border-box;display:block;object-fit:cover;overflow:hidden}.xwk-account-name{color:${theme.foreground};font-size:21px;font-weight:650;line-height:1.2;max-width:100%;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap}.xwk-account-panel-dropdown .xwk-account-name{font-size:18px}.xwk-account-address{background:${theme.surface};border:1px solid ${theme.border};border-radius:12px;color:${theme.muted};font-size:14px;font-weight:520;line-height:1.25;max-width:100%;overflow:hidden;padding:8px 12px;text-align:center;text-overflow:ellipsis;white-space:nowrap}.xwk-account-balance{background:${theme.surface};border:1px solid ${theme.border};border-radius:999px;color:${theme.foreground};font-size:13px;font-weight:560;line-height:1.2;padding:7px 12px;text-align:center}.xwk-account-balance-loading{align-items:center;display:inline-flex;gap:6px}.xwk-account-warning{background:${theme.surface};border:1px solid ${actionBorder};border-radius:12px;box-sizing:border-box;color:${theme.muted};font-size:13px;font-weight:520;line-height:1.35;padding:9px 12px;text-align:center;width:100%}.xwk-account-panel-actions{display:grid;gap:10px;grid-template-columns:1fr;width:100%}.xwk-account-modal-body .xwk-account-panel-actions{margin-top:auto}.xwk-account-panel-actions button,.xwk-account-panel-actions a{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:${theme.surface};border:1px solid ${actionBorder};border-radius:${theme.walletRadius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:flex;font:inherit;font-size:14px;font-weight:560;gap:8px;justify-content:center;line-height:1.2;min-height:46px;min-width:0;outline:none;overflow:hidden;padding:0 12px;text-decoration:none;touch-action:manipulation;transform:none;transition:background-color .16s ease,border-color .16s ease;width:100%}.xwk-account-panel-actions button:disabled{cursor:wait;opacity:1}.xwk-account-panel-actions svg{flex:0 0 auto;opacity:.58}.xwk-account-panel-actions span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-account-panel-actions button:hover,.xwk-account-panel-actions a:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;text-decoration:none;transform:none}.xwk-account-panel-actions button:active,.xwk-account-panel-actions a:active{background:${theme.surfaceHover};opacity:1;text-decoration:none;transform:none}.xwk-copied-icon{color:${theme.accent};opacity:1!important}.xwk-action-spinner{animation:xwk-action-spin .8s linear infinite;border:2px solid ${iconBorder};border-top-color:${theme.muted};border-radius:999px;box-sizing:border-box;display:inline-block;height:17px;width:17px}@keyframes xwk-action-spin{to{transform:rotate(360deg)}}@keyframes xwk-account-overlay-in{from{opacity:0}to{opacity:1}}@keyframes xwk-account-panel-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}@media(prefers-reduced-motion:reduce){.xwk-account-button,.xwk-account-panel-actions button,.xwk-account-panel-actions a{transition:none}.xwk-account-portal[data-xwk-entering="true"] .xwk-account-overlay,.xwk-account-portal[data-xwk-entering="true"] .xwk-account-panel-modal{animation-duration:1ms!important}.xwk-action-spinner,.xwk-balance-spinner{animation:none}}@media(max-width:520px){.xwk-account-panel-dropdown{bottom:0;left:0;margin-top:0;min-width:0;position:fixed;right:0;top:auto;width:100vw}.xwk-account-overlay{align-items:flex-end;padding:max(12px,env(safe-area-inset-top)) 0 0}.xwk-account-panel-modal{align-self:flex-end;border-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0;border-left:0;border-right:0;border-top-left-radius:${theme.radius};border-top-right-radius:${theme.radius};height:auto;max-height:calc(100dvh - env(safe-area-inset-top));max-width:none;width:100vw}.xwk-account-portal[data-xwk-entering="true"] .xwk-account-panel-modal{animation:xwk-account-sheet-in .28s cubic-bezier(.32,.72,0,1)}.xwk-account-modal-header{border-top-left-radius:${theme.radius};border-top-right-radius:${theme.radius};grid-template-columns:44px minmax(0,1fr) 44px;padding:10px 16px}.xwk-account-modal-body{min-height:340px;padding:18px 20px max(22px,calc(22px + env(safe-area-inset-bottom)))}.xwk-button-label{max-width:min(150px,calc(100vw - 140px))}}@keyframes xwk-account-sheet-in{from{opacity:1;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}`;
+    return `.xwk-button-root{display:inline-block;max-width:100%;position:relative;font-family:${theme.fontFamily};font-size:14px}.xwk-account-button{align-items:center;background:${background};border:1px solid ${border};border-radius:${radius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:inline-flex;gap:8px;font:inherit;font-weight:560;max-width:100%;min-height:${height};overflow:hidden;padding:0 12px 0 10px;touch-action:manipulation;transition:background-color .16s ease,border-color .16s ease;white-space:nowrap;-webkit-tap-highlight-color:transparent;transform:none}.xwk-account-button:hover{background:${hoverBackground};box-shadow:none;opacity:1;transform:none}.xwk-account-button:active{background:${hoverBackground};opacity:1;transform:none}.xwk-account-button:focus-visible,.xwk-button-chevron:focus-visible,.xwk-account-panel-actions button:focus-visible,.xwk-account-panel-actions a:focus-visible,.xwk-address-qr-trigger:focus-visible{outline:2px solid ${theme.accent};outline-offset:2px;text-decoration:none}.xwk-button-icon{background:${theme.background};border:1px solid ${iconBorder};border-radius:10px;box-sizing:border-box;display:inline-flex;flex:0 0 28px;height:28px;isolation:isolate;line-height:0;max-width:28px;min-width:28px;object-fit:contain;overflow:hidden;position:relative;width:28px}.xwk-button-icon-fallback{align-items:center;background:${fallbackIconBackground};color:${fallbackIconColor};justify-content:center}.xwk-button-icon-initial{font-size:12px;line-height:1}.xwk-button-icon-svg-fallback{font-size:0}.xwk-button-icon-svg-fallback svg{display:block;flex:0 0 17px;height:17px;max-height:17px;max-width:17px;min-height:17px;min-width:17px;width:17px}.xwk-button-label{display:inline-block;flex:1 1 0;font-size:13px;font-weight:560;line-height:1.1;max-width:220px;min-width:0;overflow:hidden;padding-right:2px;text-overflow:ellipsis;white-space:nowrap}.xwk-button-balance{color:${theme.muted};font-weight:500;margin-left:4px}.xwk-button-balance-loading{display:inline-flex;vertical-align:-2px}.xwk-balance-spinner{animation:xwk-action-spin .8s linear infinite;border:2px solid ${iconBorder};border-top-color:${theme.muted};border-radius:999px;box-sizing:border-box;display:inline-block;flex:0 0 13px;height:13px;width:13px}.xwk-button-chevron{align-items:center;background:${theme.background};border:1px solid ${iconBorder};border-radius:999px;color:${theme.muted};display:inline-flex;flex:0 0 26px;height:26px;justify-content:center;line-height:1;touch-action:manipulation;width:26px}.xwk-button-chevron:hover{background:${theme.surfaceHover};color:${theme.foreground}}.xwk-account-overlay{align-items:center;background:${theme.overlay};display:flex;inset:0;justify-content:center;overscroll-behavior:contain;padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));position:fixed;z-index:2147483647}.xwk-account-portal[data-xwk-entering="true"] .xwk-account-overlay{animation:xwk-account-overlay-in .18s ease-out}.xwk-account-panel{background:${theme.background};border:1px solid ${theme.border};border-radius:${theme.radius};box-shadow:${theme.shadow};box-sizing:border-box;color:${theme.foreground};display:grid;gap:12px;overflow:hidden;z-index:2147483647}.xwk-account-panel:focus{outline:none}.xwk-account-panel-dropdown{box-shadow:none;justify-items:center;margin-top:10px;min-width:320px;padding:18px;position:absolute;right:0;top:100%;width:min(360px,calc(100vw - 32px))}.xwk-account-panel-modal{gap:0;grid-template-rows:auto minmax(0,1fr);height:min(527px,calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));max-width:520px;position:relative;transform-origin:center bottom;width:min(520px,100%)}.xwk-account-portal[data-xwk-entering="true"] .xwk-account-panel-modal{animation:xwk-account-panel-in .22s cubic-bezier(.22,1,.36,1)}.xwk-account-modal-header{align-items:center;border-bottom:1px solid ${theme.border};display:grid;grid-template-columns:44px minmax(0,1fr) 44px;column-gap:8px;padding:8px 18px}.xwk-account-modal-header h2{color:${theme.foreground};font-size:16px;font-weight:500;line-height:1.2;margin:0;min-width:0;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap}.xwk-account-modal-body{-webkit-overflow-scrolling:touch;display:grid;gap:12px;justify-items:center;min-height:0;overflow:auto;overscroll-behavior:contain;padding:22px 28px 28px}.xwk-account-close,.xwk-account-back{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:transparent!important;border:0!important;border-radius:999px;box-shadow:none!important;color:${theme.muted};cursor:pointer;display:inline-flex;font:inherit;font-size:26px;font-weight:500;height:44px;justify-content:center;line-height:1;margin:0;min-height:0;outline:none!important;padding:0;touch-action:manipulation;transform:none;width:44px}.xwk-account-back{font-size:0;justify-self:start}.xwk-account-close{justify-self:end}.xwk-account-close:hover,.xwk-account-back:hover{background:${theme.surfaceHover}!important;box-shadow:none!important;color:${theme.foreground};transform:none}.xwk-account-close:focus-visible,.xwk-account-back:focus-visible{outline:2px solid ${theme.accent}!important;outline-offset:0}.xwk-account-hero{height:154px;margin-top:4px;position:relative;width:180px}.xwk-account-panel-dropdown .xwk-account-hero{height:132px;width:160px}.xwk-account-art,.xwk-account-avatar{border-radius:999px;height:118px;left:31px;position:absolute;top:8px;width:118px}.xwk-account-panel-dropdown .xwk-account-art,.xwk-account-panel-dropdown .xwk-account-avatar{height:104px;left:28px;width:104px}.xwk-account-art{align-items:center;background:radial-gradient(circle at 58% 38%,var(--xwk-avatar-spot),transparent 0 22%,transparent 23%),linear-gradient(160deg,var(--xwk-avatar-from),var(--xwk-avatar-to));display:flex;justify-content:center}.xwk-account-art span{background:rgba(255,255,255,.18);border-radius:999px;height:50px;width:50px}.xwk-account-panel-dropdown .xwk-account-art span{height:42px;width:42px}.xwk-account-avatar{background:${theme.surface};border:1px solid ${iconBorder};box-sizing:border-box;display:block;object-fit:cover;overflow:hidden}.xwk-account-name{color:${theme.foreground};font-size:21px;font-weight:650;line-height:1.2;max-width:100%;overflow:hidden;text-align:center;text-overflow:ellipsis;white-space:nowrap}.xwk-account-panel-dropdown .xwk-account-name{font-size:18px}.xwk-account-name-with-qr,.xwk-account-address{align-items:center;display:inline-flex;gap:6px;justify-content:center}.xwk-account-name-with-qr span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-account-address{background:${theme.surface};border:1px solid ${theme.border};border-radius:12px;color:${theme.muted};font-size:14px;font-weight:520;line-height:1.25;max-width:100%;overflow:hidden;padding:8px 8px 8px 12px;text-align:center;text-overflow:ellipsis;white-space:nowrap}.xwk-address-qr-trigger{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:transparent;border:0;border-radius:10px;box-shadow:none;color:currentColor;cursor:pointer;display:inline-flex;flex:0 0 36px;height:36px;justify-content:center;margin:-5px -5px -5px 0;min-height:0;outline:none;padding:0;touch-action:manipulation;transform:none;width:36px}.xwk-address-qr-trigger svg{height:16px;width:16px}.xwk-address-qr-trigger:hover{background:${theme.surfaceHover};box-shadow:none;transform:none}.xwk-account-balance{background:${theme.surface};border:1px solid ${theme.border};border-radius:999px;color:${theme.foreground};font-size:13px;font-weight:560;line-height:1.2;padding:7px 12px;text-align:center}.xwk-account-balance-loading{align-items:center;display:inline-flex;gap:6px}.xwk-account-warning{background:${theme.surface};border:1px solid ${actionBorder};border-radius:12px;box-sizing:border-box;color:${theme.muted};font-size:13px;font-weight:520;line-height:1.35;padding:9px 12px;text-align:center;width:100%}.xwk-address-qr-content{align-content:center;display:grid;gap:14px;justify-items:center;min-height:100%;width:100%}.xwk-address-qr-code{aspect-ratio:1/1;background:${theme.surface};border:1px solid ${theme.border};border-radius:14px;box-sizing:border-box;display:grid;max-width:304px;padding:12px;place-items:center;width:min(304px,100%)}.xwk-address-qr-code svg,.xwk-address-qr-code canvas,.xwk-address-qr-code img{aspect-ratio:1/1;display:block;height:auto;max-width:100%;width:100%}.xwk-address-qr-chip{background:${theme.surface};border:1px solid ${theme.border};border-radius:12px;box-sizing:border-box;color:${theme.muted};font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;font-weight:520;line-height:1.45;max-width:100%;overflow-wrap:anywhere;padding:9px 11px;text-align:center;width:100%}.xwk-address-qr-fallback{color:${theme.muted};font-size:12px;line-height:1.45;overflow-wrap:anywhere}.xwk-account-panel-actions{display:grid;gap:10px;grid-template-columns:1fr;width:100%}.xwk-account-modal-body .xwk-account-panel-actions{margin-top:auto}.xwk-account-panel-actions button,.xwk-account-panel-actions a{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:${theme.surface};border:1px solid ${actionBorder};border-radius:${theme.walletRadius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:flex;font:inherit;font-size:14px;font-weight:560;gap:8px;justify-content:center;line-height:1.2;min-height:46px;min-width:0;outline:none;overflow:hidden;padding:0 12px;text-decoration:none;touch-action:manipulation;transform:none;transition:background-color .16s ease,border-color .16s ease;width:100%}.xwk-account-panel-actions button:disabled{cursor:wait;opacity:1}.xwk-account-panel-actions svg{flex:0 0 auto;opacity:.58}.xwk-account-panel-actions span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-account-panel-actions button:hover,.xwk-account-panel-actions a:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;text-decoration:none;transform:none}.xwk-account-panel-actions button:active,.xwk-account-panel-actions a:active{background:${theme.surfaceHover};opacity:1;text-decoration:none;transform:none}.xwk-copied-icon{color:${theme.accent};opacity:1!important}.xwk-action-spinner{animation:xwk-action-spin .8s linear infinite;border:2px solid ${iconBorder};border-top-color:${theme.muted};border-radius:999px;box-sizing:border-box;display:inline-block;height:17px;width:17px}@keyframes xwk-action-spin{to{transform:rotate(360deg)}}@keyframes xwk-account-overlay-in{from{opacity:0}to{opacity:1}}@keyframes xwk-account-panel-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}@media(prefers-reduced-motion:reduce){.xwk-account-button,.xwk-account-panel-actions button,.xwk-account-panel-actions a{transition:none}.xwk-account-portal[data-xwk-entering="true"] .xwk-account-overlay,.xwk-account-portal[data-xwk-entering="true"] .xwk-account-panel-modal{animation-duration:1ms!important}.xwk-action-spinner,.xwk-balance-spinner{animation:none}}@media(max-width:520px){.xwk-account-panel-dropdown{bottom:0;left:0;margin-top:0;min-width:0;position:fixed;right:0;top:auto;width:100vw}.xwk-account-overlay{align-items:flex-end;padding:max(12px,env(safe-area-inset-top)) 0 0}.xwk-account-panel-modal{align-self:flex-end;border-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0;border-left:0;border-right:0;border-top-left-radius:${theme.radius};border-top-right-radius:${theme.radius};height:min(527px,calc(100dvh - env(safe-area-inset-top)));max-width:none;width:100vw}.xwk-account-portal[data-xwk-entering="true"] .xwk-account-panel-modal{animation:xwk-account-sheet-in .28s cubic-bezier(.32,.72,0,1)}.xwk-account-modal-header{border-top-left-radius:${theme.radius};border-top-right-radius:${theme.radius};grid-template-columns:44px minmax(0,1fr) 44px;padding:10px 16px}.xwk-account-modal-body{min-height:0;padding:18px 20px max(22px,calc(22px + env(safe-area-inset-bottom)))}.xwk-button-label{max-width:min(150px,calc(100vw - 140px))}}@keyframes xwk-account-sheet-in{from{opacity:1;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}`;
   }
 
   private resolveTheme(): ResolvedTheme {
@@ -761,8 +890,8 @@ export class WalletButtonController {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }
 
-  private escapeHtml(value: string): string {
-    return value.replace(/[&<>"']/g, (char) => ({
+  private escapeHtml(value: unknown): string {
+    return String(value ?? "").replace(/[&<>"']/g, (char) => ({
       "&": "&amp;",
       "<": "&lt;",
       ">": "&gt;",

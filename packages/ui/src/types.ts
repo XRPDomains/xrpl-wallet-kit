@@ -117,6 +117,7 @@ export interface WalletButtonOptions {
   showWeb3Name?: boolean;
   fallbackToAddress?: boolean;
   copyAddress?: boolean;
+  showAddressQr?: boolean;
   explorer?: boolean;
   disconnect?: boolean;
   accountPanel?: boolean;
@@ -191,6 +192,7 @@ export interface WalletAccountPanelUiConfig {
   mode?: WalletAccountPanelMode;
   showAvatar?: boolean;
   copyAddress?: boolean;
+  showAddressQr?: boolean;
   disconnect?: boolean;
   explorer?: boolean;
 }

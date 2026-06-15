@@ -18,6 +18,8 @@ export interface GemWalletProvider {
   acceptNFTOffer?(payload: unknown): Promise<unknown>;
   cancelNFTOffer?(payload: unknown): Promise<unknown>;
   burnNFT?(payload: unknown): Promise<unknown>;
+  setTrustline?(payload: unknown): Promise<unknown>;
+  addTrustline?(payload: unknown): Promise<unknown>;
   signAndSubmit?(payload: unknown): Promise<unknown>;
 }
 
@@ -79,18 +81,25 @@ export class GemWalletAdapter extends BaseWalletAdapter {
       methodHint === "acceptNFTOffer" && provider.acceptNFTOffer ? await provider.acceptNFTOffer(payload) :
       methodHint === "cancelNFTOffer" && provider.cancelNFTOffer ? await provider.cancelNFTOffer(payload) :
       methodHint === "burnNFT" && provider.burnNFT ? await provider.burnNFT(request.walletPayload ?? this.toGemWalletBurnNFTPayload(request.txJson)) :
+      methodHint === "setTrustline" && provider.setTrustline ? await provider.setTrustline(request.walletPayload ?? this.toGemWalletTrustlinePayload(request.txJson)) :
+      methodHint === "setTrustline" && provider.addTrustline ? await provider.addTrustline(request.walletPayload ?? this.toGemWalletTrustlinePayload(request.txJson)) :
       provider.signAndSubmit ? await provider.signAndSubmit(payload) :
       this.unsupported(`GemWallet method: ${methodHint ?? "generic"}`);
     return normalizeTxResult(raw);
   }
   private resolveMethodHint(request: SignAndSubmitRequest): SignAndSubmitRequest["methodHint"] {
-    if (request.methodHint && request.methodHint !== "generic") return request.methodHint;
+    if (request.methodHint && request.methodHint !== "generic") {
+      const hint = String(request.methodHint);
+      if (["trustset", "trustSet", "setTrustline", "trustline", "trustLine"].includes(hint)) return "setTrustline";
+      return request.methodHint;
+    }
     const transactionType = request.txJson.TransactionType;
     if (transactionType === "Payment") return "payment";
     if (transactionType === "NFTokenCreateOffer") return "createNFTOffer";
     if (transactionType === "NFTokenAcceptOffer") return "acceptNFTOffer";
     if (transactionType === "NFTokenCancelOffer") return "cancelNFTOffer";
     if (transactionType === "NFTokenBurn") return "burnNFT";
+    if (transactionType === "TrustSet") return "setTrustline";
     return request.methodHint ?? "generic";
   }
   private toGemWalletPaymentPayload(txJson: Record<string, unknown>): Record<string, unknown> {
@@ -107,6 +116,26 @@ export class GemWalletAdapter extends BaseWalletAdapter {
     const payload: Record<string, unknown> = {
       NFTokenID: txJson.NFTokenID,
       owner: txJson.Owner
+    };
+    return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+  }
+  private toGemWalletTrustlinePayload(txJson: Record<string, unknown>): Record<string, unknown> {
+    const payload: Record<string, unknown> = {
+      limitAmount: txJson.LimitAmount,
+      qualityIn: txJson.QualityIn,
+      qualityOut: txJson.QualityOut,
+      flags: txJson.Flags,
+      fee: txJson.Fee,
+      sequence: txJson.Sequence,
+      accountTxnID: txJson.AccountTxnID,
+      lastLedgerSequence: txJson.LastLedgerSequence,
+      memos: txJson.Memos !== undefined ? this.toGemWalletMemos(txJson.Memos) : undefined,
+      networkID: txJson.NetworkID,
+      signers: txJson.Signers,
+      sourceTag: txJson.SourceTag,
+      signingPubKey: txJson.SigningPubKey,
+      ticketSequence: txJson.TicketSequence,
+      txnSignature: txJson.TxnSignature
     };
     return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
   }

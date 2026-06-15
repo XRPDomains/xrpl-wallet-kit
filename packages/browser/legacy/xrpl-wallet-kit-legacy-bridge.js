@@ -37,6 +37,7 @@
     if (options && options.gemMethod === 'acceptNFTOffer') return 'acceptNFTOffer';
     if (options && options.gemMethod === 'cancelNFTOffer') return 'cancelNFTOffer';
     if (options && options.gemMethod === 'burnNFT') return 'burnNFT';
+    if (options && (options.gemMethod === 'setTrustline' || options.gemMethod === 'addTrustline')) return 'setTrustline';
 
     var transactionType = txJson && txJson.TransactionType;
     if (transactionType === 'Payment') return 'payment';
@@ -44,6 +45,7 @@
     if (transactionType === 'NFTokenAcceptOffer') return 'acceptNFTOffer';
     if (transactionType === 'NFTokenCancelOffer') return 'cancelNFTOffer';
     if (transactionType === 'NFTokenBurn') return 'burnNFT';
+    if (transactionType === 'TrustSet') return 'setTrustline';
     return 'generic';
   }
 
@@ -96,6 +98,17 @@
         Account: address,
         NFTokenID: payload.NFTokenID || payload.nftokenID || payload.nfTokenId,
         Owner: payload.Owner || payload.owner
+      });
+    }
+
+    if (options.gemMethod === 'setTrustline' || options.gemMethod === 'addTrustline' || options.methodHint === 'setTrustline' || options.methodHint === 'trustSet' || options.methodHint === 'trustset') {
+      return cleanTxJson({
+        TransactionType: 'TrustSet',
+        Account: address,
+        LimitAmount: payload.LimitAmount || payload.limitAmount,
+        Flags: payload.Flags || payload.flags,
+        QualityIn: payload.QualityIn || payload.qualityIn,
+        QualityOut: payload.QualityOut || payload.qualityOut
       });
     }
 

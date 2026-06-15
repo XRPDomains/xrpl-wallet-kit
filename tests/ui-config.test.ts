@@ -29,3 +29,8 @@ test("resolveWalletButtonOptions lets direct button accountPanelMode override ap
 
   assert.equal(options.accountPanelMode, "modal");
 });
+
+test("resolveWalletButtonOptions maps account panel address QR config", () => {
+  assert.equal(resolveWalletButtonOptions().showAddressQr, true);
+  assert.equal(resolveWalletButtonOptions({ accountPanel: { showAddressQr: false } }).showAddressQr, false);
+});

@@ -119,6 +119,125 @@ test("GemWallet burnNFT methodHint preserves explicit walletPayload override", a
   assert.equal(capturedPayload, walletPayload);
 });
 
+test("GemWallet TrustSet routes to setTrustline with GemWallet payload shape", async () => {
+  let capturedPayload: unknown;
+  const provider: GemWalletProvider = {
+    setTrustline: async (payload) => {
+      capturedPayload = payload;
+      return { result: { hash: "TRUST" } };
+    }
+  };
+
+  const result = await new GemWalletAdapter({ provider }).signAndSubmit({
+    submit: true,
+    txJson: {
+      TransactionType: "TrustSet",
+      Account: "rSender",
+      LimitAmount: {
+        currency: "USD",
+        issuer: "rIssuer",
+        value: "100"
+      },
+      Flags: 131072,
+      QualityIn: 1,
+      QualityOut: 2,
+      LastLedgerSequence: 12345,
+      Memos: [
+        {
+          Memo: {
+            MemoData: "7472757374"
+          }
+        }
+      ]
+    }
+  });
+
+  assert.equal(result.hash, "TRUST");
+  assert.deepEqual(capturedPayload, {
+    limitAmount: {
+      currency: "USD",
+      issuer: "rIssuer",
+      value: "100"
+    },
+    qualityIn: 1,
+    qualityOut: 2,
+    flags: 131072,
+    lastLedgerSequence: 12345,
+    memos: [
+      {
+        memo: {
+          memoData: "7472757374"
+        }
+      }
+    ]
+  });
+});
+
+test("GemWallet TrustSet accepts legacy trustset hint and walletPayload override", async () => {
+  let capturedPayload: unknown;
+  const provider: GemWalletProvider = {
+    setTrustline: async (payload) => {
+      capturedPayload = payload;
+      return { result: { hash: "TRUST" } };
+    }
+  };
+  const walletPayload = {
+    limitAmount: {
+      currency: "EUR",
+      issuer: "rIssuer",
+      value: "0"
+    }
+  };
+
+  await new GemWalletAdapter({ provider }).signAndSubmit({
+    methodHint: "trustset" as never,
+    submit: true,
+    txJson: {
+      TransactionType: "TrustSet",
+      LimitAmount: {
+        currency: "USD",
+        issuer: "rIssuer",
+        value: "100"
+      }
+    },
+    walletPayload
+  });
+
+  assert.equal(capturedPayload, walletPayload);
+});
+
+test("GemWallet TrustSet falls back to deprecated addTrustline provider method", async () => {
+  let capturedPayload: unknown;
+  const provider: GemWalletProvider = {
+    addTrustline: async (payload) => {
+      capturedPayload = payload;
+      return { result: { hash: "TRUST_OLD" } };
+    }
+  };
+
+  const result = await new GemWalletAdapter({ provider }).signAndSubmit({
+    methodHint: "trustSet",
+    submit: true,
+    txJson: {
+      TransactionType: "TrustSet",
+      LimitAmount: {
+        currency: "USD",
+        issuer: "rIssuer",
+        value: "100"
+      }
+    }
+  });
+
+  assert.equal(result.hash, "TRUST_OLD");
+  assert.deepEqual(capturedPayload, {
+    limitAmount: {
+      currency: "USD",
+      issuer: "rIssuer",
+      value: "100"
+    }
+  });
+});
+
 test("GemWallet connect and signMessage include publicKey when provider exposes it", async () => {
   const provider: GemWalletProvider = {
     isInstalled: async () => ({ result: { isInstalled: true } }),

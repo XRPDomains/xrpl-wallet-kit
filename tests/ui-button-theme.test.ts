@@ -80,6 +80,22 @@ test("WalletButton account actions defend against host button CSS", () => {
   assert.match(styles, /\.xwk-account-panel-actions button,\.xwk-account-panel-actions a\{[^}]*line-height:1\.2/);
   assert.match(styles, /\.xwk-account-panel-actions button,\.xwk-account-panel-actions a\{[^}]*width:100%/);
   assert.match(styles, /\.xwk-account-panel-actions span\{[^}]*text-overflow:ellipsis/);
+  assert.match(styles, /\.xwk-address-qr-trigger\{[^}]*height:36px/);
+  assert.match(styles, /\.xwk-address-qr-trigger svg\{height:16px;width:16px/);
+  assert.match(styles, /\.xwk-account-close,\.xwk-account-back\{[^}]*appearance:none/);
+  assert.match(styles, /\.xwk-account-close:focus-visible,\.xwk-account-back:focus-visible\{outline:2px solid/);
+});
+
+test("WalletButton account modal reserves stable height across account and address QR views", () => {
+  const button = createButton({}) as unknown as { renderStyles(): string };
+  const styles = button.renderStyles();
+
+  assert.match(styles, /\.xwk-account-panel\{[^}]*box-sizing:border-box/);
+  assert.match(styles, /\.xwk-account-panel-modal\{[^}]*grid-template-rows:auto minmax\(0,1fr\)/);
+  assert.match(styles, /\.xwk-account-panel-modal\{[^}]*height:min\(527px,calc\(100dvh - 48px - env\(safe-area-inset-top\) - env\(safe-area-inset-bottom\)\)\)/);
+  assert.match(styles, /\.xwk-account-modal-body\{[^}]*min-height:0/);
+  assert.match(styles, /\.xwk-address-qr-content\{[^}]*min-height:100%/);
+  assert.match(styles, /@media\(max-width:520px\).*\.xwk-account-panel-modal\{[^}]*height:min\(527px,calc\(100dvh - env\(safe-area-inset-top\)\)\)/);
 });
 
 test("WalletButton pre-connect fallback icon renders SVG instead of label text", () => {
@@ -246,4 +262,96 @@ test("WalletButton balance refresh is event-driven when showBalance is enabled",
   } finally {
     (globalThis as { window?: unknown }).window = originalWindow;
   }
+});
+
+test("WalletButton account panel can show address QR without duplicating identity layout", () => {
+  const session = createSession();
+  const button = createButton({}, {
+    manager: {
+      on: () => () => undefined,
+      getSession: () => session,
+      getAccount: () => session.account
+    }
+  }) as unknown as {
+    renderPanelContent(session: WalletSession): string;
+    renderAddressQrPanelContent(session: WalletSession): string;
+    renderPanel(): string;
+    identityName: string | null;
+    addressQrOpen: boolean;
+  };
+
+  const noIdentityHtml = button.renderPanelContent(session);
+  assert.match(noIdentityHtml, /xwk-account-name-with-qr/);
+  assert.match(noIdentityHtml, /data-xwk-address-qr/);
+  assert.doesNotMatch(noIdentityHtml, /xwk-account-address/);
+
+  button.identityName = "xrpdomains.xrp";
+  const identityHtml = button.renderPanelContent(session);
+  assert.match(identityHtml, /xwk-account-address/);
+  assert.match(identityHtml, /data-xwk-address-qr/);
+  assert.doesNotMatch(identityHtml, /xwk-account-name-with-qr/);
+
+  const qrHtml = button.renderAddressQrPanelContent(session);
+  assert.match(qrHtml, /xwk-address-qr-code/);
+  assert.match(qrHtml, /rTestAddress1234567890/);
+  assert.match(qrHtml, /Copy address/);
+
+  button.addressQrOpen = true;
+  assert.match(button.renderPanel(), /data-xwk-account-back/);
+  assert.match(button.renderPanel(), /Address QR/);
+});
+
+test("WalletButton address QR render is defensive when session address is missing", () => {
+  const session = createSession();
+  const missingAddressSession = {
+    ...session,
+    account: {
+      ...session.account,
+      address: undefined
+    }
+  } as unknown as WalletSession;
+  const classicAddressSession = {
+    ...session,
+    account: {
+      ...session.account,
+      address: undefined,
+      classicAddress: "rClassicAddress1234567890"
+    }
+  } as unknown as WalletSession;
+  const button = createButton({}, {
+    manager: {
+      on: () => () => undefined,
+      getSession: () => missingAddressSession,
+      getAccount: () => missingAddressSession.account
+    }
+  }) as unknown as {
+    renderPanelContent(session: WalletSession): string;
+    renderAddressQrPanelContent(session: WalletSession): string;
+    escapeHtml(value: unknown): string;
+  };
+
+  assert.doesNotThrow(() => button.renderPanelContent(missingAddressSession));
+  assert.doesNotMatch(button.renderPanelContent(missingAddressSession), /data-xwk-address-qr/);
+  assert.equal(button.renderAddressQrPanelContent(missingAddressSession), "");
+  assert.equal(button.escapeHtml(undefined), "");
+
+  const fallbackHtml = button.renderPanelContent(classicAddressSession);
+  assert.match(fallbackHtml, /data-xwk-address-qr/);
+  assert.match(button.renderAddressQrPanelContent(classicAddressSession), /rClassicAddress1234567890/);
+});
+
+test("WalletButton address QR trigger can be disabled", () => {
+  const session = createSession();
+  const button = createButton({}, {
+    showAddressQr: false,
+    manager: {
+      on: () => () => undefined,
+      getSession: () => session,
+      getAccount: () => session.account
+    }
+  }) as unknown as {
+    renderPanelContent(session: WalletSession): string;
+  };
+
+  assert.doesNotMatch(button.renderPanelContent(session), /data-xwk-address-qr/);
 });

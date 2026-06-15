@@ -29,6 +29,8 @@ export const enUSMessages: WalletUiMessages = {
   qrUriCopied: "QR URI copied.",
   installed: "Installed",
   copyAddress: "Copy address",
+  addressQr: "Address QR",
+  showAddressQr: "Show address QR code",
   copying: "Copying...",
   viewExplorer: "View explorer",
   disconnect: "Disconnect",

@@ -44,6 +44,8 @@ When using `@xrpl-wallet-kit/client` defaults, GemWallet is already included.
   - `acceptNFTOffer` -> `acceptNFTOffer`
   - `cancelNFTOffer` -> `cancelNFTOffer`
   - `burnNFT` or `NFTokenBurn` tx type -> `burnNFT`
+  - `trustSet`, `setTrustline`, `trustset`, or `TrustSet` tx type -> `setTrustline`
+- GemWallet trust line APIs expect `limitAmount`, `qualityIn`, `qualityOut`, and `flags`, so the adapter maps XRPL `TrustSet` fields such as `LimitAmount`, `QualityIn`, `QualityOut`, and `Flags` into the provider's native payload format.
 - Transaction responses are normalized with `normalizeTxResult()` so submitted hashes can drive lifecycle events and WalletToast.
 
 ## Auto Reconnect

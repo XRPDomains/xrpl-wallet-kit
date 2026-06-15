@@ -41,6 +41,8 @@ export interface WalletUiMessages {
   qrUriCopied: string;
   installed: string;
   copyAddress: string;
+  addressQr: string;
+  showAddressQr: string;
   copying: string;
   viewExplorer: string;
   disconnect: string;

@@ -908,8 +908,8 @@ export class WalletModal {
             return "light";
         return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
-    private escapeHtml(value: string) {
-        return value.replace(/[&<>"']/g, (char) => ({
+    private escapeHtml(value: unknown) {
+        return String(value ?? "").replace(/[&<>"']/g, (char) => ({
             "&": "&amp;",
             "<": "&lt;",
             ">": "&gt;",

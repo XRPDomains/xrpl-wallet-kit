@@ -269,7 +269,31 @@ await walletKit.manager.signAndSubmit({
 });
 ```
 
-## 9. Sign a Message
+## 9. Trust Lines
+
+Set up or remove an issued-currency trust line with XRPL `TrustSet`:
+
+```js
+const session = walletKit.manager.getSession();
+
+await walletKit.manager.signAndSubmit({
+  methodHint: 'trustSet',
+  submit: true,
+  txJson: {
+    TransactionType: 'TrustSet',
+    Account: session.account.address,
+    LimitAmount: {
+      currency: 'USD',
+      issuer: 'rIssuerAddress...',
+      value: '100'
+    }
+  }
+});
+```
+
+GemWallet uses a wallet-specific `setTrustline()` payload internally. Wallet Kit maps the standard XRPL `TrustSet` fields for you.
+
+## 10. Sign a Message
 
 ```js
 const result = await walletKit.manager.signMessage({
@@ -279,7 +303,7 @@ const result = await walletKit.manager.signMessage({
 
 For some WalletConnect wallets, Wallet Kit may use a transaction proof with `Payment` and `submit: false` to produce a compatible signature flow.
 
-## 10. Production Checklist
+## 11. Production Checklist
 
 - Serve the website through HTTP/HTTPS. Do not open the HTML file directly from disk.
 - Pass a real `walletConnectProjectId` from your app config.

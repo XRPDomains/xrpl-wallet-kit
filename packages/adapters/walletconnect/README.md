@@ -60,6 +60,7 @@ Use mock `SignClient` sessions for unit tests and verify:
 - QR/deeplink events are emitted;
 - stale sessions return `null`;
 - disconnect clears WalletConnect sessions and pending state.
+- request-time stale proposal/key/pairing failures are treated as stale WalletConnect state. The adapter best-effort clears the session and pairings, then asks the user to reconnect instead of surfacing low-level SignClient key errors.
 
 ## Links
 

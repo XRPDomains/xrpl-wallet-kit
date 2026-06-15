@@ -202,6 +202,60 @@ test("transaction-style message signing adapters accept wrapped tx blob proofs",
   assert.ok(wcTxJson.txBlob?.startsWith("1200"));
 });
 
+test("WalletConnect request clears stale key state and asks user to reconnect", async () => {
+  let disconnectedTopic: string | undefined;
+  const disconnectedPairings: string[] = [];
+  const walletConnect = createWalletConnectAdapter({
+    projectId: "test-project",
+    signClient: {
+      request: async () => {
+        throw new Error("No matching key. proposal id expired");
+      },
+      disconnect: async ({ topic }: { topic: string }) => {
+        disconnectedTopic = topic;
+      },
+      core: {
+        pairing: {
+          getPairings: () => [{ topic: "pairing-a" }, { topic: "pairing-b" }],
+          disconnect: async ({ topic }: { topic: string }) => {
+            disconnectedPairings.push(topic);
+          }
+        }
+      }
+    } as never
+  }) as unknown as {
+    session: unknown;
+    activeNetwork: typeof network;
+    signAndSubmit(request: { txJson: Record<string, unknown>; submit?: boolean }): Promise<unknown>;
+  };
+  walletConnect.activeNetwork = network;
+  walletConnect.session = {
+    topic: "stale-topic",
+    namespaces: {
+      xrpl: {
+        methods: [XRPLWalletConnectMethod.SIGN_TRANSACTION],
+        accounts: [`${network.walletConnectChainId}:${account.address}`]
+      }
+    }
+  };
+
+  await assert.rejects(
+    () => walletConnect.signAndSubmit({
+      submit: true,
+      txJson: {
+        TransactionType: "Payment",
+        Account: account.address,
+        Destination: account.address,
+        Amount: "1"
+      }
+    }),
+    /WalletConnect session is stale\. Please reconnect your wallet/
+  );
+  assert.equal(disconnectedTopic, "stale-topic");
+  assert.deepEqual(disconnectedPairings, ["pairing-a", "pairing-b"]);
+  assert.equal(walletConnect.session, undefined);
+});
+
 test("extension message signing adapters reject cancel/null signature results", async () => {
   await assert.rejects(
     () => new GemWalletAdapter({

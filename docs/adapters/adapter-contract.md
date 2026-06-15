@@ -99,6 +99,8 @@ type WalletMethodHint =
   | "acceptNFTOffer"
   | "cancelNFTOffer"
   | "burnNFT"
+  | "trustSet"
+  | "setTrustline"
   | "generic";
 ```
 
@@ -111,6 +113,7 @@ Valid values:
 - `acceptNFTOffer`: XRPL `NFTokenAcceptOffer` flow.
 - `cancelNFTOffer`: XRPL `NFTokenCancelOffer` flow.
 - `burnNFT`: XRPL `NFTokenBurn` flow.
+- `trustSet` / `setTrustline`: XRPL `TrustSet` flow for trust line setup or removal.
 - `generic`: fallback for any other transaction type.
 
 Adapter guidance:
@@ -124,6 +127,7 @@ Adapter guidance:
 Per-adapter examples:
 
 - GemWallet payment APIs expect camelCase payment payloads, so the adapter maps XRPL `Payment` `txJson` into the provider's shape for `methodHint: "payment"`.
+- GemWallet trust line APIs expect camelCase trust line payloads, so the adapter maps XRPL `TrustSet` fields into `setTrustline()` payloads and accepts legacy hints such as `trustset`.
 - Wallets that accept standard XRPL JSON, such as Xaman or WalletConnect wallets, can usually use `txJson` directly.
 
 ## Auto Reconnect And `restoreSession()`

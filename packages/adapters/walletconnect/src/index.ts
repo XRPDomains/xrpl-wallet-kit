@@ -931,9 +931,63 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
         wallet: this.metadata.id,
         message: error instanceof Error ? error.message : String(error)
       });
+      if (this.isStaleWalletConnectRequestError(error)) {
+        await this.handleStaleWalletConnectRequest(method, error);
+      }
       throw error;
     } finally {
       if (timer) clearTimeout(timer);
+    }
+  }
+
+  private async handleStaleWalletConnectRequest(method: XRPLWalletConnectMethod, error: unknown): Promise<never> {
+    const topic = this.session?.topic;
+    this.debug("request_stale_session_cleanup", "custom", {
+      method,
+      wallet: this.metadata.id,
+      topic,
+      message: error instanceof Error ? error.message : String(error)
+    });
+    await this.clearStaleWalletConnectState(topic);
+    throw new Error(`${this.metadata.name} WalletConnect session is stale. Please reconnect your wallet and try again.`);
+  }
+
+  private isStaleWalletConnectRequestError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return /no matching key|proposal.*expired|proposal.*not found|pairing.*not found|session.*not found|missing.*key|keychain/i.test(message);
+  }
+
+  private async clearStaleWalletConnectState(topic?: string): Promise<void> {
+    const client = this.client;
+    if (client && topic) {
+      try {
+        await client.disconnect({ topic, reason: USER_DISCONNECTED });
+      } catch {
+        // Stale WalletConnect state often cannot be disconnected cleanly.
+      }
+    }
+    await this.clearWalletConnectPairings();
+    this.cleanup();
+  }
+
+  private async clearWalletConnectPairings(): Promise<void> {
+    const pairing = (this.client as unknown as {
+      core?: {
+        pairing?: {
+          getPairings?: () => Array<{ topic?: string }>;
+          disconnect?: (params: { topic: string }) => Promise<void>;
+        };
+      };
+    } | undefined)?.core?.pairing;
+    if (!pairing?.getPairings || !pairing.disconnect) return;
+    const pairings = pairing.getPairings();
+    for (const item of pairings) {
+      if (!item.topic) continue;
+      try {
+        await pairing.disconnect({ topic: item.topic });
+      } catch {
+        // Pairing cleanup is best-effort and should not mask the reconnect guidance.
+      }
     }
   }
 

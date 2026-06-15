@@ -31,6 +31,8 @@ export const viVNMessages: WalletUiMessages = {
   qrUriCopied: "Đã sao chép QR URI.",
   installed: "Đã cài",
   copyAddress: "Sao chép địa chỉ",
+  addressQr: "Mã QR địa chỉ",
+  showAddressQr: "Hiển thị mã QR địa chỉ",
   copying: "Đang sao chép...",
   viewExplorer: "Xem explorer",
   disconnect: "Ngắt kết nối",
@@ -45,4 +47,3 @@ export const viVNMessages: WalletUiMessages = {
   moreWallets: (count) => `+${count} ví khác`,
   accountNotActivated: (asset) => `Tài khoản chưa kích hoạt. Gửi ${asset} để kích hoạt.`
 };
-

@@ -123,7 +123,7 @@ export interface AuthenticateResult {
 
 export interface SignAndSubmitRequest {
   txJson: TransactionPayload;
-  methodHint?: "payment" | "createNFTOffer" | "acceptNFTOffer" | "cancelNFTOffer" | "burnNFT" | "generic";
+  methodHint?: "payment" | "createNFTOffer" | "acceptNFTOffer" | "cancelNFTOffer" | "burnNFT" | "trustSet" | "setTrustline" | "generic";
   walletPayload?: unknown;
   submit?: boolean;
 }
