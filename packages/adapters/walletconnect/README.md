@@ -8,7 +8,7 @@ This package provides the generic XRPL WalletConnect adapter plus built-in walle
 
 - `connect`
 - `disconnect`
-- `signMessage` when enabled and supported by the wallet
+- `signMessage` via legacy transaction proof (`xrpl_signTransaction` with `submit: false`)
 - `signTransaction`
 - `signAndSubmit`
 - `payments`
@@ -47,10 +47,22 @@ When using `@xrpl-wallet-kit/client` defaults, WalletConnect adapters are create
 - Pending return recovery markers use `WalletStorage` through `recoveryStorage`.
 - `signTransaction()` signs without submit when the connected wallet supports the method.
 - `signAndSubmit()` normalizes provider responses with `normalizeTxResult()`.
+- WalletConnect `signMessage` intentionally uses the legacy transaction-proof path: `xrpl_signTransaction` with `submit: false` and the message encoded in a Memo. This avoids unreliable `xrpl_signMessage` responses observed in some XRPL WalletConnect wallets.
+- Pass `signMessageDestination` (or `walletConnectSignMessageDestination` through `@xrpl-wallet-kit/client`) so the non-submitted proof transaction does not self-send to the connected account.
 
 ## Wallet Profiles
 
 The package includes profiles for the currently supported XRPL WalletConnect wallets in `src/wallets.ts`. Use `createWalletConnectAdapters({ wallets: [...] })` to limit the generated detail adapters.
+
+Built-in detail profiles enable `signMessage` only when the legacy transaction-proof flow has been verified:
+
+| Wallet | signMessage default | Notes |
+| --- | --- | --- |
+| Bifrost Wallet | enabled | Verified with legacy `xrpl_signTransaction` + `submit: false`. Payment, trust line, and common NFT offer flows work; `NFTokenBurn` is not supported over WalletConnect in current testing. |
+| Joey | enabled | Verified with legacy `xrpl_signTransaction` + `submit: false`. Payment, trust line, NFT offer, and `NFTokenBurn` flows work in current testing. |
+| Bitget Wallet | disabled | Message signing is disabled because the proof request can be treated as a real Payment; Payment, trust line, NFT offer, and `NFTokenBurn` flows work in current testing. |
+| Girin Wallet | disabled | Message signing is not supported; Payment, trust line, NFT offer, and `NFTokenBurn` flows work in current testing. |
+| StaticBit | disabled | Observed signing error: `Scalar is not in the interval [1,n - 1]`; QR scanning is sensitive to dark QR contrast, so the UI provides a Light QR toggle for custom QR flows. |
 
 ## Testing
 

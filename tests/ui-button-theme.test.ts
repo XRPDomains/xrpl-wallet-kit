@@ -80,8 +80,20 @@ test("WalletButton account actions defend against host button CSS", () => {
   assert.match(styles, /\.xwk-account-panel-actions button,\.xwk-account-panel-actions a\{[^}]*line-height:1\.2/);
   assert.match(styles, /\.xwk-account-panel-actions button,\.xwk-account-panel-actions a\{[^}]*width:100%/);
   assert.match(styles, /\.xwk-account-panel-actions span\{[^}]*text-overflow:ellipsis/);
-  assert.match(styles, /\.xwk-address-qr-trigger\{[^}]*height:36px/);
-  assert.match(styles, /\.xwk-address-qr-trigger svg\{height:16px;width:16px/);
+  assert.match(styles, /\.xwk-account-name-address\{[^}]*font-size:16px/);
+  assert.match(styles, /\.xwk-account-name-address\{[^}]*max-width:min\(260px,100%\)/);
+  assert.match(styles, /\.xwk-address-qr-trigger\{[^}]*height:34px/);
+  assert.match(styles, /\.xwk-address-qr-trigger\{[^}]*overflow:visible/);
+  assert.match(styles, /\.xwk-address-qr-trigger svg\{display:block;height:17px;overflow:visible;width:17px/);
+  assert.match(styles, /\.xwk-account-balance\{[^}]*align-items:center/);
+  assert.match(styles, /\.xwk-account-balance\{[^}]*display:inline-flex/);
+  assert.match(styles, /\.xwk-account-balance\{[^}]*height:42px/);
+  assert.match(styles, /\.xwk-account-balance\{[^}]*justify-content:center/);
+  assert.match(styles, /\.xwk-account-balance\{[^}]*color:#94a3b8/);
+  assert.match(styles, /\.xwk-account-warning\{[^}]*align-items:center/);
+  assert.match(styles, /\.xwk-account-warning\{[^}]*display:flex/);
+  assert.match(styles, /\.xwk-account-warning\{[^}]*justify-content:center/);
+  assert.match(styles, /\.xwk-account-warning\{[^}]*min-height:54px/);
   assert.match(styles, /\.xwk-account-close,\.xwk-account-back\{[^}]*appearance:none/);
   assert.match(styles, /\.xwk-account-close:focus-visible,\.xwk-account-back:focus-visible\{outline:2px solid/);
 });
@@ -282,6 +294,7 @@ test("WalletButton account panel can show address QR without duplicating identit
 
   const noIdentityHtml = button.renderPanelContent(session);
   assert.match(noIdentityHtml, /xwk-account-name-with-qr/);
+  assert.match(noIdentityHtml, /xwk-account-name-address/);
   assert.match(noIdentityHtml, /data-xwk-address-qr/);
   assert.doesNotMatch(noIdentityHtml, /xwk-account-address/);
 

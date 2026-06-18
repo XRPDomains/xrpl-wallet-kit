@@ -95,7 +95,7 @@
         <div class="panel-heading">
           <div>
             <h2>Transactions</h2>
-            <p>Payment and NFT offer signing with submit enabled.</p>
+            <p>Payment, NFT offer, and NFT burn signing with submit enabled.</p>
           </div>
         </div>
         <div class="lab-grid">
@@ -166,6 +166,26 @@
               <button id="nft-accept-submit-button" type="button">Accept NFT offer</button>
             </div>
             <pre id="nft-accept-result">Connect a wallet to test NFT Offer accept.</pre>
+          </div>
+
+          <div class="lab">
+            <h3>Burn NFT</h3>
+            <label>
+              <span>NFTokenID</span>
+              <input id="nft-burn-token-id" placeholder="0008..." />
+            </label>
+            <label>
+              <span>Owner address optional</span>
+              <input id="nft-burn-owner" placeholder="r..." />
+            </label>
+            <label>
+              <span>Memo optional</span>
+              <input id="nft-burn-memo" placeholder="test memo" />
+            </label>
+            <div class="lab-actions">
+              <button id="nft-burn-submit-button" type="button">Burn NFT</button>
+            </div>
+            <pre id="nft-burn-result">Connect a wallet to test NFT Burn.</pre>
           </div>
         </div>
       </section>

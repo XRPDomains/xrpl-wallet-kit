@@ -17,6 +17,7 @@ export const XRPL_WALLETCONNECT_WALLETS: WalletConnectWalletConfig[] = [
     links: { universal: "https://staticbit.app/wc" },
     qrMode: "walletconnect",
     useModal: false,
+    signMessage: false,
     icon: STATICBIT_ICON
   },
   {
@@ -31,6 +32,7 @@ export const XRPL_WALLETCONNECT_WALLETS: WalletConnectWalletConfig[] = [
     },
     qrMode: "walletconnect",
     useModal: false,
+    signMessage: false,
     deeplink: walletConnectDeeplinks.bitget,
     icon: BITGET_ICON
   },
@@ -46,6 +48,7 @@ export const XRPL_WALLETCONNECT_WALLETS: WalletConnectWalletConfig[] = [
     },
     qrMode: "walletconnect",
     useModal: false,
+    signMessage: true,
     deeplink: walletConnectDeeplinks.joey,
     icon: JOEY_ICON
   },
@@ -61,6 +64,7 @@ export const XRPL_WALLETCONNECT_WALLETS: WalletConnectWalletConfig[] = [
     },
     qrMode: "walletconnect",
     useModal: false,
+    signMessage: false,
     icon: GIRIN_ICON
   },
   {
@@ -75,6 +79,7 @@ export const XRPL_WALLETCONNECT_WALLETS: WalletConnectWalletConfig[] = [
     },
     qrMode: "walletconnect",
     useModal: false,
+    signMessage: true,
     deeplink: walletConnectDeeplinks.bifrost,
     icon: BIFROST_ICON
   }

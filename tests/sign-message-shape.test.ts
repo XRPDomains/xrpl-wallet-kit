@@ -256,6 +256,258 @@ test("WalletConnect request clears stale key state and asks user to reconnect", 
   assert.equal(walletConnect.session, undefined);
 });
 
+test("WalletConnect preflights stale pairing state before sending a session request", async () => {
+  let requestCalled = false;
+  let disconnectedTopic: string | undefined;
+  const disconnectedPairings: string[] = [];
+  const session = {
+    topic: "stale-topic",
+    pairingTopic: "missing-pairing",
+    expiry: Math.floor(Date.now() / 1000) + 3600,
+    namespaces: {
+      xrpl: {
+        methods: [XRPLWalletConnectMethod.SIGN_TRANSACTION],
+        accounts: [`${network.walletConnectChainId}:${account.address}`]
+      }
+    }
+  };
+  const walletConnect = createWalletConnectAdapter({
+    projectId: "test-project",
+    signClient: {
+      request: async () => {
+        requestCalled = true;
+        return { tx_json: { hash: "SHOULD_NOT_HAPPEN" } };
+      },
+      disconnect: async ({ topic }: { topic: string }) => {
+        disconnectedTopic = topic;
+      },
+      session: {
+        get: () => session,
+        getAll: () => [session]
+      },
+      core: {
+        pairing: {
+          getPairings: () => [{ topic: "other-pairing" }],
+          disconnect: async ({ topic }: { topic: string }) => {
+            disconnectedPairings.push(topic);
+          }
+        }
+      }
+    } as never
+  }) as unknown as {
+    session: unknown;
+    activeNetwork: typeof network;
+    signAndSubmit(request: { txJson: Record<string, unknown>; submit?: boolean }): Promise<unknown>;
+  };
+  walletConnect.activeNetwork = network;
+  walletConnect.session = session;
+
+  await assert.rejects(
+    () => walletConnect.signAndSubmit({
+      submit: true,
+      txJson: {
+        TransactionType: "Payment",
+        Account: account.address,
+        Destination: "rDestinationForPayment",
+        Amount: "1"
+      }
+    }),
+    /WalletConnect session is stale\. Please reconnect your wallet/
+  );
+
+  assert.equal(requestCalled, false);
+  assert.equal(disconnectedTopic, "stale-topic");
+  assert.deepEqual(disconnectedPairings, ["other-pairing"]);
+  assert.equal(walletConnect.session, undefined);
+});
+
+test("WalletConnect signMessage uses legacy xrpl_signTransaction submit false proof", async () => {
+  const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+  const debugEvents: Array<{ step: string; detail?: Record<string, unknown> }> = [];
+  const walletConnect = createWalletConnectAdapter({
+    projectId: "test-project",
+    signRequestTimeoutMs: 1,
+    signClient: {
+      request: async ({ request }: { request: { method: string; params: Record<string, unknown> } }) => {
+        requests.push(request);
+        return { response: { data: { tx_blob: "LEGACY_WC_TX" } } };
+      }
+    } as never,
+    onDebug: (event) => debugEvents.push(event)
+  }) as unknown as {
+    session: unknown;
+    activeNetwork: typeof network;
+    signMessage(request: { message: string; account: typeof account }): Promise<{ signatureKind: string; proof?: string; txBlob?: string }>;
+  };
+  walletConnect.activeNetwork = network;
+  walletConnect.session = {
+    topic: "topic",
+    namespaces: {
+      xrpl: {
+        methods: [
+          XRPLWalletConnectMethod.SIGN_MESSAGE,
+          XRPLWalletConnectMethod.SIGN_TRANSACTION,
+          XRPLWalletConnectMethod.SIGN_TRANSACTION_FOR
+        ],
+        accounts: [`${network.walletConnectChainId}:${account.address}`]
+      }
+    }
+  };
+
+  const result = await walletConnect.signMessage({ message: "hello", account });
+
+  assert.equal(result.signatureKind, "signedTx");
+  assert.equal(result.proof, "LEGACY_WC_TX");
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].method, XRPLWalletConnectMethod.SIGN_TRANSACTION);
+  assert.equal(requests[0].params.submit, false);
+  assert.equal("autofill" in requests[0].params, false);
+  assert.equal("tx_json" in requests[0].params, true);
+  assert.equal("txJson" in requests[0].params, false);
+  assert.equal("transaction" in requests[0].params, false);
+  const start = debugEvents.find((event) => event.step === "request_start");
+  assert.equal(start?.detail?.timeoutMs, 120000);
+});
+
+test("WalletConnect uses the long request timeout for submitted transactions", async () => {
+  const debugEvents: Array<{ step: string; detail?: Record<string, unknown> }> = [];
+  const requests: Array<{ params: Record<string, unknown> }> = [];
+  const walletConnect = createWalletConnectAdapter({
+    projectId: "test-project",
+    signRequestTimeoutMs: 1,
+    signClient: {
+      request: async ({ request }: { request: { params: Record<string, unknown> } }) => {
+        requests.push(request);
+        return { tx_json: { hash: "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890" } };
+      }
+    } as never,
+    onDebug: (event) => debugEvents.push(event)
+  }) as unknown as {
+    session: unknown;
+    activeNetwork: typeof network;
+    signAndSubmit(request: { txJson: Record<string, unknown>; submit?: boolean }): Promise<unknown>;
+  };
+  walletConnect.activeNetwork = network;
+  walletConnect.session = {
+    topic: "topic",
+    namespaces: {
+      xrpl: {
+        methods: [XRPLWalletConnectMethod.SIGN_TRANSACTION],
+        accounts: [`${network.walletConnectChainId}:${account.address}`]
+      }
+    }
+  };
+
+  await walletConnect.signAndSubmit({
+    submit: true,
+    txJson: {
+      TransactionType: "Payment",
+      Account: account.address,
+      Destination: "rDestinationForPayment",
+      Amount: "1"
+    }
+  });
+
+  const start = debugEvents.find((event) => event.step === "request_start");
+  assert.equal(start?.detail?.method, XRPLWalletConnectMethod.SIGN_TRANSACTION);
+  assert.equal(start?.detail?.timeoutMs, 120000);
+  assert.equal("submit" in requests[0].params, false);
+  assert.equal("tx_json" in requests[0].params, true);
+  assert.equal("autofill" in requests[0].params, false);
+});
+
+test("WalletConnect restoreSession ignores sessions from another detail wallet profile", async () => {
+  const bitgetSession = {
+    topic: "bitget-topic",
+    expiry: Math.floor(Date.now() / 1000) + 3600,
+    namespaces: {
+      xrpl: {
+        methods: [XRPLWalletConnectMethod.SIGN_TRANSACTION],
+        accounts: [`${network.walletConnectChainId}:${account.address}`]
+      }
+    },
+    peer: {
+      metadata: {
+        name: "Bitget Wallet"
+      }
+    }
+  };
+  const joey = createWalletConnectAdapter({
+    id: "joey",
+    name: "Joey",
+    projectId: "test-project",
+    signClient: {
+      session: {
+        get: () => bitgetSession,
+        getAll: () => [bitgetSession]
+      }
+    } as never
+  });
+
+  const restored = await joey.restoreSession({
+    adapterId: "joey",
+    account: { ...account, network },
+    connectedAt: Date.now(),
+    metadata: { topic: "bitget-topic" }
+  });
+
+  assert.equal(restored, null);
+});
+
+test("WalletConnect strips nullish transaction fields before sending wallet requests", async () => {
+  let txJson: Record<string, unknown> | undefined;
+  let params: Record<string, unknown> | undefined;
+  const walletConnect = createWalletConnectAdapter({
+    projectId: "test-project",
+    signClient: {
+      request: async ({ request }: { request: { params: Record<string, unknown> & { tx_json: Record<string, unknown> } } }) => {
+        params = request.params;
+        txJson = request.params.tx_json;
+        return { tx_json: { hash: "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890" } };
+      }
+    } as never
+  }) as unknown as {
+    session: unknown;
+    activeNetwork: typeof network;
+    signAndSubmit(request: { txJson: Record<string, unknown>; submit?: boolean }): Promise<unknown>;
+  };
+  walletConnect.activeNetwork = network;
+  walletConnect.session = {
+    topic: "topic",
+    namespaces: {
+      xrpl: {
+        methods: [XRPLWalletConnectMethod.SIGN_TRANSACTION],
+        accounts: [`${network.walletConnectChainId}:${account.address}`]
+      }
+    }
+  };
+
+  await walletConnect.signAndSubmit({
+    submit: true,
+    txJson: {
+      TransactionType: "NFTokenBurn",
+      Account: account.address,
+      NFTokenID: "00080000ABCDEF",
+      Owner: undefined,
+      Destination: null,
+      Memos: [
+        { Memo: { MemoData: "74657374", MemoFormat: undefined } }
+      ]
+    }
+  });
+
+  assert.deepEqual(txJson, {
+    TransactionType: "NFTokenBurn",
+    Account: account.address,
+    NFTokenID: "00080000ABCDEF",
+    Memos: [
+      { Memo: { MemoData: "74657374" } }
+    ]
+  });
+  assert.equal("submit" in (params ?? {}), false);
+  assert.equal("autofill" in (params ?? {}), false);
+});
+
 test("extension message signing adapters reject cancel/null signature results", async () => {
   await assert.rejects(
     () => new GemWalletAdapter({

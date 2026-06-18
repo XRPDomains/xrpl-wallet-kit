@@ -54,7 +54,27 @@ export function normalizeTxResult(raw: unknown): TxResult {
     "response.data.tx_hash",
     "response.data.transactionHash",
     "response.data.transaction_hash",
-    "response.data.resp.result.hash"
+    "response.data.result.hash",
+    "response.data.result.txid",
+    "response.data.result.txHash",
+    "response.data.result.tx_hash",
+    "response.data.result.transactionHash",
+    "response.data.result.transaction_hash",
+    "response.data.result.tx_json.hash",
+    "response.data.resp.result.hash",
+    "result.response.hash",
+    "result.response.txid",
+    "result.response.txHash",
+    "result.response.tx_hash",
+    "result.response.transactionHash",
+    "result.response.transaction_hash",
+    "result.response.data.hash",
+    "result.response.data.txid",
+    "result.response.data.txHash",
+    "result.response.data.tx_hash",
+    "result.response.data.transactionHash",
+    "result.response.data.transaction_hash",
+    "result.response.data.result.hash"
   ]);
   const status = pickPath(raw, ["status", "result", "engine_result", "result.engine_result", "result.meta.TransactionResult", "response.data.resp.result.meta.TransactionResult"]);
   const signed = pickPath(raw, ["signed"]);

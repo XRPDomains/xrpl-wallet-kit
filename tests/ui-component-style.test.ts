@@ -54,13 +54,17 @@ test("WalletModal clamps long adapter errors before display", () => {
     themeMode: "light"
   }) as unknown as {
     getFriendlyErrorMessage(error: unknown): string;
+    isTimeoutError(error: unknown, message: string): boolean;
     renderStyles(theme: typeof lightTheme, layout: "list", size: "default", textSize: "sm"): string;
   };
   const longJson = JSON.stringify({ message: "Snap failed", data: "x".repeat(900) });
   const message = modal.getFriendlyErrorMessage(new Error(longJson));
+  const wrappedTimeout = new Error("Failed to connect Girin Wallet: WalletConnect connection timed out. Please try again.");
   const styles = modal.renderStyles(lightTheme, "list", "default", "sm");
 
   assert.equal(message, "Wallet request failed. Please try again.");
+  assert.equal(modal.getFriendlyErrorMessage(wrappedTimeout), "Wallet request timed out. Please try again.");
+  assert.equal(modal.isTimeoutError(wrappedTimeout, wrappedTimeout.message), true);
   assert.match(styles, /\.xwk-status\{[^}]*overflow-wrap:anywhere/);
   assert.match(styles, /\.xwk-qr-message span\{[^}]*overflow-wrap:anywhere/);
 });
@@ -94,6 +98,27 @@ test("WalletModal visual states use semantic theme tokens", () => {
   assert.match(mobileOverrides, /\.xwk-close:focus-visible,\.xwk-back:focus-visible\{outline:2px solid #123abc!important/);
   assert.match(modal.checkIcon(), /fill="currentColor"/);
   assert.doesNotMatch(styles, /#1d9bf0|#64748b|rgba\(148,163,184/);
+});
+
+test("WalletModal custom QR supports light QR mode without changing modal frame", () => {
+  const modal = new WalletModal({
+    manager: manager as never,
+    themeMode: "dark"
+  }) as unknown as {
+    renderStyles(theme: typeof lightTheme, layout: "list", size: "default", textSize: "sm"): string;
+  };
+  const styles = modal.renderStyles(lightTheme, "list", "default", "sm");
+
+  assert.match(styles, /\.xwk-qr-code-wrap\{position:relative/);
+  assert.match(styles, /\.xwk-qr-code-light\{background:#fff;padding:8px\}/);
+  assert.match(styles, /\.xwk-qr-theme-action\{[^}]*position:absolute/);
+  assert.match(styles, /\.xwk-qr-theme-action\{[^}]*height:34px/);
+  assert.match(styles, /\.xwk-qr-theme-action\{[^}]*opacity:0/);
+  assert.match(styles, /\.xwk-qr-theme-action\{[^}]*pointer-events:none/);
+  assert.match(styles, /\.xwk-qr-code-wrap:hover \.xwk-qr-theme-action,[^}]*\.xwk-qr-theme-action:focus-visible\{opacity:1;pointer-events:auto\}/);
+  assert.match(styles, /\.xwk-qr-card-actions-dual\{grid-template-columns:repeat\(auto-fit,minmax\(0,1fr\)\)\}/);
+  assert.match(styles, /\.xwk-qr-card-actions-dual\{grid-template-columns:1fr\}/);
+  assert.doesNotMatch(styles, /transition:[^}]*height/);
 });
 
 test("WalletModal installs shared styles instead of reinjecting inline style tags", () => {

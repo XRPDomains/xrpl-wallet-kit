@@ -107,6 +107,7 @@ window.walletKit = XRPLWalletKitLegacyBridge.mount({
 
   xamanClientId: window.APP_CONFIG.xamanClientId,
   walletConnectProjectId: window.APP_CONFIG.walletConnectProjectId,
+  walletConnectSignMessageDestination: window.APP_CONFIG.walletConnectSignMessageDestination,
 
   showWeb3Name: true,
   showBalance: true,
@@ -302,6 +303,7 @@ const result = await walletKit.manager.signMessage({
 ```
 
 For some WalletConnect wallets, Wallet Kit may use a transaction proof with `Payment` and `submit: false` to produce a compatible signature flow.
+Set `walletConnectSignMessageDestination` to a valid XRPL address controlled by your app or a harmless sink account. Do not let this fallback self-send to the connected account, because some wallets reject redundant self-payments before signing.
 
 ## 11. Production Checklist
 

@@ -60,6 +60,7 @@ export interface CreateWalletClientOptions extends Omit<WalletManagerConfig, "ad
   adapters?: WalletAdapter[];
   storage?: WalletManagerConfig["storage"] | "localStorage" | "memory";
   walletConnectProjectId?: string;
+  walletConnectSignMessageDestination?: string;
   xamanClientId?: string;
   wallets?: "all" | WalletKitAdapterId[];
   ui?: WalletKitUiConfig;
@@ -182,6 +183,7 @@ function createDefaultAdapters(options: CreateWalletClientOptions, onQr: (event:
         icons: options.appIcons ?? []
       }),
       onQr,
+      signMessageDestination: options.walletConnectSignMessageDestination,
       useModal: walletConnectUiMode === "default" ? true : undefined,
       modalMode: walletConnectUiMode === "default" ? "always" : undefined
     }));
@@ -309,6 +311,7 @@ function withoutKitOnlyOptions(options: CreateWalletClientOptions): WalletManage
     adapters: _adapters,
     storage: _storage,
     walletConnectProjectId: _walletConnectProjectId,
+    walletConnectSignMessageDestination: _walletConnectSignMessageDestination,
     xamanClientId: _xamanClientId,
     wallets: _wallets,
     ui: _ui,

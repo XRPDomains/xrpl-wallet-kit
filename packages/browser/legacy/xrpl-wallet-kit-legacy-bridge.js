@@ -271,6 +271,7 @@
       autoReconnect: options.autoReconnect !== false,
       xamanClientId: options.xamanClientId,
       walletConnectProjectId: options.walletConnectProjectId,
+      walletConnectSignMessageDestination: options.walletConnectSignMessageDestination,
       wallets: options.wallets || ['xaman', 'gemwallet', 'crossmark', 'dropfi', 'xrplsnap', 'walletconnect'],
       ui: ui,
       identity: options.identityRoot,

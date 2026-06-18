@@ -17,7 +17,7 @@ import {
   normalizeTxResult,
   validateWalletAdapter
 } from "../packages/core/src/index";
-import { WALLETCONNECT_ICON, XRPL_WALLETCONNECT_WALLETS, createWalletConnectAdapter } from "../packages/adapters/walletconnect/src/index";
+import { WALLETCONNECT_ICON, XRPL_WALLETCONNECT_WALLETS, createWalletConnectAdapter, createWalletConnectAdapters } from "../packages/adapters/walletconnect/src/index";
 import { normalizeWalletUiLocale, resolveWalletUiMessages } from "../packages/ui/src/index";
 
 const network = {
@@ -442,6 +442,28 @@ test("WalletConnect built-in detail wallets preserve wallet-specific icons", () 
   }
 });
 
+test("WalletConnect detail adapters advertise signMessage only for verified profiles", () => {
+  const adapters = createWalletConnectAdapters({
+    projectId: "test-project",
+    mode: "details",
+    wallets: ["staticbit", "bitget", "joey", "girin", "bifrost"]
+  });
+
+  assert.deepEqual(adapters.map((adapter) => adapter.metadata.id), ["staticbit", "bitget", "joey", "girin", "bifrost"]);
+  assert.deepEqual(adapters.map((adapter) => adapter.capabilities.signMessage), [false, false, true, false, true]);
+});
+
+test("WalletConnect optional namespaces avoid xrpl_signMessage for legacy transaction-proof signing", () => {
+  const adapter = createWalletConnectAdapter({
+    projectId: "test-project",
+    signMessage: true
+  }) as unknown as {
+    createOptionalNamespaces(network: typeof network): Record<string, { methods: string[] }>;
+  };
+
+  assert.deepEqual(adapter.createOptionalNamespaces(network).xrpl.methods, ["xrpl_signTransactionFor"]);
+});
+
 test("WalletConnect validates missing chain id only when WalletConnect paths need it", () => {
   const adapter = createWalletConnectAdapter({
     projectId: "test-project",
@@ -863,6 +885,7 @@ test("normalizeTxResult extracts wallet-specific transaction hash shapes", () =>
   assert.equal(normalizeTxResult({ type: "response", result: { hash: "gem-hash" } }).hash, "gem-hash");
   assert.equal(normalizeTxResult({ result: { txHash: "camel-hash" } }).hash, "camel-hash");
   assert.equal(normalizeTxResult({ response: { data: { transaction_hash: "snake-hash" } } }).hash, "snake-hash");
+  assert.equal(normalizeTxResult({ result: { response: { data: { result: { hash: "walletconnect-hash" } } } } }).hash, "walletconnect-hash");
 });
 
 test("Wallet UI messages resolve locale defaults and caller overrides", () => {

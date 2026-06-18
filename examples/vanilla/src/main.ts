@@ -44,6 +44,11 @@ const nftBuyOfferInput = document.querySelector<HTMLInputElement>("#nft-buy-offe
 const nftBrokerFeeInput = document.querySelector<HTMLInputElement>("#nft-broker-fee")!;
 const nftAcceptSubmitButton = document.querySelector<HTMLButtonElement>("#nft-accept-submit-button")!;
 const nftAcceptResult = document.querySelector<HTMLPreElement>("#nft-accept-result")!;
+const nftBurnTokenIdInput = document.querySelector<HTMLInputElement>("#nft-burn-token-id")!;
+const nftBurnOwnerInput = document.querySelector<HTMLInputElement>("#nft-burn-owner")!;
+const nftBurnMemoInput = document.querySelector<HTMLInputElement>("#nft-burn-memo")!;
+const nftBurnSubmitButton = document.querySelector<HTMLButtonElement>("#nft-burn-submit-button")!;
+const nftBurnResult = document.querySelector<HTMLPreElement>("#nft-burn-result")!;
 const signMessageInput = document.querySelector<HTMLTextAreaElement>("#sign-message")!;
 const signMessageButton = document.querySelector<HTMLButtonElement>("#sign-message-button")!;
 const resetMessageButton = document.querySelector<HTMLButtonElement>("#reset-message-button")!;
@@ -84,7 +89,7 @@ walletConnectMode.addEventListener("change", () => {
 paymentSubmitButton.addEventListener("click", () => {
   submitPayment().catch((error) => {
     const message = formatError(error);
-    paymentResult.textContent = message;
+    showTransactionError(paymentResult, message);
     log("payment_error", { message });
   });
 });
@@ -92,7 +97,7 @@ paymentSubmitButton.addEventListener("click", () => {
 nftOfferSubmitButton.addEventListener("click", () => {
   submitNftOffer().catch((error) => {
     const message = formatError(error);
-    nftOfferResult.textContent = message;
+    showTransactionError(nftOfferResult, message);
     log("nft_offer_error", { message });
   });
 });
@@ -100,8 +105,16 @@ nftOfferSubmitButton.addEventListener("click", () => {
 nftAcceptSubmitButton.addEventListener("click", () => {
   acceptNftOffer().catch((error) => {
     const message = formatError(error);
-    nftAcceptResult.textContent = message;
+    showTransactionError(nftAcceptResult, message);
     log("nft_accept_error", { message });
+  });
+});
+
+nftBurnSubmitButton.addEventListener("click", () => {
+  submitNftBurn().catch((error) => {
+    const message = formatError(error);
+    showTransactionError(nftBurnResult, message);
+    log("nft_burn_error", { message });
   });
 });
 
@@ -268,11 +281,13 @@ function renderTransactionState() {
   paymentSubmitButton.disabled = !canSignAndSubmit;
   nftOfferSubmitButton.disabled = !canSignAndSubmit;
   nftAcceptSubmitButton.disabled = !canSignAndSubmit;
+  nftBurnSubmitButton.disabled = !canSignAndSubmit;
 
   if (!current) {
     paymentResult.textContent = "Connect a wallet to test Payment signAndSubmit.";
     nftOfferResult.textContent = "Connect a wallet to test NFT Offer signAndSubmit.";
     nftAcceptResult.textContent = "Connect a wallet to test NFT Offer accept.";
+    nftBurnResult.textContent = "Connect a wallet to test NFT Burn.";
     return;
   }
 
@@ -281,6 +296,7 @@ function renderTransactionState() {
     paymentResult.textContent = message;
     nftOfferResult.textContent = message;
     nftAcceptResult.textContent = message;
+    nftBurnResult.textContent = message;
   }
 }
 
@@ -332,9 +348,11 @@ async function submitPayment() {
     destination
   };
 
-  paymentResult.textContent = "Requesting Payment signature and submit...";
-  const result = await manager.signAndSubmit({ txJson, walletPayload, methodHint: "payment", submit: true });
-  paymentResult.textContent = JSON.stringify({ txJson, result }, null, 2);
+  const requestPreview = createTransactionRequestPreview({ txJson, walletPayload, methodHint: "payment", submit: true });
+  showTransactionRequest(paymentResult, "Requesting Payment signature and submit...", requestPreview);
+  log("payment_request", requestPreview);
+  const result = await manager.signAndSubmit(requestPreview);
+  paymentResult.textContent = JSON.stringify({ requestPreview, result }, null, 2);
 }
 
 async function submitNftOffer() {
@@ -363,9 +381,11 @@ async function submitNftOffer() {
     ...(destination ? { destination } : {})
   };
 
-  nftOfferResult.textContent = "Requesting NFT Offer signature and submit...";
-  const result = await manager.signAndSubmit({ txJson, walletPayload, methodHint: "createNFTOffer", submit: true });
-  nftOfferResult.textContent = JSON.stringify({ txJson, result }, null, 2);
+  const requestPreview = createTransactionRequestPreview({ txJson, walletPayload, methodHint: "createNFTOffer", submit: true });
+  showTransactionRequest(nftOfferResult, "Requesting NFT Offer signature and submit...", requestPreview);
+  log("nft_offer_request", requestPreview);
+  const result = await manager.signAndSubmit(requestPreview);
+  nftOfferResult.textContent = JSON.stringify({ requestPreview, result }, null, 2);
 }
 
 async function acceptNftOffer() {
@@ -389,9 +409,69 @@ async function acceptNftOffer() {
     ...(brokerFee ? { NFTokenBrokerFee: brokerFee } : {})
   };
 
-  nftAcceptResult.textContent = "Requesting NFT Offer accept signature and submit...";
-  const result = await manager.signAndSubmit({ txJson, walletPayload, methodHint: "acceptNFTOffer", submit: true });
-  nftAcceptResult.textContent = JSON.stringify({ txJson, result }, null, 2);
+  const requestPreview = createTransactionRequestPreview({ txJson, walletPayload, methodHint: "acceptNFTOffer", submit: true });
+  showTransactionRequest(nftAcceptResult, "Requesting NFT Offer accept signature and submit...", requestPreview);
+  log("nft_accept_request", requestPreview);
+  const result = await manager.signAndSubmit(requestPreview);
+  nftAcceptResult.textContent = JSON.stringify({ requestPreview, result }, null, 2);
+}
+
+async function submitNftBurn() {
+  const current = requireActiveSignAndSubmitWallet();
+  const tokenId = nftBurnTokenIdInput.value.trim();
+  const owner = nftBurnOwnerInput.value.trim();
+  const memo = nftBurnMemoInput.value.trim();
+  if (!tokenId) throw new Error("NFTokenID is required.");
+  if (!/^[A-Fa-f0-9]{64}$/.test(tokenId)) throw new Error("NFTokenID must be a 64-character hex string.");
+
+  const txJson: TransactionPayload = {
+    TransactionType: "NFTokenBurn",
+    Account: current.account.address,
+    NFTokenID: tokenId.toUpperCase(),
+    ...(owner ? { Owner: owner } : {}),
+    ...(memo ? { Memos: [{ Memo: { MemoData: stringToHex(memo) } }] } : {})
+  };
+  const walletPayload = {
+    NFTokenID: tokenId.toUpperCase(),
+    ...(owner ? { owner } : {})
+  };
+
+  const requestPreview = createTransactionRequestPreview({ txJson, walletPayload, methodHint: "burnNFT", submit: true });
+  showTransactionRequest(nftBurnResult, "Requesting NFT Burn signature and submit...", requestPreview);
+  log("nft_burn_request", requestPreview);
+  const result = await manager.signAndSubmit(requestPreview);
+  nftBurnResult.textContent = JSON.stringify({ requestPreview, result }, null, 2);
+}
+
+function createTransactionRequestPreview(request: {
+  txJson: TransactionPayload;
+  walletPayload?: unknown;
+  methodHint: "payment" | "createNFTOffer" | "acceptNFTOffer" | "burnNFT";
+  submit: true;
+}) {
+  return request;
+}
+
+function showTransactionRequest(target: HTMLPreElement, status: string, requestPreview: unknown) {
+  target.textContent = JSON.stringify({ status, requestPreview }, null, 2);
+}
+
+function showTransactionError(target: HTMLPreElement, message: string) {
+  const current = parsePreJson(target);
+  if (current && typeof current === "object" && "requestPreview" in current) {
+    target.textContent = JSON.stringify({ ...current, error: message }, null, 2);
+    return;
+  }
+  target.textContent = message;
+}
+
+function parsePreJson(target: HTMLPreElement): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(target.textContent || "");
+    return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
 }
 
 function requireActiveSignAndSubmitWallet() {
@@ -400,6 +480,13 @@ function requireActiveSignAndSubmitWallet() {
   const adapter = manager.getAdapter();
   if (!adapter?.capabilities.signAndSubmit) throw new Error(`${current.wallet?.name ?? current.adapterId} does not support signAndSubmit.`);
   return current;
+}
+
+function stringToHex(value: string) {
+  return Array.from(new TextEncoder().encode(value))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
 }
 
 function xrpToDrops(value: string) {
