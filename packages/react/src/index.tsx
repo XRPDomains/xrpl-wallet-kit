@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { WalletAccount, WalletCapabilities, WalletManager, WalletMetadata, WalletSession } from "@xrpl-wallet-kit/core";
 import { createWalletButton, createWalletModal } from "@xrpl-wallet-kit/ui";
 import type { WalletButtonController, WalletButtonOptions, WalletModal, WalletUiConfig } from "@xrpl-wallet-kit/ui";
@@ -27,15 +27,25 @@ export interface WalletKitProviderProps {
 export type ReactWalletButtonProps = Partial<Omit<WalletButtonOptions, "manager" | "modal" | "target">>;
 
 const WalletKitContext = createContext<WalletKitContextValue | null>(null);
+const useClientLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export function WalletKitProvider(props: WalletKitProviderProps) {
   const [session, setSession] = useState<WalletSession | null>(props.manager.getSession());
   const [status, setStatus] = useState<WalletKitStatus>(props.manager.getSession() ? "connected" : "disconnected");
+  const [modal, setModal] = useState<WalletModal | null>(null);
   const modalRef = useRef<WalletModal | null>(null);
 
-  if (!modalRef.current && typeof document !== "undefined") {
-    modalRef.current = createWalletModal({ manager: props.manager, ...props.ui });
-  }
+  useClientLayoutEffect(() => {
+    if (typeof document === "undefined") return;
+    const nextModal = createWalletModal({ manager: props.manager, ...props.ui });
+    modalRef.current = nextModal;
+    setModal(nextModal);
+    return () => {
+      nextModal.destroy();
+      if (modalRef.current === nextModal) modalRef.current = null;
+      setModal(null);
+    };
+  }, [props.manager]);
 
   useEffect(() => {
     modalRef.current?.updateOptions(props.ui ?? {});
@@ -80,14 +90,11 @@ export function WalletKitProvider(props: WalletKitProviderProps) {
       offStale();
       offExpired();
       offError();
-      modalRef.current?.destroy();
-      modalRef.current = null;
     };
   }, [props.manager]);
 
-  const value = useMemo<WalletKitContextValue>(() => {
-    const modal = modalRef.current;
-    if (!modal) throw new Error("Wallet Kit React UI requires a browser document");
+  const value = useMemo<WalletKitContextValue | null>(() => {
+    if (!modal) return null;
     return {
       manager: props.manager,
       account: session?.account ?? null,
@@ -100,7 +107,9 @@ export function WalletKitProvider(props: WalletKitProviderProps) {
       closeModal: () => modal.close(),
       modal
     };
-  }, [props.manager, session, status]);
+  }, [props.manager, session, status, modal]);
+
+  if (!value) return null;
 
   return <WalletKitContext.Provider value={value}>{props.children}</WalletKitContext.Provider>;
 }

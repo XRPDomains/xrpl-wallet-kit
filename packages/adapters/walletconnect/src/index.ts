@@ -694,17 +694,11 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     return (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
   }
 
-  private createRequiredNamespaces(network: XrplNetwork) {
-    const chainId = this.requireWalletConnectChainId(network);
-    return {
-      [XRPL_NAMESPACE]: {
-        chains: [chainId],
-        methods: [
-          XRPLWalletConnectMethod.SIGN_TRANSACTION
-        ],
-        events: []
-      }
-    };
+  private createRequiredNamespaces(_network: XrplNetwork) {
+    // requiredNamespaces is deprecated in WalletConnect SDK v2 — the SDK
+    // auto-assigns them to optionalNamespaces anyway, but logs a warning.
+    // Return empty to silence the deprecation warning cleanly.
+    return {};
   }
 
   private createOptionalNamespaces(network: XrplNetwork) {
@@ -713,6 +707,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
       [XRPL_NAMESPACE]: {
         chains: [chainId],
         methods: [
+          XRPLWalletConnectMethod.SIGN_TRANSACTION,      // moved from requiredNamespaces
           XRPLWalletConnectMethod.SIGN_TRANSACTION_FOR
         ],
         events: []

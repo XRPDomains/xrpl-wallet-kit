@@ -1,5 +1,6 @@
 import { WalletManager, createBrowserWalletStorage } from "../../../packages/core/src";
 import { Buffer } from "buffer";
+import { createWalletAuth, formatAuthMessage } from "../../../packages/auth/src";
 import { createDefaultWalletButtonConfig, createDefaultWalletUiConfig } from "../../../packages/ui/src";
 import type { TransactionPayload, WalletAdapter } from "../../../packages/core/src";
 import type { WalletUiLayout, WalletUiThemeMode } from "../../../packages/ui/src";
@@ -53,6 +54,9 @@ const signMessageInput = document.querySelector<HTMLTextAreaElement>("#sign-mess
 const signMessageButton = document.querySelector<HTMLButtonElement>("#sign-message-button")!;
 const resetMessageButton = document.querySelector<HTMLButtonElement>("#reset-message-button")!;
 const signResult = document.querySelector<HTMLPreElement>("#sign-result")!;
+const authStatementInput = document.querySelector<HTMLInputElement>("#auth-statement")!;
+const authSignInButton = document.querySelector<HTMLButtonElement>("#auth-sign-in-button")!;
+const authResult = document.querySelector<HTMLPreElement>("#auth-result")!;
 
 type WalletConnectMode = "default" | "list" | "group";
 type SignMessagePreviewAdapter = WalletAdapter & {
@@ -128,6 +132,14 @@ signMessageButton.addEventListener("click", () => {
 
 resetMessageButton.addEventListener("click", () => {
   setDefaultSignMessage();
+});
+
+authSignInButton.addEventListener("click", () => {
+  signInWithAuthServer().catch((error) => {
+    const message = formatError(error);
+    authResult.textContent = message;
+    log("auth_sign_in_error", { message });
+  });
 });
 
 setDefaultSignMessage();
@@ -235,18 +247,21 @@ async function bootstrap(run = bootstrapRun) {
     renderSession();
     renderTransactionState();
     renderSigningState();
+    renderAuthState();
   });
   manager.on("disconnected", (event) => {
     log("disconnected", event);
     renderSession();
     renderTransactionState();
     renderSigningState();
+    renderAuthState();
   });
   manager.on("session_restored", (event) => {
     log("session_restored", event);
     renderSession();
     renderTransactionState();
     renderSigningState();
+    renderAuthState();
   });
   manager.on("session_stale", (event) => log("session_stale", event));
   manager.on("session_expired", (event) => log("session_expired", event));
@@ -262,6 +277,7 @@ async function bootstrap(run = bootstrapRun) {
   renderSession();
   renderTransactionState();
   renderSigningState();
+  renderAuthState();
   log("ready", { walletConnectMode: mode, wallets: manager.getWallets().map((wallet) => wallet.id) });
 }
 
@@ -314,6 +330,20 @@ function renderSigningState() {
   }
 }
 
+function renderAuthState() {
+  const current = manager.getSession();
+  const adapter = manager.getAdapter();
+  const canSignMessage = Boolean(current && adapter?.capabilities.signMessage);
+  authSignInButton.disabled = !canSignMessage;
+  if (!current) {
+    authResult.textContent = "Connect a wallet to test auth sign-in.";
+    return;
+  }
+  if (!adapter?.capabilities.signMessage) {
+    authResult.textContent = `${current.wallet?.name ?? current.adapterId} does not support signMessage, so auth sign-in is disabled.`;
+  }
+}
+
 async function signMessage() {
   const current = manager.getSession();
   if (!current) throw new Error("Connect a wallet before signing a message.");
@@ -329,6 +359,73 @@ async function signMessage() {
   log("sign_message_request", requestPreview);
   const result = await manager.signMessage({ message });
   signResult.textContent = JSON.stringify({ requestPreview, result }, null, 2);
+}
+
+async function signInWithAuthServer() {
+  const current = manager.getSession();
+  if (!current) throw new Error("Connect a wallet before auth sign-in.");
+  const adapter = manager.getAdapter();
+  if (!adapter?.capabilities.signMessage) throw new Error(`${current.wallet?.name ?? current.adapterId} does not support signMessage.`);
+
+  let lastServerResponse: unknown;
+  const auth = createWalletAuth(manager, {
+    async getNonce() {
+      const response = await fetch("/api/auth/nonce", { credentials: "include" });
+      const body = await response.json();
+      lastServerResponse = body;
+      if (!response.ok || !body?.nonce) throw new Error(`Nonce request failed: ${JSON.stringify(body, null, 2)}`);
+      return body.nonce;
+    },
+    createMessage(params) {
+      return formatAuthMessage(params);
+    },
+    async verify(params) {
+      const response = await fetch("/api/auth/verify", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(params)
+      });
+      const body = await response.json();
+      lastServerResponse = body;
+      if (!response.ok || !body?.ok) {
+        throw new Error(`Server verification failed: ${JSON.stringify(body, null, 2)}`);
+      }
+      return true;
+    }
+  }, {
+    domain: window.location.host,
+    uri: window.location.origin,
+    chainId: getSelectedNetwork() === "mainnet" ? "xrpl:0" : `xrpl:${getSelectedNetwork()}`,
+    statement: authStatementInput.value.trim() || "Sign in to XRPL Wallet Kit Preview",
+    expiresIn: 10 * 60
+  });
+
+  authResult.textContent = JSON.stringify({
+    status: "Requesting nonce and wallet signature...",
+    adapterId: current.adapterId,
+    wallet: current.wallet?.name ?? adapter.metadata.name
+  }, null, 2);
+  log("auth_sign_in_start", { adapterId: current.adapterId, wallet: current.wallet?.name ?? adapter.metadata.name });
+
+  try {
+    const result = await auth.signIn();
+    authResult.textContent = JSON.stringify({
+      status: "Authenticated",
+      result,
+      server: lastServerResponse
+    }, null, 2);
+    log("auth_sign_in_success", { address: result.address, signatureKind: result.signatureKind, server: lastServerResponse });
+  } catch (error) {
+    authResult.textContent = JSON.stringify({
+      status: "Authentication failed",
+      error: parseFormattedError(error),
+      server: lastServerResponse
+    }, null, 2);
+    throw error;
+  } finally {
+    auth.destroy();
+  }
 }
 
 async function submitPayment() {
@@ -585,5 +682,14 @@ function formatError(error: unknown) {
     return JSON.stringify(error, null, 2);
   } catch {
     return String(error);
+  }
+}
+
+function parseFormattedError(error: unknown) {
+  const formatted = formatError(error);
+  try {
+    return JSON.parse(formatted);
+  } catch {
+    return formatted;
   }
 }

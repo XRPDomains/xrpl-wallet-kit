@@ -94,6 +94,25 @@
       <section class="panel">
         <div class="panel-heading">
           <div>
+            <h2>Auth Sign-In Test</h2>
+            <p>Client signs, posts proof to the local server, and shows server verification logs.</p>
+          </div>
+        </div>
+        <div class="lab">
+          <label>
+            <span>Statement</span>
+            <input id="auth-statement" value="Sign in to XRPL Wallet Kit Preview" />
+          </label>
+          <div class="lab-actions">
+            <button id="auth-sign-in-button" type="button">Sign in with wallet</button>
+          </div>
+          <pre id="auth-result">Connect a wallet to test auth sign-in.</pre>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
             <h2>Transactions</h2>
             <p>Payment, NFT offer, and NFT burn signing with submit enabled.</p>
           </div>

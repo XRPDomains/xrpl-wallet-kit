@@ -1,2 +1,20 @@
 "use client";
-export { XrplWalletProvider, useXrplWallet } from "@xrpl-wallet-kit/react";
+export {
+  WalletButton,
+  WalletKitProvider,
+  useWalletAccount,
+  useWalletCapabilities,
+  useWalletKit,
+  useWalletSession,
+  useWalletStatus,
+  XrplWalletProvider,
+  useXrplWallet
+} from "@xrpl-wallet-kit/react";
+export type {
+  ReactWalletButtonProps,
+  WalletKitContextValue,
+  WalletKitProviderProps,
+  WalletKitStatus,
+  XrplWalletContextValue,
+  XrplWalletProviderProps
+} from "@xrpl-wallet-kit/react";

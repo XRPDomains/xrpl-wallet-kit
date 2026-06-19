@@ -67,12 +67,6 @@ export interface OtsuProvider {
   off(event: string, callback: (data: unknown) => void): void;
 }
 
-declare global {
-  interface Window {
-    xrpl?: OtsuProvider;
-  }
-}
-
 export interface OtsuAdapterOptions {
   /** Override the injected provider (useful for testing) */
   provider?: OtsuProvider;
@@ -262,11 +256,21 @@ export class OtsuAdapter extends BaseWalletAdapter {
   private getProvider(required: true): OtsuProvider;
   private getProvider(required: false): OtsuProvider | undefined;
   private getProvider(required = true): OtsuProvider | undefined {
-    const provider = this.options.provider ?? (typeof window !== "undefined" ? window.xrpl : undefined);
+    const provider = this.options.provider ?? this.getInjectedProvider();
     if (required && (!provider || !provider.isOtsu)) {
       throw createWalletError.walletNotAvailable(this.metadata.name);
     }
     return provider?.isOtsu ? provider : undefined;
+  }
+
+  private getInjectedProvider(): OtsuProvider | undefined {
+    if (typeof window === "undefined") return undefined;
+    const provider = (window as unknown as { xrpl?: unknown }).xrpl;
+    return this.isOtsuProvider(provider) ? provider : undefined;
+  }
+
+  private isOtsuProvider(provider: unknown): provider is OtsuProvider {
+    return Boolean(provider && typeof provider === "object" && (provider as { isOtsu?: unknown }).isOtsu === true);
   }
 
   private requireProvider(): OtsuProvider {

@@ -1,0 +1,69 @@
+{
+  "name": "@xrpl-wallet-kit/auth",
+  "version": "0.1.0-beta.0",
+  "description": "Sign-In with Wallet helpers for XRPL Wallet Kit.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./verifiers": {
+      "types": "./dist/verifiers/index.d.ts",
+      "import": "./dist/verifiers/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@xrpl-wallet-kit/core": "0.1.0-beta.0"
+  },
+  "peerDependencies": {
+    "ripple-keypairs": "^2.0.0",
+    "verify-xrpl-signature": "^9.2.0",
+    "xrpl": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ripple-keypairs": {
+      "optional": true
+    },
+    "verify-xrpl-signature": {
+      "optional": true
+    },
+    "xrpl": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "ripple-keypairs": "^2.0.0",
+    "verify-xrpl-signature": "^9.2.0",
+    "xrpl": "^4.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XRPDomains/xrpl-wallet-kit.git"
+  },
+  "homepage": "https://github.com/XRPDomains/xrpl-wallet-kit#readme",
+  "bugs": {
+    "url": "https://github.com/XRPDomains/xrpl-wallet-kit/issues"
+  },
+  "keywords": [
+    "xrpl",
+    "wallet",
+    "wallet-auth",
+    "sign-in",
+    "web3"
+  ]
+}

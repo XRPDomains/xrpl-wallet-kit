@@ -20,7 +20,7 @@ export interface WalletNetwork {
 }
 
 export type WalletAdapterType = "mobile" | "extension" | "walletconnect" | "snap" | "hardware" | "embedded";
-export type WalletAdapterApiVersion = "1.0" | (string & {});
+export type WalletAdapterApiVersion = "1.0" | "1.1" | (string & {});
 
 export interface WalletCapabilities {
   connect: boolean;
