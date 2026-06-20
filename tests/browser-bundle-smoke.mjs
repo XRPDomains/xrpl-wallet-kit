@@ -80,3 +80,5 @@ assert.equal(typeof context.Buffer, "function");
 assert.equal(typeof context.XRPLWalletKit, "object");
 assert.equal(typeof context.XRPLWalletKit.create, "function");
 assert.equal(typeof context.XRPLWalletKit.createClient, "function");
+assert.equal(context.XRPLWalletKit.WalletButton, context.XRPLWalletKit.WalletButtonController);
+assert.equal(typeof context.XRPLWalletKit.WalletButton, "function");

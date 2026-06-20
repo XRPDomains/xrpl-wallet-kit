@@ -17,7 +17,7 @@ export function resolveWalletUiOptions(overrides: (WalletUiConfig & Partial<Omit
     transactionPreview
   } = overrides;
   const resolvedMessages = resolveWalletUiMessages(language, messages);
-  const walletConnectUiMode = walletConnect?.mode ?? overrides.walletConnectUiMode;
+  const walletConnectUiMode = walletConnect?.mode ?? overrides.walletConnectUiMode ?? "default";
   const wallets = walletList?.wallets === "all" ? undefined : walletList?.wallets;
 
   return {

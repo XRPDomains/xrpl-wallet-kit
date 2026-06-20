@@ -1229,7 +1229,11 @@ export function createWalletConnectMetadata(metadata: SignClientTypes.Metadata):
 }
 
 export function createWalletConnectAdapter(options: WalletConnectAdapterOptions) {
-  return new WalletConnectXrplAdapter(options);
+  return new WalletConnectXrplAdapter({
+    useModal: true,
+    modalMode: "always",
+    ...options
+  });
 }
 
 export function createWalletConnectAdapters(config: CreateWalletConnectAdaptersConfig): WalletAdapter[] {
@@ -1269,4 +1273,3 @@ export function createWalletConnectAdapters(config: CreateWalletConnectAdaptersC
 
 export { BIFROST_ICON, BITGET_ICON, GIRIN_ICON, JOEY_ICON, STATICBIT_ICON } from "./icons";
 export * from "./wallets";
-

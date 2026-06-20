@@ -86,7 +86,7 @@ showWeb3Name: true
 showBalance: true
 buttonSize: 'lg'
 accountPanel.mode: 'modal'
-walletConnect.mode: 'group'
+walletConnect.mode: 'default'
 reloadOnDisconnect: false
 ```
 
@@ -131,7 +131,7 @@ window.walletKit = XRPLWalletKitLegacyBridge.mount({
       showInstalledBadge: true
     },
     walletConnect: {
-      mode: 'group',
+      mode: 'default',
       cta: 'both',
       qr: {
         style: 'dots',

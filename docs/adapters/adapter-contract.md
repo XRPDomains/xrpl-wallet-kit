@@ -50,16 +50,18 @@ type SignatureKind = "signature" | "signedTx";
 
 interface SignMessageResult {
   signatureKind: SignatureKind;
-  signature?: string;
-  txBlob?: string;
+  proof?: string;      // primary proof field — always populated when a proof is available
+  signature?: string;  // compact ECDSA/Ed25519 signature (signatureKind: "signature" only)
+  txBlob?: string;     // signed XRPL transaction hex blob (signatureKind: "signedTx" only)
   publicKey?: string;
   raw?: unknown;
 }
 ```
 
-- Use `signatureKind: "signature"` when the wallet returns a compact message signature. Include `publicKey` when the wallet exposes it; otherwise server code may need ledger lookup or wallet-specific verification.
-- Use `signatureKind: "signedTx"` when the wallet returns a signed XRPL transaction blob, such as a Xaman `SignIn` payload or a non-submitted memo transaction. Put the blob in `txBlob`; do not also copy it into `signature`.
-- Existing `signature` and `txBlob` fields remain for compatibility, but `signatureKind` is the source of truth for new adapters.
+- **`proof`** is the unified proof field. Server verification code should read `proof` regardless of `signatureKind`. For `"signature"` adapters, `proof === signature`. For `"signedTx"` adapters, `proof === txBlob`.
+- Use `signatureKind: "signature"` when the wallet returns a compact message signature (GemWallet, Crossmark, DropFi). Include `publicKey` when the wallet exposes it; otherwise server code may need ledger lookup or wallet-specific verification.
+- Use `signatureKind: "signedTx"` when the wallet returns a signed XRPL transaction blob — for example a Xaman `SignIn` payload, a WalletConnect non-submitted Payment with message in Memos, or an XRPL Snap signed Payment. Put the blob in both `proof` and `txBlob`.
+- Existing `signature` and `txBlob` fields remain for compatibility, but `signatureKind` + `proof` are the source of truth for new adapters.
 
 ## Required Fields
 

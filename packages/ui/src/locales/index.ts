@@ -22,9 +22,12 @@ const builtInMessages: Record<string, WalletUiMessages> = {
 
 export function resolveWalletUiMessages(locale: WalletUiLocale = "en-US", overrides: WalletUiMessagesInput = {}): WalletUiMessages {
   const normalizedLocale = normalizeWalletUiLocale(locale);
+  const definedOverrides = Object.fromEntries(
+    Object.entries(overrides).filter(([, value]) => value !== undefined)
+  ) as WalletUiMessagesInput;
   return {
     ...(builtInMessages[normalizedLocale] ?? enUSMessages),
-    ...overrides
+    ...definedOverrides
   };
 }
 

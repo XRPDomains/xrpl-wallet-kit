@@ -220,7 +220,7 @@
         showGroup: true,
         showInstalledBadge: true
       }, options.walletList || {}),
-      walletConnect: Object.assign({ mode: 'group', cta: 'both', qr: { style: 'dots', showLogo: false } }, options.walletConnect || {}),
+      walletConnect: Object.assign({ mode: 'default', cta: 'both', qr: { style: 'dots', showLogo: false } }, options.walletConnect || {}),
       connectButton: Object.assign({
         label: options.connectLabel || 'Connect Wallet',
         showAdapterIcon: true,

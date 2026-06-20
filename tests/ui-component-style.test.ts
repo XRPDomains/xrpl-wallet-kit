@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { WalletMetadata } from "../packages/core/src";
+import { WalletButton, WalletButtonController } from "../packages/ui/src/index";
 import { WalletModal } from "../packages/ui/src/modal";
 import { WalletToast } from "../packages/ui/src/toast";
 import { lightTheme } from "../packages/ui/src/themes";
@@ -10,6 +12,10 @@ const manager = {
   getWallets: () => [],
   getAdapter: () => undefined
 };
+
+test("UI package exports WalletButton alias for vanilla imports", () => {
+  assert.equal(WalletButton, WalletButtonController);
+});
 
 test("WalletModal buttons defend against host button CSS", () => {
   const modal = new WalletModal({
@@ -100,6 +106,51 @@ test("WalletModal visual states use semantic theme tokens", () => {
   assert.doesNotMatch(styles, /#1d9bf0|#64748b|rgba\(148,163,184/);
 });
 
+test("WalletModal renders recommended badge without duplicating recommended group label", () => {
+  const modal = new WalletModal({
+    manager: manager as never,
+    themeMode: "light"
+  }) as unknown as {
+    renderStyles(theme: typeof lightTheme, layout: "list", size: "default", textSize: "sm"): string;
+    renderWallet(wallet: WalletMetadata, layout: "list" | "card" | "icon"): string;
+  };
+  const wallet: WalletMetadata = {
+    id: "xaman",
+    name: "Xaman",
+    type: "mobile",
+    group: "Recommended",
+    recommended: true
+  };
+  const styles = modal.renderStyles(lightTheme, "list", "default", "sm");
+  const html = modal.renderWallet(wallet, "list");
+
+  assert.match(styles, /\.xwk-wallet-badges\{[^}]*margin-left:auto/);
+  assert.match(styles, /\.xwk-wallet-badge\.xwk-recommended\{[^}]*color:#0078ae/);
+  assert.match(html, /class="xwk-wallet-badge xwk-recommended">Recommended<\/span>/);
+  assert.match(html, /<span class="xwk-group">Mobile wallet<\/span>/);
+  assert.doesNotMatch(html, /<span class="xwk-group">Recommended<\/span>/);
+});
+
+test("WalletModal keeps recommended badge text when partial messages omit new labels", () => {
+  const modal = new WalletModal({
+    manager: manager as never,
+    themeMode: "light",
+    messages: { recommended: undefined, installed: undefined } as never
+  }) as unknown as {
+    renderWallet(wallet: WalletMetadata, layout: "list" | "card" | "icon"): string;
+  };
+  const wallet: WalletMetadata = {
+    id: "xaman",
+    name: "Xaman",
+    type: "mobile",
+    group: "Recommended",
+    recommended: true
+  };
+  const html = modal.renderWallet(wallet, "list");
+
+  assert.match(html, /class="xwk-wallet-badge xwk-recommended">Recommended<\/span>/);
+});
+
 test("WalletModal custom QR supports light QR mode without changing modal frame", () => {
   const modal = new WalletModal({
     manager: manager as never,
@@ -163,6 +214,43 @@ test("WalletModal delegates only WalletConnect default modal wallets", () => {
     ),
     false
   );
+});
+
+test("WalletModal uses custom QR only for WalletConnect list or group modes", () => {
+  const defaultModal = new WalletModal({
+    manager: manager as never,
+    walletConnectUiMode: "default",
+    themeMode: "light"
+  }) as unknown as {
+    shouldUseCustomWalletConnectQr(wallet: unknown, adapter: unknown): boolean;
+  };
+  const groupModal = new WalletModal({
+    manager: manager as never,
+    walletConnectUiMode: "group",
+    themeMode: "light"
+  }) as unknown as {
+    shouldUseCustomWalletConnectQr(wallet: unknown, adapter: unknown): boolean;
+  };
+  const wallet = { id: "bifrost", type: "walletconnect", group: "WalletConnect" };
+  const customQrAdapter = { capabilities: { qr: true } };
+
+  assert.equal(defaultModal.shouldUseCustomWalletConnectQr(wallet, customQrAdapter), false);
+  assert.equal(groupModal.shouldUseCustomWalletConnectQr(wallet, customQrAdapter), true);
+});
+
+test("WalletModal treats omitted WalletConnect mode as default AppKit mode", () => {
+  const modal = new WalletModal({
+    manager: manager as never,
+    themeMode: "light"
+  }) as unknown as {
+    shouldDelegateToWalletConnectModal(wallet: unknown, adapter: unknown): boolean;
+    shouldUseCustomWalletConnectQr(wallet: unknown, adapter: unknown): boolean;
+  };
+  const wallet = { id: "walletconnect", type: "walletconnect", group: "WalletConnect" };
+  const adapter = { capabilities: { qr: true } };
+
+  assert.equal(modal.shouldDelegateToWalletConnectModal(wallet, adapter), true);
+  assert.equal(modal.shouldUseCustomWalletConnectQr(wallet, adapter), false);
 });
 
 test("WalletToast controls defend against host button and link CSS", () => {

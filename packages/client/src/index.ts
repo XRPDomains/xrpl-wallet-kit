@@ -32,6 +32,7 @@ export type WalletKitAdapterId =
   | "crossmark"
   | "dropfi"
   | "xrplsnap"
+  | "xrpl-snap"
   | "staticbit"
   | "bitget"
   | "joey"
@@ -204,7 +205,7 @@ function resolveModalOptions(options: CreateWalletKitOptions): { ui: Partial<Omi
   const modalWidth = options.ui?.modal?.width ?? modalConfig.modal?.width;
   const walletConnectModeValue = options.ui?.walletConnect?.mode
     ?? modalConfig.walletConnect?.mode
-    ?? "group";
+    ?? "default";
   const merged: WalletKitUiConfig = {
     ...options.ui,
     ...modalUi,
@@ -284,11 +285,15 @@ function resolveResponsiveValue<T>(value: ResponsiveValue<T> | undefined): T | u
 }
 
 function getWalletConnectUiMode(options: Pick<CreateWalletClientOptions, "ui">): WalletConnectMode {
-  return options.ui?.walletConnect?.mode ?? "group";
+  return options.ui?.walletConnect?.mode ?? "default";
 }
 
 function shouldInclude(ids: Set<string> | undefined, id: string): boolean {
-  return !ids || ids.has(id);
+  if (!ids) return true;
+  if (id === "xrplsnap") {
+    return ids.has("xrplsnap") || ids.has("xrpl-snap");
+  }
+  return ids.has(id);
 }
 
 function shouldIncludeWalletConnect(ids: Set<string> | undefined): boolean {

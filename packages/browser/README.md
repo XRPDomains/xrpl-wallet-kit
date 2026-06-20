@@ -28,7 +28,7 @@ The package publishes:
     ui: {
       layout: "list",
       themeMode: "light",
-      walletConnectMode: "group",
+      walletConnect: { mode: "default" },
       showWeb3Name: true,
       showBalance: true
     }

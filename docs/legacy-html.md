@@ -43,7 +43,7 @@ Use the readable `xrpl-wallet-kit.iife.js` while debugging, and the minified fil
     ui: {
       layout: "list",
       themeMode: "light",
-      walletConnectMode: "group",
+      walletConnect: { mode: "default" },
       showWeb3Name: true,
       showBalance: true
     }

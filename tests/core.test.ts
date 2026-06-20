@@ -453,6 +453,30 @@ test("WalletConnect detail adapters advertise signMessage only for verified prof
   assert.deepEqual(adapters.map((adapter) => adapter.capabilities.signMessage), [false, false, true, false, true]);
 });
 
+test("WalletConnect singular factory defaults to AppKit modal mode", () => {
+  const adapter = createWalletConnectAdapter({
+    projectId: "test-project"
+  });
+  const options = (adapter as unknown as { options: Record<string, unknown> }).options;
+
+  assert.equal(options.useModal, true);
+  assert.equal(options.modalMode, "always");
+  assert.equal(adapter.capabilities.qr, false);
+});
+
+test("WalletConnect singular factory allows custom QR override", () => {
+  const adapter = createWalletConnectAdapter({
+    projectId: "test-project",
+    useModal: false,
+    modalMode: "never"
+  });
+  const options = (adapter as unknown as { options: Record<string, unknown> }).options;
+
+  assert.equal(options.useModal, false);
+  assert.equal(options.modalMode, "never");
+  assert.equal(adapter.capabilities.qr, true);
+});
+
 test("WalletConnect optional namespaces avoid xrpl_signMessage for legacy transaction-proof signing", () => {
   const adapter = createWalletConnectAdapter({
     projectId: "test-project",
@@ -461,7 +485,7 @@ test("WalletConnect optional namespaces avoid xrpl_signMessage for legacy transa
     createOptionalNamespaces(network: typeof network): Record<string, { methods: string[] }>;
   };
 
-  assert.deepEqual(adapter.createOptionalNamespaces(network).xrpl.methods, ["xrpl_signTransactionFor"]);
+  assert.deepEqual(adapter.createOptionalNamespaces(network).xrpl.methods, ["xrpl_signTransaction", "xrpl_signTransactionFor"]);
 });
 
 test("WalletConnect validates missing chain id only when WalletConnect paths need it", () => {
@@ -477,8 +501,12 @@ test("WalletConnect validates missing chain id only when WalletConnect paths nee
     rpcUrl: "wss://custom.example"
   };
 
+  assert.deepEqual(
+    (adapter as unknown as { createRequiredNamespaces(network: typeof customNetwork): unknown }).createRequiredNamespaces(customNetwork),
+    {}
+  );
   assert.throws(
-    () => (adapter as unknown as { createRequiredNamespaces(network: typeof customNetwork): unknown }).createRequiredNamespaces(customNetwork),
+    () => (adapter as unknown as { createOptionalNamespaces(network: typeof customNetwork): unknown }).createOptionalNamespaces(customNetwork),
     /walletConnectChainId/
   );
 });

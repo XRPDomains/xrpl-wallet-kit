@@ -241,7 +241,7 @@ WalletConnect-specific UI settings.
 
 ```ts
 walletConnect: {
-  mode: "group",
+  mode: "default",
   cta: "both",
   qr: {
     style: "dots",
@@ -254,11 +254,11 @@ walletConnect: {
 
 Values:
 
-- `default`: shows a single WalletConnect item. Clicking it uses the default WalletConnect modal (`useModal=true`) and does not use the custom QR panel.
-- `list`: shows WalletConnect wallets as individual wallet items.
-- `group`: groups WalletConnect wallets under one WalletConnect item. The user clicks the group, selects a child wallet, then sees the custom QR/deeplink panel.
+- `default`: shows a single WalletConnect item. Clicking it uses the official WalletConnect AppKit modal (`useModal=true`) and does not use the kit custom QR panel.
+- `list`: shows WalletConnect wallets as individual wallet items. Clicking a wallet uses the kit custom QR/deeplink panel.
+- `group`: groups WalletConnect wallets under one WalletConnect item. The user clicks the group, selects a child wallet, then sees the kit custom QR/deeplink panel.
 
-Current client default: `group` when no override is provided.
+Current client default: `default` when no override is provided.
 
 ### `walletConnect.cta`
 

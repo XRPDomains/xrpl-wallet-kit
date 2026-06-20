@@ -56,7 +56,7 @@ const kit = createWalletKit({
   ui: {
     themeMode: "light",
     layout: "list",
-    walletConnectMode: "group",
+    walletConnect: { mode: "default" },
     showWeb3Name: true,
     showBalance: true
   }
@@ -114,9 +114,9 @@ export function App() {
 
 ## WalletConnect Modes
 
-- `default`: one WalletConnect entry, using the official WalletConnect modal.
-- `list`: show supported WalletConnect wallets as normal wallet items.
-- `group`: show one WalletConnect entry, then let users choose a supported wallet.
+- `default`: one WalletConnect entry using the official WalletConnect AppKit modal. This is the client default.
+- `list`: show supported WalletConnect wallets as normal wallet items, using the kit custom QR/deeplink panel.
+- `group`: show one WalletConnect entry, then let users choose a supported wallet, using the kit custom QR/deeplink panel.
 
 ## Transaction Toasts
 

@@ -40,6 +40,13 @@ export interface WalletUiMessages {
   openWallet: string;
   qrUriCopied: string;
   installed: string;
+  recommended: string;
+  mobileWallet: string;
+  extensionWallet: string;
+  walletConnectWallet: string;
+  xrplSnapWallet: string;
+  hardwareWallet: string;
+  embeddedWallet: string;
   copyAddress: string;
   addressQr: string;
   showAddressQr: string;
