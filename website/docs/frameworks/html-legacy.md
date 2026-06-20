@@ -1,0 +1,207 @@
+# HTML (Legacy / CDN)
+
+Use XRPL Wallet Kit on pages that cannot use a bundler — a classic CMS site, a legacy app, or any plain HTML page. The IIFE bundle works with any JavaScript environment: vanilla JS, jQuery, Alpine.js, or no library at all.
+
+## Load the IIFE Bundle
+
+```html
+<!-- From CDN (replace x.x.x with the latest version) -->
+<script src="https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@x.x.x/dist/xrpl-wallet-kit.iife.min.js"></script>
+```
+
+Or self-host the file — copy it from `node_modules/@xrpl-wallet-kit/browser/dist/` to your server:
+
+```html
+<script src="/assets/xrpl-wallet-kit.iife.min.js"></script>
+```
+
+The bundle exposes a global `XRPLWalletKit` object:
+
+```html
+<script>
+  var { createWalletKit, WalletManager, WalletModal, WalletButton } = XRPLWalletKit;
+</script>
+```
+
+::: warning Bundle size
+The IIFE bundle is large because it includes all adapters and polyfills. For production sites, prefer the modular install with a bundler.
+:::
+
+## Quick Start
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My XRPL dApp</title>
+</head>
+<body>
+  <!-- The connect button renders itself here -->
+  <button id="connect-btn"></button>
+
+  <script src="https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js"></script>
+  <script>
+    var kit = XRPLWalletKit.createWalletKit({
+      wallets: 'all',
+      walletConnectProjectId: 'YOUR_WC_PROJECT_ID',
+      connectButton: '#connect-btn',
+    });
+
+    kit.manager.recoverSession();
+  </script>
+</body>
+</html>
+```
+
+## Manual Setup (more control)
+
+```html
+<button id="connect-btn"></button>
+<div id="status"></div>
+
+<script src="/assets/xrpl-wallet-kit.iife.min.js"></script>
+<script>
+  var WalletKit = XRPLWalletKit;
+
+  var manager = new WalletKit.WalletManager({
+    adapters: [
+      WalletKit.createGemWalletAdapter(),
+      WalletKit.createWalletConnectAdapter({
+        projectId: 'YOUR_WC_PROJECT_ID'
+      }),
+    ],
+    network: {
+      id: 'mainnet',
+      networkType: 'MAINNET',
+      url: 'wss://xrplcluster.com',
+      nativeAsset: 'XRP',
+      nativeAssetDecimals: 6,
+    }
+  });
+
+  var modal = new WalletKit.WalletModal({ manager: manager });
+
+  var button = new WalletKit.WalletButton({
+    manager: manager,
+    modal:   modal,
+    target:  document.getElementById('connect-btn'),
+  });
+
+  manager.on('connected', function (event) {
+    document.getElementById('status').textContent =
+      'Connected: ' + event.account.address;
+  });
+
+  manager.on('disconnected', function () {
+    document.getElementById('status').textContent = 'Disconnected';
+  });
+
+  manager.recoverSession();
+</script>
+```
+
+## Example: jQuery Integration
+
+The kit works equally well with jQuery, Alpine.js, or any other library — just call the same global API inside your existing setup code.
+
+```html
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="/assets/xrpl-wallet-kit.iife.min.js"></script>
+
+<script>
+$(function () {
+  var WalletKit = window.XRPLWalletKit;
+
+  var manager = new WalletKit.WalletManager({
+    adapters: [ WalletKit.createGemWalletAdapter() ],
+    network: {
+      id: 'mainnet',
+      networkType: 'MAINNET',
+      url: 'wss://xrplcluster.com',
+      nativeAsset: 'XRP',
+      nativeAssetDecimals: 6,
+    }
+  });
+
+  var modal = new WalletKit.WalletModal({ manager: manager });
+
+  new WalletKit.WalletButton({
+    manager: manager,
+    modal:   modal,
+    target:  '#connect-btn',   // CSS selector string or HTMLElement both work
+  });
+
+  manager.on('connected', function (event) {
+    $('#wallet-address').text(event.account.address).show();
+    $('#connect-section').hide();
+    $('#app-section').show();
+  });
+
+  manager.on('disconnected', function () {
+    $('#app-section').hide();
+    $('#connect-section').show();
+  });
+
+  manager.recoverSession();
+});
+</script>
+```
+
+## Signing a Transaction
+
+```js
+document.getElementById('pay-btn').addEventListener('click', async function () {
+  try {
+    var result = await manager.signAndSubmit({
+      txJson: {
+        TransactionType: 'Payment',
+        Account: manager.getAccount().address,
+        Destination: 'rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe',
+        Amount: '1000000',
+        Fee: '12',
+        Sequence: 1,
+      }
+    });
+    alert('Transaction submitted: ' + result.hash);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+});
+```
+
+## Available Global Exports
+
+The `XRPLWalletKit` global exposes:
+
+```js
+// Factory (recommended)
+XRPLWalletKit.createWalletKit(options)
+XRPLWalletKit.createWalletClient(options)
+
+// Core classes
+XRPLWalletKit.WalletManager
+XRPLWalletKit.WalletModal
+XRPLWalletKit.WalletButton
+XRPLWalletKit.WalletToast
+
+// Adapter factories
+XRPLWalletKit.createXamanAdapter(options)
+XRPLWalletKit.createGemWalletAdapter()
+XRPLWalletKit.createWalletConnectAdapter(options)
+XRPLWalletKit.createCrossmarkAdapter()
+XRPLWalletKit.createLedgerAdapter()
+XRPLWalletKit.createDropfiAdapter()
+XRPLWalletKit.createXrplSnapAdapter()
+XRPLWalletKit.createOtsuAdapter()
+```
+
+## TypeScript in a `<script type="module">`
+
+If your HTML page uses `<script type="module">` you can also import ESM directly from a CDN like esm.sh:
+
+```html
+<script type="module">
+  import { createWalletKit } from "https://esm.sh/@xrpl-wallet-kit/client@latest";
+
+  const { manager } = cre

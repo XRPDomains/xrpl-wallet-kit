@@ -1,0 +1,285 @@
+/* ────────────────────────────────────────────────────────────
+   XRPL Wallet Kit — Docs Theme
+   Color strategy: Restrained. Deep amber primary (OKLCH hue 45°),
+   pure white surface, near-black ink. Not blockchain blue.
+   "Financial infrastructure manual — established, precise, unhurried."
+   ──────────────────────────────────────────────────────────── */
+
+/* ── Primitive tokens (OKLCH) ──────────────────────────────── */
+:root {
+  /* Primary — deep amber-rust. Ownable, not generic. */
+  --xwk-primary-600:  oklch(0.40 0.14 45);   /* main CTA / active nav  */
+  --xwk-primary-500:  oklch(0.50 0.13 45);   /* hover states           */
+  --xwk-primary-100:  oklch(0.95 0.025 45);  /* tinted callout bg      */
+  --xwk-primary-50:   oklch(0.975 0.012 45); /* very light tint        */
+
+  /* Surfaces — pure white bg, amber-tinted surfaces */
+  --xwk-bg:           oklch(1.000 0.000 0);  /* page background        */
+  --xwk-surface:      oklch(0.972 0.008 45); /* cards, sidebar         */
+  --xwk-surface-2:    oklch(0.945 0.012 45); /* code blocks, tables    */
+
+  /* Typography */
+  --xwk-ink:          oklch(0.130 0.018 45); /* body text — ~18:1 vs white */
+  --xwk-muted:        oklch(0.460 0.038 45); /* secondary text — ~5.5:1    */
+  --xwk-subtle:       oklch(0.700 0.015 45); /* placeholders, decorative   */
+
+  /* Accent — teal, for info callouts / links in body text */
+  --xwk-accent:       oklch(0.50 0.13 200);
+
+  /* Borders */
+  --xwk-border:       oklch(0.875 0.012 45);
+  --xwk-border-soft:  oklch(0.930 0.008 45);
+}
+
+/* ── VitePress brand overrides ─────────────────────────────── */
+:root {
+  --vp-c-brand-1:    oklch(0.40 0.14 45);
+  --vp-c-brand-2:    oklch(0.50 0.13 45);
+  --vp-c-brand-3:    oklch(0.60 0.11 45);
+  --vp-c-brand-soft: oklch(0.95 0.025 45);
+
+  /* Nav / sidebar surfaces */
+  --vp-c-bg-soft:    oklch(0.972 0.008 45);
+  --vp-c-bg-mute:    oklch(0.945 0.012 45);
+  --vp-c-divider:    oklch(0.875 0.012 45);
+  --vp-c-border:     oklch(0.875 0.012 45);
+
+  /* Text */
+  --vp-c-text-1:     oklch(0.130 0.018 45);
+  --vp-c-text-2:     oklch(0.460 0.038 45);
+  --vp-c-text-3:     oklch(0.680 0.018 45);
+}
+
+.dark {
+  --xwk-primary-600:  oklch(0.70 0.13 45);
+  --xwk-primary-500:  oklch(0.78 0.12 45);
+  --xwk-primary-100:  oklch(0.22 0.05 45);
+  --xwk-primary-50:   oklch(0.17 0.035 45);
+
+  --xwk-bg:           oklch(0.130 0.008 45);
+  --xwk-surface:      oklch(0.172 0.010 45);
+  --xwk-surface-2:    oklch(0.210 0.012 45);
+
+  --xwk-ink:          oklch(0.940 0.012 45);
+  --xwk-muted:        oklch(0.650 0.025 45);
+  --xwk-subtle:       oklch(0.420 0.018 45);
+
+  --xwk-border:       oklch(0.260 0.020 45);
+  --xwk-border-soft:  oklch(0.220 0.014 45);
+
+  --vp-c-brand-1:    oklch(0.70 0.13 45);
+  --vp-c-brand-2:    oklch(0.78 0.12 45);
+  --vp-c-brand-3:    oklch(0.84 0.10 45);
+  --vp-c-brand-soft: oklch(0.22 0.05 45);
+
+  --vp-c-bg-soft:    oklch(0.172 0.010 45);
+  --vp-c-bg-mute:    oklch(0.210 0.012 45);
+  --vp-c-divider:    oklch(0.260 0.020 45);
+  --vp-c-border:     oklch(0.260 0.020 45);
+
+  --vp-c-text-1:     oklch(0.940 0.012 45);
+  --vp-c-text-2:     oklch(0.650 0.025 45);
+  --vp-c-text-3:     oklch(0.420 0.018 45);
+}
+
+/* ── Hero — fix absolute ban (gradient text removed) ──────── */
+/* VitePress sets background-clip: text by default on .name.
+   We clear the gradient and use a solid color instead.       */
+.VPHero .name {
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  -webkit-text-fill-color: var(--xwk-primary-600);
+  color: var(--xwk-primary-600);
+}
+
+/* Hero tagline — slightly warmer muted so it reads against white */
+.VPHero .tagline {
+  color: var(--xwk-muted);
+}
+
+/* Hero CTA — primary button uses amber, not the default blue  */
+.VPHero .VPButton.brand {
+  background-color: var(--xwk-primary-600);
+  border-color: var(--xwk-primary-600);
+  color: oklch(1 0 0); /* white text on saturated dark fill */
+}
+.VPHero .VPButton.brand:hover {
+  background-color: var(--xwk-primary-500);
+  border-color: var(--xwk-primary-500);
+}
+
+/* ── Nav bar ─────────────────────────────────────────────── */
+.VPNav {
+  border-bottom: 1px solid var(--xwk-border);
+}
+
+/* Active nav item */
+.VPNavBarMenuLink.active,
+.VPNavBarMenuLink:hover {
+  color: var(--xwk-primary-600) !important;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+.VPSidebarItem.is-active > .item > .VPLink,
+.VPSidebarItem.is-active > .item > .text {
+  color: var(--xwk-primary-600) !important;
+  font-weight: 600;
+}
+
+/* Active sidebar link underline indicator (not side-stripe) */
+.VPSidebarItem.is-active > .item {
+  background: var(--xwk-primary-50);
+  border-radius: 6px;
+}
+
+/* ── Feature Cards (home page) ───────────────────────────── */
+.VPFeature {
+  border: 1px solid var(--xwk-border);
+  border-radius: 12px;
+  background: var(--xwk-bg);
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.VPFeature:hover {
+  border-color: var(--xwk-primary-600);
+  background: var(--xwk-primary-50);
+}
+
+/* Feature icon — override emoji sizing for consistency */
+.VPFeature .icon {
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+/* Feature title — amber instead of default brand color */
+.VPFeature .title {
+  color: var(--xwk-ink);
+  font-weight: 600;
+}
+
+/* ── Code blocks ─────────────────────────────────────────── */
+.vp-doc div[class*="language-"] {
+  border-radius: 10px;
+  border: 1px solid var(--xwk-border-soft);
+}
+
+/* Code block filename badge */
+.vp-doc div[class*="language-"] span.lang {
+  color: var(--xwk-muted);
+}
+
+/* Inline code */
+.vp-doc code {
+  background: var(--xwk-surface-2);
+  color: var(--xwk-primary-600);
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+  font-size: 0.88em;
+}
+
+/* ── Custom callout blocks (tip / warning / danger) ──────── */
+.vp-doc .custom-block {
+  border-radius: 8px;
+  border-width: 1px;
+  border-style: solid;
+}
+
+/* Tip callout uses primary amber soft bg */
+.vp-doc .custom-block.tip {
+  background: var(--xwk-primary-50);
+  border-color: oklch(0.75 0.07 45);
+}
+.vp-doc .custom-block.tip .custom-block-title {
+  color: var(--xwk-primary-600);
+}
+
+/* ── Tables ──────────────────────────────────────────────── */
+.vp-doc table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.vp-doc th {
+  background: var(--xwk-surface);
+  color: var(--xwk-ink);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+.vp-doc tr:hover {
+  background: var(--xwk-primary-50);
+}
+
+/* ── Links ───────────────────────────────────────────────── */
+.vp-doc a {
+  color: var(--xwk-primary-600);
+  text-decoration: underline;
+  text-decoration-color: oklch(0.75 0.07 45);
+  text-underline-offset: 2px;
+  transition: text-decoration-color 0.15s ease;
+}
+.vp-doc a:hover {
+  text-decoration-color: var(--xwk-primary-600);
+}
+
+/* ── Doc content max-width & line-length cap ─────────────── */
+.vp-doc p,
+.vp-doc li {
+  max-width: 72ch;
+  line-height: 1.75;
+}
+
+/* ── Adapter badge pills ─────────────────────────────────── */
+.adapter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--xwk-primary-50);
+  color: var(--xwk-primary-600);
+  border: 1px solid oklch(0.85 0.04 45);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  margin: 2px;
+}
+
+/* ── Footer ──────────────────────────────────────────────── */
+.VPFooter {
+  border-top: 1px solid var(--xwk-border);
+  color: var(--xwk-muted);
+}
+
+/* ── Nav logo ────────────────────────────────────────────── */
+.VPNavBarTitle .logo {
+  height: 24px;
+  width: 24px;
+}
+
+/* ── Scrollbar (subtle brand tint, not intrusive) ────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: oklch(0.80 0.04 45);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.68 0.07 45);
+}
+
+/* ── Reduced motion ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .VPFeature,
+  .VPHero .VPButton,
+  .vp-doc a {
+    transition: none;
+  }
+}
