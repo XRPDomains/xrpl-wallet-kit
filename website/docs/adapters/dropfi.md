@@ -1,6 +1,6 @@
 # DropFi Adapter
 
-[DropFi](https://dropfi.app) is a browser extension wallet for XRPL. It injects its provider into the page at `window.__xwk_dropfi` (modern) or `window.dropfi` (legacy).
+[DropFi](https://dropfi.app) is a browser extension wallet for XRPL. Its official web injection script exposes the wallet provider at `window.xrpl`. XRPL Wallet Kit also checks `window.__xwk_dropfi` and `window.dropfi` first so host apps can avoid namespace collisions with `xrpl.js` or other injected wallets.
 
 ## Installation
 
@@ -36,9 +36,11 @@ const adapter = createDropFiAdapter();
 The adapter resolves the DropFi provider in this priority order:
 
 1. `options.provider` — injected directly (useful for testing or embedding)
-2. `window.__xwk_dropfi` — current DropFi injection point
-3. `window.dropfi` — legacy DropFi injection point
-4. `window.xrpl` — only accepted when it passes the DropFi feature guard (must expose `isDropFi` or specific DropFi methods: `connect`, `getAddress`, `sendTransaction`, etc.) to avoid collision with `xrpl.js` or other XRPL extension providers
+2. `window.__xwk_dropfi` — optional private alias for host apps that preserve the DropFi provider before loading `xrpl.js`
+3. `window.dropfi` — optional legacy/private alias
+4. `window.xrpl` — the official DropFi injection point, accepted only when it passes the DropFi feature guard (must expose `isDropFi` or specific DropFi methods: `connect`, `sendTransaction`, `initialize`, etc.) to avoid collision with `xrpl.js` or other XRPL extension providers
+
+The official provider includes `selectedAddress`, `connectedAccounts`, `selectedNetwork`, `network`, `endpoint`, `connect`, `disconnect`, `signMessage`, `sendTransaction`, `switchNetwork`, `changeAccount`, `initialize`, and `isConnected`. It emits events such as `xrpl_selectedAddress`, `xrpl_connectedAccounts`, `xrpl_selectedNetwork`, and `xrpl_disconnect`.
 
 ## Capabilities
 
@@ -55,7 +57,7 @@ The adapter resolves the DropFi provider in this priority order:
 
 ## Message Signing
 
-DropFi returns a **compact message signature** (ECDSA/Ed25519):
+DropFi returns a **compact message signature** and public key:
 
 ```ts
 const result = await manager.signMessage({ message: "Verify wallet ownership" });
@@ -63,10 +65,12 @@ const result = await manager.signMessage({ message: "Verify wallet ownership" })
 // result.signatureKind === "signature"
 // result.proof      — same as result.signature
 // result.signature  — compact hex signature
-// result.publicKey  — account public key (if DropFi exposes it)
+// result.publicKey  — public key returned by DropFi
 ```
 
-Use DropFi (or GemWallet/Crossmark) when your backend expects a compact verifiable signature rather than an XRPL transaction blob.
+Use DropFi (or GemWallet/Crossmark) when your backend expects a compact verifiable signature rather than an XRPL transaction blob. DropFi's auth docs require the server to receive the original `message`, `signature`, and `publicKey`, convert the UTF-8 message to hex, and verify with `ripple-keypairs.verify(messageHex, signature, publicKey)`.
+
+If DropFi returns no `signature` or no `publicKey`, the adapter raises `SIGN_REJECTED`. Apps should not fall through to a different signing method after the user has already seen a DropFi signing prompt.
 
 ## Transactions
 
@@ -97,6 +101,7 @@ There is no mobile return / deeplink recovery — DropFi is a desktop browser ex
 
 - No `signTransaction` (sign without submit).
 - The `window.xrpl` fallback only activates when the provider passes the DropFi feature guard — it will not pick up `xrpl.js` global or other XRPL extension providers at `window.xrpl`.
+- DropFi `signMessage` is not GemWallet's `{ result: { signedMessage } }` shape. Treat the canonical DropFi shape as `{ signature, publicKey }`.
 
 ## Troubleshooting
 
@@ -114,7 +119,12 @@ There is no mobile return / deeplink recovery — DropFi is a desktop browser ex
 - [ ] Connect — DropFi popup appears, address returned on approval
 - [ ] `signAndSubmit` Payment — DropFi popup shows txn, hash returned
 - [ ] `signAndSubmit` NFT offer — DropFi popup shows NFT txn, hash returned
-- [ ] `signMessage` — compact signature returned, `signatureKind: "signature"`
+- [ ] `signMessage` — compact signature and public key returned, `signatureKind: "signature"`
 - [ ] Page reload — `autoReconnect()` restores session via `isConnected()` + address match
 - [ ] Extension not installed — modal shows install link to dropfi.app
 - [ ] Rejection — user dismisses popup, adapter throws `CONNECTION_REJECTED`
+
+## References
+
+- [DropFi Web Injection Script](https://www.dropfi.app/docs/dropfi-web-injection-script)
+- [DropFi Authentication with Message Hashing](https://www.dropfi.app/docs/authentication-with-message-hashing)

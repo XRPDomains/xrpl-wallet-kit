@@ -41,12 +41,12 @@ test("extension message signing adapters return compact signature proofs", async
   assert.equal(crossmark.publicKey, "EDCROSSMARK");
 
   const dropfi = await new DropFiAdapter({
-    provider: { signMessage: async () => "dropfi-signature" }
+    provider: { signMessage: async () => ({ signature: "dropfi-signature", publicKey: "EDDROPFI" }) }
   }).signMessage({ message: "hello", account });
   assert.equal(dropfi.signatureKind, "signature");
   assert.equal(dropfi.proof, "dropfi-signature");
   assert.equal(dropfi.signature, "dropfi-signature");
-  assert.equal(dropfi.publicKey, account.publicKey);
+  assert.equal(dropfi.publicKey, "EDDROPFI");
 
   const otsu = await new OtsuAdapter({
     provider: {
@@ -84,21 +84,21 @@ test("message signing adapters accept wallet-specific wrapped proof shapes", asy
   assert.equal(crossmark.publicKey, "EDWRAPPED");
 
   const dropfi = await new DropFiAdapter({
-    provider: { signMessage: async () => ({ result: { signedMessage: "dropfi-wrapped-signature" } }) }
+    provider: { signMessage: async () => ({ signature: "dropfi-signature", publicKey: "EDDROPFI" }) }
   }).signMessage({ message: "hello", account });
   assert.equal(dropfi.signatureKind, "signature");
-  assert.equal(dropfi.proof, "dropfi-wrapped-signature");
-  assert.equal(dropfi.signature, "dropfi-wrapped-signature");
+  assert.equal(dropfi.proof, "dropfi-signature");
+  assert.equal(dropfi.signature, "dropfi-signature");
+  assert.equal(dropfi.publicKey, "EDDROPFI");
 
-  const dropfiWithPublicKey = await new DropFiAdapter({
+  const wrappedDropfi = await new DropFiAdapter({
     provider: {
-      getPublicKey: async () => ({ result: { publicKey: "EDDROPFI" } }),
-      signMessage: async () => ({ response: { data: { signature: "dropfi-public-key-signature" } } })
+      signMessage: async () => ({ response: { data: { signature: "dropfi-wrapped-signature", publicKey: "EDWRAPPEDDROPFI" } } })
     }
   }).signMessage({ message: "hello", account: { address: account.address } });
-  assert.equal(dropfiWithPublicKey.signatureKind, "signature");
-  assert.equal(dropfiWithPublicKey.proof, "dropfi-public-key-signature");
-  assert.equal(dropfiWithPublicKey.publicKey, "EDDROPFI");
+  assert.equal(wrappedDropfi.signatureKind, "signature");
+  assert.equal(wrappedDropfi.proof, "dropfi-wrapped-signature");
+  assert.equal(wrappedDropfi.publicKey, "EDWRAPPEDDROPFI");
 
   const otsuWithPublicKey = await new OtsuAdapter({
     provider: {
@@ -538,6 +538,13 @@ test("extension message signing adapters reject cancel/null signature results", 
   await assert.rejects(
     () => new DropFiAdapter({
       provider: { signMessage: async () => null }
+    }).signMessage({ message: "hello", account }),
+    { code: WalletKitErrorCode.SIGN_REJECTED }
+  );
+
+  await assert.rejects(
+    () => new DropFiAdapter({
+      provider: { signMessage: async () => ({ signature: "dropfi-signature" }) }
     }).signMessage({ message: "hello", account }),
     { code: WalletKitErrorCode.SIGN_REJECTED }
   );

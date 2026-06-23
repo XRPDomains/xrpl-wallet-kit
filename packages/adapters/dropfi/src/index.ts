@@ -6,10 +6,13 @@ export const DROPFI_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAA
 export interface DropFiProvider {
   isDropFi?: boolean;
   selectedAddress?: string;
+  selectedNetwork?: string | { network?: string; networkId?: string; id?: string };
   connectedAccounts?: string[];
   accounts?: string[];
   network?: string | { network?: string; networkId?: string; id?: string };
   endpoint?: string;
+  on?: (event: string, cb: (payload: unknown) => void) => void;
+  off?: (event: string, cb: (payload: unknown) => void) => void;
   isConnected?: () => boolean | Promise<boolean>;
   publicKey?: string;
   getPublicKey?: () => string | { publicKey?: string; result?: { publicKey?: string } } | Promise<string | { publicKey?: string; result?: { publicKey?: string } } | null | undefined> | null | undefined;
@@ -18,8 +21,10 @@ export interface DropFiProvider {
   initialize?(): Promise<DropFiState | null>;
   getAddress?: () => string | null | { address?: string; selectedAddress?: string; publicKey?: string; result?: { address?: string; publicKey?: string } } | Promise<string | null | { address?: string; selectedAddress?: string; publicKey?: string; result?: { address?: string; publicKey?: string } }>;
   getAccounts?: () => string[] | { accounts?: string[] } | Promise<string[] | { accounts?: string[] }>;
-  signMessage?: (message: string) => Promise<string | { signature?: string; signedMessage?: string; result?: unknown; response?: unknown } | null | undefined>;
+  signMessage?: (message: string) => Promise<{ signature?: string; publicKey?: string } | null | undefined>;
   sendTransaction?: (tx: unknown) => Promise<string>;
+  switchNetwork?: (networkId: string) => Promise<unknown>;
+  changeAccount?: (account: string) => Promise<unknown>;
 }
 
 export interface DropFiState {
@@ -116,19 +121,11 @@ export class DropFiAdapter extends BaseWalletAdapter {
     const provider = this.provider();
     if (!provider.signMessage) throw new Error("DropFi provider is missing signMessage()");
     const result = await provider.signMessage(request.message);
-    const signature = typeof result === "string" ? result : this.pickString(result, [
+    const signature = this.pickString(result, [
       "signature",
-      "signedMessage",
-      "signed_message",
       "result.signature",
-      "result.signedMessage",
-      "result.signed_message",
       "response.signature",
-      "response.signedMessage",
-      "response.signed_message",
-      "response.data.signature",
-      "response.data.signedMessage",
-      "response.data.signed_message"
+      "response.data.signature"
     ]);
     if (typeof signature !== "string" || !signature) throw createWalletError.signRejected(signature);
     const publicKey = this.pickString(result, [
@@ -140,7 +137,8 @@ export class DropFiAdapter extends BaseWalletAdapter {
       "response.public_key",
       "response.data.publicKey",
       "response.data.public_key"
-    ]) ?? request.account?.publicKey ?? await this.resolvePublicKey(provider);
+    ]);
+    if (typeof publicKey !== "string" || !publicKey) throw createWalletError.signRejected(result);
     return {
       signatureKind: "signature" as const,
       proof: signature,

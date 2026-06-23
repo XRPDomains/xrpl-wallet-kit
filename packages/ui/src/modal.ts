@@ -56,7 +56,7 @@ export class WalletModal {
         this.openHandlers = new Set();
         this.closeHandlers = new Set();
         this.onDocumentKeyDown = (event) => this.handleDocumentKeyDown(event);
-        this.options = { manager: options.manager, ...resolveWalletUiOptions(options) };
+        this.options = { manager: options.manager, mount: options.mount, ...resolveWalletUiOptions(options) };
         this.offEvents.push(options.manager.on("qr", ({ adapterId, uri, deeplink }) => this.showQr(adapterId, uri, deeplink)), options.manager.on("connecting", ({ adapterId, recovering }) => {
             if (!recovering)
                 this.setLoading(adapterId);
@@ -141,8 +141,8 @@ export class WalletModal {
     onClose(handler: () => void): () => void {
         return this.on("close", handler);
     }
-    updateOptions(options: WalletUiConfig) {
-        this.options = { ...this.options, ...resolveWalletUiOptions(options) };
+    updateOptions(options: WalletUiConfig & Partial<Pick<WalletUiOptions, "mount">>) {
+        this.options = { ...this.options, mount: options.mount ?? this.options.mount, ...resolveWalletUiOptions(options) };
         this.activeGroupId = undefined;
     }
     private bind() {

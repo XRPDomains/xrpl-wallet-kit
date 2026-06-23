@@ -8,6 +8,7 @@ import { lightTheme } from "../packages/ui/src/themes";
 
 const manager = {
   on: () => () => undefined,
+  cancelPendingConnection: async () => undefined,
   getNetwork: () => ({ id: "mainnet", name: "XRPL Mainnet", networkType: "MAINNET" }),
   getWallets: () => [],
   getAdapter: () => undefined
@@ -52,6 +53,24 @@ test("WalletModal uses subtle motion without animating modal dimensions", () => 
   assert.match(styles, /@media\(prefers-reduced-motion:reduce\)/);
   assert.doesNotMatch(styles, /transition:[^}]*height/);
   assert.doesNotMatch(styles, /xwk-view-forward/);
+});
+
+test("WalletModal preserves custom mount through constructor and option updates", () => {
+  const mount = {} as HTMLElement;
+  const modal = new WalletModal({
+    manager: manager as never,
+    mount,
+    themeMode: "light"
+  }) as unknown as WalletModal & { options: { mount?: HTMLElement }; updateOptions(options: { themeMode?: "dark" | "light"; mount?: HTMLElement }): void };
+
+  assert.equal(modal.options.mount, mount);
+
+  modal.updateOptions({ themeMode: "dark" });
+  assert.equal(modal.options.mount, mount);
+
+  const nextMount = {} as HTMLElement;
+  modal.updateOptions({ mount: nextMount });
+  assert.equal(modal.options.mount, nextMount);
 });
 
 test("WalletModal clamps long adapter errors before display", () => {
