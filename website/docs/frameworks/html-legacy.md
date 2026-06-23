@@ -204,4 +204,19 @@ If your HTML page uses `<script type="module">` you can also import ESM directly
 <script type="module">
   import { createWalletKit } from "https://esm.sh/@xrpl-wallet-kit/client@latest";
 
-  const { manager } = cre
+  const { manager } = createWalletKit({
+    adapters: [XRPLWalletKit.createGemWalletAdapter()],
+    network: "mainnet",
+  });
+</script>
+```
+
+::: info
+ESM imports from esm.sh do not require a bundler, but they do need a browser that supports `<script type="module">`. For maximum compatibility with older browsers, use the IIFE bundle instead.
+:::
+
+## See Also
+
+- [Quick Start](/docs/quick-start) — modern bundler setup
+- [Vanilla TypeScript guide](/docs/frameworks/vanilla) — Vite / webpack setup
+- [IIFE bundle reference](/docs/api/create-wallet-kit) — full API for `createWalletKit`

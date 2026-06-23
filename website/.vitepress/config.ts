@@ -26,6 +26,7 @@ export default defineConfig({
     nav: [
       { text: "Docs", link: "/docs/introduction" },
       { text: "Playground", link: "/docs/playground" },
+      { text: "Theme Builder", link: "/docs/theme-builder" },
       { text: "API Reference", link: "/docs/api/wallet-manager" },
       {
         text: "v0.1.0-beta",
@@ -50,6 +51,7 @@ export default defineConfig({
           { text: "Installation", link: "/docs/installation" },
           { text: "Quick Start", link: "/docs/quick-start" },
           { text: "Playground", link: "/docs/playground" },
+          { text: "🎨 Theme Builder", link: "/docs/theme-builder" },
         ],
       },
       {
@@ -68,6 +70,7 @@ export default defineConfig({
           { text: "Networks", link: "/docs/configuration/networks" },
           { text: "Localization (i18n)", link: "/docs/configuration/i18n" },
           { text: "Connect Button", link: "/docs/configuration/connect-button" },
+          { text: "Identity & Avatar", link: "/docs/configuration/identity" },
         ],
       },
       {
@@ -100,6 +103,7 @@ export default defineConfig({
           { text: "Bundle & Performance", link: "/docs/advanced/bundle-performance" },
           { text: "Headless Core", link: "/docs/advanced/headless" },
           { text: "Custom Adapter", link: "/docs/advanced/custom-adapter" },
+          { text: "🤖 Building with AI", link: "/docs/advanced/ai-development" },
         ],
       },
       {

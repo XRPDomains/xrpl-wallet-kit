@@ -11,6 +11,8 @@ Adjust the controls to see how the modal looks with your configuration. The code
 The playground uses demo mode — no real wallet connection. Wallets are shown as empty slots to demonstrate layout and theming.
 :::
 
+> Want more control? **[🎨 Open Theme Builder →](/docs/theme-builder)** — full-page tool with presets, desktop/mobile preview, and live modal preview.
+
 <PlaygroundWidget />
 
 ## Applying your config

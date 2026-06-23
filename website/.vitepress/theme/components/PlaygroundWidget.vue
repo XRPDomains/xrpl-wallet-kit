@@ -313,8 +313,20 @@ function renderPreview() {
     try { modalInstance.destroy() } catch {}
     modalInstance = null
   }
-  mountRef.value.innerHTML = ''
-  mountRef.value.style.position = 'relative'
+  // Remove any lingering overlays before clearing (handles portal edge cases)
+  document.querySelectorAll('.xwk-overlay').forEach(el => el.remove())
+
+  // Root cause fix: ensureWalletStyle() (dom.js) deduplicates <style> tags by
+  // content-hash. If dark styles were injected at position 1 and light at
+  // position 2, switching back to light finds the existing light tag and
+  // SKIPS reinsertion — leaving dark at position 2 winning the cascade.
+  // Removing all xwk style tags forces fresh injection so the new theme's
+  // styles always land last in <head> and win.
+  document.head.querySelectorAll('style[data-xwk-style]').forEach(el => el.remove())
+
+  const mount = mountRef.value
+  mount.innerHTML = ''
+  mount.style.position = 'relative'
 
   const { WalletModal, WalletButtonController } = kitBundle
   const manager = buildMockManager()
@@ -385,9 +397,16 @@ function openInlineWorkaround(container: HTMLElement) {
 }
 
 // ── Watch for config changes → re-render ─────────────────────
+// Deep watch covers layout/size/accent/radius changes.
+// Explicit watch on mode ensures dark→light transition is never missed
+// (Vue may batch reactive-object watches differently from getter watches).
 watch(config, () => {
   if (kitLoaded.value) renderPreview()
 }, { deep: true })
+
+watch(() => config.mode, () => {
+  if (kitLoaded.value) renderPreview()
+})
 
 // ── Lifecycle ────────────────────────────────────────────────
 onMounted(async () => {

@@ -42,7 +42,7 @@ interface WalletButtonOptions {
   // Connected-state display
   showAdapterIcon?: boolean;        // show wallet logo next to address (default: true)
   showChevron?: boolean;            // show ▾ chevron on the button (default: true)
-  showWeb3Name?: boolean;           // show xrp.domains name if resolved (default: true)
+  showWeb3Name?: boolean;           // show xrpdomains.xyz name if resolved (default: true)
   fallbackToAddress?: boolean;      // fall back to address if no name resolved (default: true)
   formatAddress?: (addr: string) => string;   // custom address display format
 
@@ -151,7 +151,7 @@ const button = new WalletButton({
 
 ## Custom identity (web3 name)
 
-By default, the button uses `createXrpDomainsResolver()` to look up the address in xrp.domains. Supply your own resolver to use a different name registry:
+By default, the button uses `createXrpDomainsResolver()` to look up the address in [xrpdomains.xyz](https://xrpdomains.xyz). Supply your own resolver to use a different name registry:
 
 ```ts
 import { WalletButton } from "@xrpl-wallet-kit/ui";

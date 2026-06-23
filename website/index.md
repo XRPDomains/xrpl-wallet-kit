@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "XRPL Wallet Kit"
-  text: "Wallet adapters for every XRPL dApp"
-  tagline: Framework-agnostic. Headless. TypeScript-first. Supports vanilla JS, React, Vue, and legacy HTML in one SDK.
+  text: "Connect any XRPL wallet — ready in minutes"
+  tagline: "9 adapters · Customizable modal · Built-in auth · AI-powered"
   image:
     src: /logo.svg
     alt: XRPL Wallet Kit
@@ -21,37 +21,38 @@ hero:
 
 features:
   - icon: 🔌
-    title: 9 Wallet Adapters
-    details: Xaman, GemWallet, WalletConnect, Crossmark, Ledger, Dropfi, XRPL Snap, and Otsu — all behind one unified API. Add only the adapters your dApp needs.
+    title: 9 Wallet Adapters — most in the ecosystem
+    details: Xaman, GemWallet, WalletConnect, Crossmark, Ledger, Dropfi, XRPL Snap, Otsu — one unified API. Add only what your dApp needs.
     link: /docs/adapters/overview
     linkText: Browse adapters
 
   - icon: 🎨
-    title: Headless UI
-    details: Drop in the prebuilt modal and connect button, or build your own UI on top of the headless core — no framework required.
-    link: /docs/advanced/headless
-    linkText: Headless guide
+    title: Beautiful modal, fully customizable
+    details: Accent color, radius, dark/light mode, list or grid layout — all configurable. Live preview in the playground before writing a line of code.
+    link: /docs/playground
+    linkText: Try the playground
 
-  - icon: 🌐
-    title: Framework Agnostic
-    details: Works with React, Vue, Svelte, vanilla TypeScript, and plain HTML via IIFE CDN bundle. No framework, no bundler required.
-    link: /docs/frameworks/vanilla
-    linkText: Framework guides
-
-  - icon: ⚡
-    title: Tree-Shakeable
-    details: Only pay for what you import. Each adapter is a separate package. Core is 5.7 KB gzip.
-    link: /docs/advanced/bundle-performance
-    linkText: Bundle guide
+  - icon: 🤖
+    title: Build adapters with AI
+    details: The only XRPL wallet library with an AI coding skill. Claude Code and Codex produce correct adapters from wallet docs alone, with capability rules and error codes enforced automatically.
+    link: /docs/advanced/ai-development
+    linkText: AI development guide
 
   - icon: 🔒
-    title: Sign In with Wallet
-    details: Built-in authentication package — SIWW flow with nonce, message signing, and server-side signature verification. Works with any backend.
+    title: Sign In with XRPL Wallet
+    details: Nonce, wallet-signed message, server-side verification — all built in. Works with Express, Next.js, or any backend. No third-party service required.
     link: /docs/auth/introduction
     linkText: Auth guide
 
-  - icon: 🌍
-    title: Multinetwork
-    details: Mainnet, Testnet, Devnet, and custom XRPL networks. Built-in explorer links and network badge in the modal.
-    link: /docs/configuration/networks
-    linkText: Network co
+  - icon: 📦
+    title: Works everywhere — zero lock-in
+    details: React, Vue, vanilla TypeScript, or plain HTML via CDN script — one API everywhere. Core is 5.7 KB gzip.
+    link: /docs/frameworks/vanilla
+    linkText: See all frameworks
+
+  - icon: 🧩
+    title: Headless core & typed contract
+    details: UI is fully optional. Build a custom wallet selector on the headless core, or validate any adapter at runtime with assertWalletAdapter().
+    link: /docs/advanced/headless
+    linkText: Headless guide
+---

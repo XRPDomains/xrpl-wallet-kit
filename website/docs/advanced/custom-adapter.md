@@ -258,12 +258,18 @@ Never include these in an adapter:
 - **No DOM modals or framework code** — adapters must be pure TypeScript with no UI dependencies.
 - **No hardcoded WalletConnect `projectId`** — always require caller injection for credentials.
 
-## Building with AI (Claude Code / Codex)
+## Building with AI
 
-XRPL Wallet Kit ships an **adapter developer skill** for AI coding agents. If you use Claude Code or Codex, activate the skill at the start of your session:
+::: tip Adapter developer skill — a key differentiator
+XRPL Wallet Kit ships a dedicated **adapter developer skill** for Claude Code and Codex. No other XRPL wallet library has an equivalent. The skill encodes the full adapter contract, capability rules, error codes, session restore safety rules, and cleanup requirements — so AI agents produce correct adapters from wallet documentation alone, without missing edge cases.
+
+**[→ Full guide: Building Adapters with AI](/docs/advanced/ai-development)**
+:::
+
+Activate the skill at the start of your Claude Code session:
 
 ```
 /xrpl-wallet-kit-adapter-developer
 ```
 
-The skill loads the full adapter contract, capa
+Then describe the wallet's API to the agent. It will scaffold the factory function, set capability flags correctly, map errors to `WalletKitErrorCode`, implement `recoverSession()` with passive-only rules, and generate a test scaffold — all following the adapter contract automatically.
