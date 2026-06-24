@@ -8,7 +8,7 @@ export const XRPL_MAINNET: WalletNetwork = {
   nativeAsset: "XRP",
   nativeAssetDecimals: 6,
   rpcUrl: "wss://xrplcluster.com",
-  httpRpcUrl: "https://xrplcluster.com",
+  httpRpcUrl: "https://xrpl.ws",
   walletConnectChainId: "xrpl:0",
   explorerTxUrl: "https://livenet.xrpl.org/transactions/{hash}",
   explorerAccountUrl: "https://livenet.xrpl.org/accounts/{address}"

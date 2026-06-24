@@ -37,7 +37,7 @@ For React:
 npm install @xrpl-wallet-kit/client @xrpl-wallet-kit/react
 ```
 
-For plain HTML or legacy jQuery sites:
+For Legacy HTML sites:
 
 ```bash
 npm install @xrpl-wallet-kit/browser

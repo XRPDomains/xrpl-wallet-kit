@@ -40,7 +40,7 @@ The package publishes:
 
 ## Legacy Bridge
 
-Use `xrpl-wallet-kit-legacy-bridge.js` when a legacy page needs a smaller integration surface around the browser bundle. The bridge is intended for HTML/jQuery apps that want to mount the connect button and read wallet state without migrating the whole app at once.
+Use `xrpl-wallet-kit-legacy-bridge.js` when a legacy page needs a smaller integration surface around the browser bundle. The bridge is intended for Legacy HTML apps that want to mount the connect button and read wallet state without migrating the whole app at once.
 
 ## Notes
 

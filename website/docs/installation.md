@@ -126,7 +126,7 @@ const { createWalletKit, createXamanAdapter } = XRPLWalletKit;
 The IIFE bundle is large because it includes all adapters and polyfills. For production sites, prefer the modular install with a bundler.
 :::
 
-See the [HTML Legacy / CDN guide](/docs/frameworks/html-legacy) for a complete example.
+See the [HTML Legacy / CDN guide](/docs/frameworks/legacy-cdn) for a complete example.
 
 ## TypeScript
 

@@ -17,11 +17,11 @@ const manager = new WalletManager({
 });
 ```
 
-| Constant | Network | WebSocket URL |
-|---|---|---|
-| `XRPL_MAINNET` | Mainnet | `wss://xrplcluster.com` |
-| `XRPL_TESTNET` | Testnet | `wss://s.altnet.rippletest.net:51233` |
-| `XRPL_DEVNET` | Devnet | `wss://s.devnet.rippletest.net:51233` |
+| Constant | Network | WebSocket URL | Browser HTTP RPC |
+|---|---|---|---|
+| `XRPL_MAINNET` | Mainnet | `wss://xrplcluster.com` | `https://xrpl.ws` |
+| `XRPL_TESTNET` | Testnet | `wss://s.altnet.rippletest.net:51233` | `https://s.altnet.rippletest.net:51234` |
+| `XRPL_DEVNET` | Devnet | `wss://s.devnet.rippletest.net:51233` | `https://s.devnet.rippletest.net:51234` |
 
 ## Custom Network
 
@@ -32,6 +32,7 @@ const manager = new WalletManager({
     id: "my-network",
     networkType: "MAINNET",        // used for network badge color
     url: "wss://my-xrpl-node.example.com",
+    httpRpcUrl: "https://my-xrpl-node.example.com",
     nativeAsset: "XRP",
     nativeAssetDecimals: 6,
     explorerUrl: "https://livenet.xrpl.org", // optional
@@ -39,6 +40,8 @@ const manager = new WalletManager({
   },
 });
 ```
+
+`httpRpcUrl` is used by browser-side account status and balance lookup. If you enable `showBalance`, use an HTTP JSON-RPC endpoint that sends CORS headers for your dApp origin.
 
 ## Network Badge
 

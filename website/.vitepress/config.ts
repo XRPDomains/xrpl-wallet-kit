@@ -51,7 +51,7 @@ export default defineConfig({
       { text: "Theme Builder", link: "/docs/theme-builder" },
       { text: "API Reference", link: "/docs/api/wallet-manager" },
       {
-        text: "v0.1.0-beta",
+        text: "v0.1.3",
         items: [
           {
             text: "Changelog",
@@ -84,7 +84,7 @@ export default defineConfig({
           { text: "Vue 3", link: "/docs/frameworks/vue" },
           { text: "Nuxt 3", link: "/docs/frameworks/nuxt" },
           { text: "Vanilla TypeScript", link: "/docs/frameworks/vanilla" },
-          { text: "HTML (Legacy / CDN)", link: "/docs/frameworks/html-legacy" },
+          { text: "HTML (Legacy / CDN)", link: "/docs/frameworks/legacy-cdn" },
         ],
       },
       {

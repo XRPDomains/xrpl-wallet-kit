@@ -261,4 +261,4 @@ await auth.signIn();
 
 - [Sign In with XRPL — Introduction](/docs/auth/introduction)
 - [Next.js Auth Guide](/docs/auth/nextjs)
-- [HTML Legacy / CDN guide](/docs/frameworks/html-legacy) — plain HTML version with IIFE 
+- [HTML Legacy / CDN guide](/docs/frameworks/legacy-cdn) — plain HTML version with IIFE

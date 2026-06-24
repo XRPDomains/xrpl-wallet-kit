@@ -1,6 +1,6 @@
 # Legacy HTML Integration Guide
 
-This guide shows how to add XRPL Wallet Kit to a plain HTML or jQuery application without converting the app to React or Next.js.
+This guide shows how to add XRPL Wallet Kit to a Legacy HTML application without converting the app to React or Next.js.
 
 ## 1. Copy the Browser Bundle
 

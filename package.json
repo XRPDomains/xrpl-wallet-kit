@@ -27,7 +27,7 @@
     "build:vanilla": "node scripts/build-vanilla.mjs",
     "dev:vanilla": "node scripts/serve-vanilla.mjs",
     "dev:react": "node scripts/serve-react.mjs",
-    "dev:html-jquery": "npm --workspace @xrpl-wallet-kit/example-html-jquery run dev"
+    "dev:html-legacy": "npm --workspace @xrpl-wallet-kit/example-html-legacy-bundle run dev"
   },
   "devDependencies": {
     "@types/react": "^18.3.28",

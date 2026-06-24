@@ -76,7 +76,7 @@ XRPL Wallet Kit has no React dependency. The headless core works with any JavaSc
 | Vue 3 | [Vue 3 guide](/docs/frameworks/vue) |
 | Nuxt 3 | [Nuxt 3 guide](/docs/frameworks/nuxt) |
 | Vanilla TypeScript | [Vanilla TS guide](/docs/frameworks/vanilla) |
-| Plain HTML / CDN | [HTML legacy guide](/docs/frameworks/html-legacy) |
+| Plain HTML / CDN | [HTML legacy guide](/docs/frameworks/legacy-cdn) |
 
 ## Next Steps
 

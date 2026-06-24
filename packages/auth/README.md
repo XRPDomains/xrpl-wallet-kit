@@ -149,7 +149,7 @@ For `signatureKind: "signature"`, `publicKey` should be provided by the wallet/s
 
 For `signatureKind: "signedTx"`, the verifier checks the signed transaction blob, signer address, transaction `Account`, and first memo text against the original auth message.
 
-## Legacy HTML / jQuery Pattern
+## Legacy HTML Pattern
 
 Legacy pages can use the same API from the browser bundle or ESM build. Keep the server verification endpoint separate:
 

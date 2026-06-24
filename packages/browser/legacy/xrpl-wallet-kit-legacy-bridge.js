@@ -217,7 +217,7 @@
       walletList: Object.assign({
         layout: 'list',
         wallets: 'all',
-        showGroup: true,
+        showGroup: false,
         showInstalledBadge: true
       }, options.walletList || {}),
       walletConnect: Object.assign({ mode: 'default', cta: 'both', qr: { style: 'dots', showLogo: false } }, options.walletConnect || {}),

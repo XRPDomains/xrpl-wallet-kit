@@ -1,6 +1,6 @@
-﻿# Install XRPL Wallet Kit in Legacy HTML / jQuery Sites
+﻿# Install XRPL Wallet Kit in Legacy HTML Sites
 
-This guide is for plain HTML, jQuery, Bootstrap, or older frontend apps that already have their own `Connect Wallet` button or legacy wallet functions. The goal is to add XRPL Wallet Kit with a few script tags and one initialization call. React is not required.
+This guide is for Legacy HTML, Bootstrap, CMS, or older frontend apps that already have their own `Connect Wallet` button or legacy wallet functions. The goal is to add XRPL Wallet Kit with a few script tags and one initialization call. React is not required.
 
 ## 1. Files to Copy to Your Server
 

@@ -1,6 +1,6 @@
 # HTML (Legacy / CDN)
 
-Use XRPL Wallet Kit on pages that cannot use a bundler — a classic CMS site, a legacy app, or any plain HTML page. The IIFE bundle works with any JavaScript environment: vanilla JS, jQuery, Alpine.js, or no library at all.
+Use XRPL Wallet Kit on pages that cannot use a bundler - a classic CMS site, a legacy app, or any plain HTML page. The IIFE bundle works with plain browser JavaScript and does not require a framework.
 
 ## Load the IIFE Bundle
 
@@ -101,16 +101,14 @@ The IIFE bundle is large because it includes all adapters and polyfills. For pro
 </script>
 ```
 
-## Example: jQuery Integration
+## Example: Existing Legacy Page
 
-The kit works equally well with jQuery, Alpine.js, or any other library — just call the same global API inside your existing setup code.
+Call the same global API from your existing page script and keep the wallet UI mounted in a normal DOM node.
 
 ```html
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="/assets/xrpl-wallet-kit.iife.min.js"></script>
 
 <script>
-$(function () {
   var WalletKit = window.XRPLWalletKit;
 
   var manager = new WalletKit.WalletManager({
@@ -133,18 +131,18 @@ $(function () {
   });
 
   manager.on('connected', function (event) {
-    $('#wallet-address').text(event.account.address).show();
-    $('#connect-section').hide();
-    $('#app-section').show();
+    document.getElementById('wallet-address').textContent = event.account.address;
+    document.getElementById('wallet-address').hidden = false;
+    document.getElementById('connect-section').hidden = true;
+    document.getElementById('app-section').hidden = false;
   });
 
   manager.on('disconnected', function () {
-    $('#app-section').hide();
-    $('#connect-section').show();
+    document.getElementById('app-section').hidden = true;
+    document.getElementById('connect-section').hidden = false;
   });
 
   manager.recoverSession();
-});
 </script>
 ```
 
