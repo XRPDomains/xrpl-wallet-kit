@@ -144,4 +144,4 @@ npm.cmd run build:browser
 
 ## Status
 
-`0.1.0-beta.0` is the first public beta target. APIs are intended to be stable enough for integration testing, but may still change before `1.0.0`.
+`0.1.0` is the first stable public release. APIs are ready for real integrations, while the project remains pre-`1.0.0` and may still make carefully documented breaking changes before the long-term stable API.

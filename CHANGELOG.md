@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.1.0-beta.0
+## 0.1.0
 
-First public beta target for XRPL Wallet Kit.
+First stable public release for XRPL Wallet Kit.
 
 ### Added
 
@@ -12,10 +12,10 @@ First public beta target for XRPL Wallet Kit.
 - React and Next.js helper packages.
 - First-party adapters for Xaman, GemWallet, Crossmark, DropFi, WalletConnect, XRPL Snap, and Ledger.
 - Sign-only and sign-and-submit manager flows.
-- Basic docs for npm beta, browser usage, and legacy HTML integration.
+- Basic docs for npm, browser usage, and legacy HTML integration.
 
 ### Notes
 
-- Published under the `beta` npm dist-tag.
+- Intended for the `latest` npm dist-tag.
 - WalletConnect `projectId` must be provided by the integrating app.
 - APIs may still change before `1.0.0`.
