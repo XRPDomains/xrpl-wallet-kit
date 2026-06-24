@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+### Fixed
+
+- Fixed the browser package build so npm publishes both the IIFE bundles and the root ESM/type entry files.
+
 ## 0.1.2
 
 ### Fixed
