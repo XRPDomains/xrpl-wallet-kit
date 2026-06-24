@@ -56,7 +56,7 @@ interface WalletUiOptions {
   /** Custom wallet groups */
   groups?: WalletUiGroup[];
 
-  /** Show group headers in wallet list (default: true) */
+  /** Show small wallet group subtitles under wallet names (default: false) */
   showWalletGroup?: boolean;
 
   /** Modal title (default: "Connect Wallet") */
@@ -170,6 +170,7 @@ interface WalletUiConfig {
     layout?: "list" | "grid" | "card" | "icon";
     wallets?: string[];
     groups?: WalletUiGroup[];
+    /** Show small wallet group subtitles under wallet names (default: false) */
     showGroup?: boolean;
   };
   /** WalletConnect section settings */

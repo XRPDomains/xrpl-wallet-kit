@@ -937,7 +937,7 @@ class WalletPickerView {
     }
     private renderWallet(wallet: WalletMetadata, layout: WalletUiLayout) {
         const icon = this.renderWalletIcon(wallet);
-        const showGroup = this.options.showWalletGroup !== false && layout !== "icon";
+        const showGroup = this.options.showWalletGroup === true && layout !== "icon";
         const secondary = showGroup ? `<span class="xwk-group">${this.escapeHtml(this.getWalletSecondaryLabel(wallet))}</span>` : "";
         const badge = this.renderWalletBadges(wallet, layout);
         return `<button class="xwk-wallet" data-wallet-id="${this.escapeHtml(wallet.id)}">${icon}<span class="xwk-wallet-info"><span class="xwk-name">${this.escapeHtml(wallet.name)}</span>${secondary}</span>${badge}</button>`;

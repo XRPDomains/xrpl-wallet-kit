@@ -33,7 +33,7 @@ export function resolveWalletUiOptions(overrides: (WalletUiConfig & Partial<Omit
     transactionPreview,
     title: modal?.title ?? overrides.title ?? resolvedMessages.connectWallet,
     footerText: modal?.footerText ?? overrides.footerText ?? "XRPL Wallet Kit",
-    showWalletGroup: walletList?.showGroup ?? overrides.showWalletGroup ?? true,
+    showWalletGroup: walletList?.showGroup ?? overrides.showWalletGroup ?? false,
     themeName,
     theme: {
       ...resolveWalletTheme({ mode: mode ?? overrides.themeMode ?? "light", themeName }),

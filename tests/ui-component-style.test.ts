@@ -179,7 +179,7 @@ test("themeName presets resolve before token overrides", () => {
   assert.equal(theme.success, "#00cc88");
 });
 
-test("WalletModal renders recommended badge without duplicating recommended group label", () => {
+test("WalletModal hides wallet group subtitles by default and keeps recommended badge", () => {
   const modal = new WalletModal({
     manager: manager as never,
     themeMode: "light"
@@ -200,8 +200,30 @@ test("WalletModal renders recommended badge without duplicating recommended grou
   assert.match(styles, /\.xwk-wallet-badges\{[^}]*margin-left:auto/);
   assert.match(styles, /\.xwk-wallet-badge\.xwk-recommended\{[^}]*color:#0078ae/);
   assert.match(html, /class="xwk-wallet-badge xwk-recommended">Recommended<\/span>/);
+  assert.doesNotMatch(html, /<span class="xwk-group">Mobile wallet<\/span>/);
+  assert.doesNotMatch(html, /<span class="xwk-group">Recommended<\/span>/);
+});
+
+test("WalletModal can opt in to wallet group subtitles", () => {
+  const modal = new WalletModal({
+    manager: manager as never,
+    themeMode: "light",
+    showWalletGroup: true
+  }) as unknown as {
+    renderWallet(wallet: WalletMetadata, layout: "list" | "card" | "icon"): string;
+  };
+  const wallet: WalletMetadata = {
+    id: "xaman",
+    name: "Xaman",
+    type: "mobile",
+    group: "Recommended",
+    recommended: true
+  };
+  const html = modal.renderWallet(wallet, "list");
+
   assert.match(html, /<span class="xwk-group">Mobile wallet<\/span>/);
   assert.doesNotMatch(html, /<span class="xwk-group">Recommended<\/span>/);
+  assert.doesNotMatch(modal.renderWallet(wallet, "icon"), /<span class="xwk-group">/);
 });
 
 test("WalletModal keeps recommended badge text when partial messages omit new labels", () => {
