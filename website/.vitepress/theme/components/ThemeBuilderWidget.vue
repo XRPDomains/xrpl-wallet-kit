@@ -549,39 +549,40 @@ function renderPreview() {
 
 
 // ── Inline containment (persistent: catches every internal SDK mount() call) ──
+
+/** WalletModal overlay — class: xwk-overlay, inner: .xwk-modal */
 function applyOverlayContainment(overlay: HTMLElement, container: HTMLElement, isMobile: boolean) {
   if (overlay.parentElement !== container) container.appendChild(overlay)
 
-  // Base: contain inside preview frame (override SDK's position:fixed)
   Object.assign(overlay.style, {
     position:        'relative',
     inset:           'unset',
     zIndex:          '1',
     backgroundColor: 'transparent',
     width:           '100%',
-    // Clear any stale flex props from previous renders
-    flexDirection:   '',
-    alignItems:      '',
-    justifyContent:  '',
   })
 
   if (isMobile) {
-    // Mobile: flex column — push modal to bottom, full-width (bottom-sheet)
+    // flex:1 fills remaining height in mount (after btnWrap) — not height:100% which would overflow
     Object.assign(overlay.style, {
       display:        'flex',
       flexDirection:  'column',
-      justifyContent: 'flex-end',   // main axis = vertical → push to bottom
-      alignItems:     'stretch',    // cross axis = horizontal → full width
-      minHeight:      '480px',
+      justifyContent: 'flex-end',
+      alignItems:     'stretch',
+      flex:           '1',
+      height:         'unset',
+      minHeight:      'unset',
       padding:        '0',
+      overflowY:      'hidden',
     })
-    // Apply bottom-sheet shape to the modal element
     const applyModal = () => {
       const modal = overlay.querySelector('.xwk-modal') as HTMLElement | null
       if (!modal) { requestAnimationFrame(applyModal); return }
       Object.assign(modal.style, {
         width:                   '100%',
         maxWidth:                'none',
+        // Let SDK height logic control vertical size, but cap at container
+        maxHeight:               '100%',
         borderBottomLeftRadius:  '0',
         borderBottomRightRadius: '0',
         borderBottom:            'none',
@@ -592,33 +593,143 @@ function applyOverlayContainment(overlay: HTMLElement, container: HTMLElement, i
     }
     requestAnimationFrame(applyModal)
   } else {
-    // Desktop: grid center — modal floats at natural size, centered horizontally
     Object.assign(overlay.style, {
-      display:     'grid',
-      placeItems:  'start center',
-      minHeight:   '520px',
-      padding:     '32px 16px 24px',
+      display:    'grid',
+      placeItems: 'start center',
+      minHeight:  '520px',
+      padding:    '32px 16px 24px',
     })
   }
 }
 
+/** WalletButton account panel portal — class: xwk-account-portal
+ *  Structure: xwk-account-portal > xwk-account-overlay (position:fixed) > xwk-account-panel-modal
+ *  Always appended to document.body. Must fix ALL 3 layers.
+ *  Called on initial containment AND re-called on every portal re-render (QR view, back button). */
+function applyPortalInnerStyles(
+  portal:   HTMLElement,
+  backdrop: HTMLElement,
+  panel:    HTMLElement,
+  isMobile: boolean,
+) {
+  // Always: un-fix backdrop + clear overlay tint
+  Object.assign(backdrop.style, {
+    position:   'relative',
+    inset:      'unset',
+    background: 'transparent',
+  })
+
+  if (isMobile) {
+    // flex:1 fills remaining height in mount (after btnWrap)
+    Object.assign(portal.style, {
+      flex:          '1',
+      height:        'unset',
+      minHeight:     'unset',
+      display:       'flex',
+      flexDirection: 'column',
+    })
+    // Backdrop fills portal → align-items:flex-end pushes panel to bottom
+    Object.assign(backdrop.style, {
+      width:          '100%',
+      flex:           '1',
+      height:         'unset',
+      display:        'flex',
+      alignItems:     'flex-end',
+      justifyContent: 'stretch',
+      padding:        '0',
+    })
+    // Panel: full-width bottom sheet, no border-radius at bottom
+    Object.assign(panel.style, {
+      width:                   '100%',
+      maxWidth:                'none',
+      maxHeight:               '100%',
+      borderBottomLeftRadius:  '0',
+      borderBottomRightRadius: '0',
+      borderBottom:            'none',
+      borderLeft:              'none',
+      borderRight:             'none',
+      transform:               'none',
+    })
+  } else {
+    // Desktop: portal as grid, backdrop transparent pass-through
+    Object.assign(portal.style, {
+      minHeight:  '520px',
+      display:    'grid',
+      placeItems: 'start center',
+      padding:    '32px 16px 24px',
+    })
+    Object.assign(backdrop.style, { display: 'contents' })
+  }
+}
+
+function applyPortalContainment(portal: HTMLElement, container: HTMLElement, isMobile: boolean) {
+  if (portal.parentElement !== container) container.appendChild(portal)
+
+  Object.assign(portal.style, {
+    position: 'relative',
+    inset:    'unset',
+    zIndex:   '1',
+    width:    '100%',
+  })
+
+  const applyInner = () => {
+    const backdrop = portal.querySelector('.xwk-account-overlay') as HTMLElement | null
+    const panel    = portal.querySelector('.xwk-account-panel-modal') as HTMLElement | null
+    if (!backdrop || !panel) { requestAnimationFrame(applyInner); return }
+    applyPortalInnerStyles(portal, backdrop, panel, isMobile)
+  }
+  requestAnimationFrame(applyInner)
+}
+
 function setupInlineObserver(container: HTMLElement, isMobile: boolean): MutationObserver {
-  // Watch document.body (not subtree) — SDK always appends overlay directly to body
-  // because the `mount` option is dropped in resolveWalletUiOptions (SDK bug)
+  // Watch BOTH container and document.body:
+  // - WalletModal overlay (.xwk-overlay): SDK → appends to options.mount (container) ✓
+  // - WalletButton account portal (.xwk-account-portal): always goes to document.body
+  // - Portal inner refresh (.xwk-account-overlay): portal.innerHTML replaced on QR/back →
+  //   new overlay added to portal childList — caught by per-portal observe below
   const mo = new MutationObserver((mutations) => {
     for (const mut of mutations) {
       for (const node of Array.from(mut.addedNodes)) {
-        if (node instanceof HTMLElement && node.classList.contains('xwk-overlay')) {
+        if (!(node instanceof HTMLElement)) continue
+
+        if (node.classList.contains('xwk-overlay')) {
           applyOverlayContainment(node, container, isMobile)
+
+        } else if (node.classList.contains('xwk-account-portal')) {
+          applyPortalContainment(node, container, isMobile)
+          // Also watch this portal's direct children so QR/back re-renders are caught
+          mo.observe(node, { childList: true })
+
+        } else if (node.classList.contains('xwk-account-overlay')) {
+          // Portal innerHTML was replaced (QR view, back button) — re-apply inner styles
+          const portal = node.parentElement
+          if (portal?.classList.contains('xwk-account-portal')) {
+            const panel = node.querySelector('.xwk-account-panel-modal') as HTMLElement | null
+            if (panel) {
+              applyPortalInnerStyles(portal, node, panel, isMobile)
+            } else {
+              // panel not yet in DOM — rAF fallback
+              requestAnimationFrame(() => {
+                const p = node.querySelector('.xwk-account-panel-modal') as HTMLElement | null
+                if (p) applyPortalInnerStyles(portal, node, p, isMobile)
+              })
+            }
+          }
         }
       }
     }
   })
+  mo.observe(container, { childList: true })
   mo.observe(document.body, { childList: true })
 
-  // Also catch overlay already in body from auto-open in renderPreview
-  const existing = document.body.querySelector(':scope > .xwk-overlay') as HTMLElement | null
-  if (existing) applyOverlayContainment(existing, container, isMobile)
+  // Catch elements already in DOM at observer start (auto-open, leftover from previous render)
+  for (const el of Array.from(document.querySelectorAll('.xwk-overlay')) as HTMLElement[]) {
+    applyOverlayContainment(el, container, isMobile)
+  }
+  for (const el of Array.from(document.querySelectorAll('.xwk-account-portal')) as HTMLElement[]) {
+    applyPortalContainment(el, container, isMobile)
+    mo.observe(el, { childList: true })
+  }
 
   return mo
 }
@@ -1082,6 +1193,8 @@ onUnmounted(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  /* Fixed height so the phone frame never jumps with content changes */
+  height: 760px;
 }
 
 /* ── Status bar (inline: time | island | icons) ── */
@@ -1205,6 +1318,18 @@ onUnmounted(() => {
   border: none;
   border-top: 1px solid var(--vp-c-border);
   border-bottom: 1px solid var(--vp-c-border);
+  flex: 1;          /* fill remaining height between status bar and home bar */
+  min-height: 0;    /* allow shrinking below content size */
+  overflow: hidden;
+}
+
+/* Mount inside phone fills the frame exactly — flex column so overlay takes remaining space */
+.tb-phone .tb-mount {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Mobile outer: center the phone */

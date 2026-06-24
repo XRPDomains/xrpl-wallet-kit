@@ -29,19 +29,6 @@
       </div>
 
       <div class="pg-section">
-        <label class="pg-label">Modal Size</label>
-        <div class="pg-chips">
-          <button
-            v-for="opt in sizes"
-            :key="opt.value"
-            class="pg-chip"
-            :class="{ active: config.size === opt.value }"
-            @click="config.size = opt.value"
-          >{{ opt.label }}</button>
-        </div>
-      </div>
-
-      <div class="pg-section">
         <label class="pg-label">Button Variant</label>
         <div class="pg-chips">
           <button
@@ -54,68 +41,6 @@
         </div>
       </div>
 
-      <div class="pg-section">
-        <label class="pg-label">Button Size</label>
-        <div class="pg-chips">
-          <button
-            v-for="opt in btnSizes"
-            :key="opt.value"
-            class="pg-chip"
-            :class="{ active: config.btnSize === opt.value }"
-            @click="config.btnSize = opt.value"
-          >{{ opt.label }}</button>
-        </div>
-      </div>
-
-      <div class="pg-section">
-        <label class="pg-label">Accent color</label>
-        <div class="pg-swatches">
-          <button
-            v-for="swatch in swatches"
-            :key="swatch.value"
-            class="pg-swatch"
-            :class="{ active: config.accent === swatch.value }"
-            :style="{ background: swatch.value }"
-            :title="swatch.label"
-            @click="config.accent = swatch.value"
-          ></button>
-        </div>
-        <input
-          type="color"
-          class="pg-color-input"
-          :value="config.accent"
-          @input="config.accent = ($event.target as HTMLInputElement).value"
-          title="Custom color"
-        />
-      </div>
-
-      <div class="pg-section">
-        <label class="pg-label">Modal Radius</label>
-        <input
-          type="range"
-          min="0"
-          max="24"
-          step="2"
-          :value="parseInt(config.radius)"
-          @input="config.radius = ($event.target as HTMLInputElement).value + 'px'"
-          class="pg-range"
-        />
-        <span class="pg-range-value">{{ config.radius }}</span>
-      </div>
-
-      <div class="pg-section">
-        <label class="pg-label">Wallet Radius</label>
-        <input
-          type="range"
-          min="0"
-          max="20"
-          step="2"
-          :value="parseInt(config.walletRadius)"
-          @input="config.walletRadius = ($event.target as HTMLInputElement).value + 'px'"
-          class="pg-range"
-        />
-        <span class="pg-range-value">{{ config.walletRadius }}</span>
-      </div>
     </aside>
 
     <!-- Preview panel -->
@@ -168,31 +93,12 @@ const modes  = [
   { value: 'dark',  label: 'Dark' },
   { value: 'auto',  label: 'Auto' },
 ]
-const sizes  = [
-  { value: 'compact', label: 'Compact' },
-  { value: 'default', label: 'Default' },
-  { value: 'wide',    label: 'Wide' },
-]
 const btnVariants = [
   { value: 'default', label: 'Default' },
   { value: 'pill',    label: 'Pill'    },
   { value: 'minimal', label: 'Minimal' },
   { value: 'outline', label: 'Outline' },
 ]
-const btnSizes = [
-  { value: 'sm', label: 'SM' },
-  { value: 'md', label: 'MD' },
-  { value: 'lg', label: 'LG' },
-]
-const swatches = [
-  { value: '#0078ae', label: 'XRPL blue (default)' },
-  { value: '#2563eb', label: 'Blue' },
-  { value: '#7c3aed', label: 'Violet' },
-  { value: '#059669', label: 'Emerald' },
-  { value: '#dc2626', label: 'Red' },
-  { value: '#0891b2', label: 'Cyan' },
-]
-
 // ── Refs ─────────────────────────────────────────────────────
 const mountRef   = ref<HTMLElement | null>(null)
 const previewRef = ref<HTMLElement | null>(null)
@@ -356,15 +262,7 @@ function renderPreview() {
     mount: mountRef.value,
   })
 
-  // Patch open() so modal renders inline inside preview (not full-screen)
-  // NOTE: openInlineWorkaround must NOT call modal.open() — that causes infinite recursion
-  const _origOpen = modalInstance.open.bind(modalInstance)
-  modalInstance.open = () => {
-    _origOpen()
-    openInlineWorkaround(mountRef.value!)
-  }
-
-  // Create connect button — clicking it triggers modal.open() above
+  // Create connect button — clicking it opens the modal as a normal popup overlay
   // Constructor only wires event listeners; .mount() does the actual DOM render
   buttonInstance = new WalletButtonController({
     manager,
@@ -375,25 +273,6 @@ function renderPreview() {
     theme: { accent: config.accent, radius: config.radius },
   })
   buttonInstance.mount(btnWrap)
-}
-
-// After _origOpen() appends .xwk-overlay to mountRef, patch its CSS
-// so it renders inline (position:relative) instead of full-screen (position:fixed)
-function openInlineWorkaround(container: HTMLElement) {
-  // Use rAF to ensure the overlay is in the DOM before querying
-  requestAnimationFrame(() => {
-    const overlay = container.querySelector('.xwk-overlay') as HTMLElement
-    if (overlay) {
-      overlay.style.position = 'relative'
-      overlay.style.inset = 'unset'
-      overlay.style.zIndex = '1'
-      overlay.style.minHeight = '480px'
-      overlay.style.display = 'flex'
-      overlay.style.alignItems = 'flex-start'
-      overlay.style.justifyContent = 'center'
-      overlay.style.padding = '24px 16px'
-    }
-  })
 }
 
 // ── Watch for config changes → re-render ─────────────────────
@@ -625,4 +504,3 @@ onUnmounted(() => {
   overflow-x: auto;
 }
 </style>
-                                                              

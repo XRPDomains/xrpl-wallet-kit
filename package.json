@@ -11,11 +11,13 @@
     "examples/*"
   ],
   "scripts": {
+    "prepare": "husky",
     "build": "tsc -b",
     "build:browser": "npm run build && npm --workspace @xrpl-wallet-kit/browser run build && npm run smoke:browser",
     "typecheck": "tsc -b --pretty false",
     "test": "npm run build && node --import tsx --test tests/*.test.ts",
     "smoke:browser": "node tests/browser-bundle-smoke.mjs",
+    "check:integrity": "node scripts/check-file-integrity.mjs",
     "check:unused": "knip --no-progress --reporter compact",
     "check:unused:report": "knip --no-progress --reporter compact --no-exit-code",
     "check:duplicates": "jscpd --config .jscpd.json packages examples tests",
@@ -36,11 +38,12 @@
     "@walletconnect/utils": "^2.23.9",
     "buffer": "^6.0.3",
     "dependency-cruiser": "^17.4.0",
+    "husky": "^9.1.7",
     "jscpd": "^4.2.3",
     "knip": "^6.14.1",
     "tsx": "^4.22.3",
     "typescript": "^5.5.4",
-    "vite": "^5.4.0",
+    "vite": "^6.4.3",
     "xumm": "^1.8.0",
     "xumm-oauth2-pkce": "^2.8.7"
   },

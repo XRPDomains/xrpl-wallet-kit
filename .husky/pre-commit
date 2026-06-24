@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+# .husky/pre-commit
+# ---------------------------------------------------------------
+# Catch agent-induced corruption + run project gates before commit.
+# ---------------------------------------------------------------
+# 1) Per-file integrity (fast)
+node scripts/check-file-integrity.mjs || exit 1
+
+# 2) Project gates
+NPM_BIN="npm"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) NPM_BIN="npm.cmd" ;;
+esac
+
+"$NPM_BIN" run typecheck || exit 1
+"$NPM_BIN" test --silent || exit 1
+
+# Optional: regenerate IIFE bundle hash so vendor copies stay in sync
+# npm run build:browser || exit 1

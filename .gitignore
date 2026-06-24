@@ -14,5 +14,8 @@ docs/*_vi.md
 
 *.log
 *.tsbuildinfo
+*.timestamp-*.mjs
 .DS_Store
 Thumbs.db
+
+website/.impeccable/
