@@ -1,6 +1,6 @@
-# HTML/jQuery Browser Bundle Preview
+# Legacy HTML Browser Bundle Preview
 
-This example shows the browser-bundle integration style for legacy HTML or jQuery apps.
+This example shows the browser-bundle integration style for Legacy HTML apps.
 
 Build the bundle first:
 
@@ -8,7 +8,7 @@ Build the bundle first:
 npm run build:browser
 ```
 
-Then open `examples/html-jquery/index.html` from a local server, or copy:
+Then open `examples/html-legacy-bundle/index.html` from a local server, or copy:
 
 ```txt
 packages/browser/dist/xrpl-wallet-kit.iife.js
@@ -48,7 +48,7 @@ Empty keys intentionally disable the corresponding adapters so the example does 
 For the bundled local preview:
 
 ```bash
-npm run dev:html-jquery
+npm run dev:html-legacy
 ```
 
 Open:

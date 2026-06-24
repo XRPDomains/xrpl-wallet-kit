@@ -1,5 +1,5 @@
 {
-  "name": "@xrpl-wallet-kit/example-html-jquery",
+  "name": "@xrpl-wallet-kit/example-html-legacy-bundle",
   "private": true,
   "version": "0.1.0",
   "type": "module",
