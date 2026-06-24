@@ -111,6 +111,7 @@ export default defineConfig({
         items: [
           { text: "WalletManager", link: "/docs/api/wallet-manager" },
           { text: "WalletModal & WalletButton", link: "/docs/api/wallet-modal" },
+          { text: "WalletInline", link: "/docs/api/wallet-inline" },
           { text: "WalletToast", link: "/docs/api/wallet-toast" },
           { text: "createWalletKit", link: "/docs/api/create-wallet-kit" },
           { text: "Errors", link: "/docs/api/errors" },

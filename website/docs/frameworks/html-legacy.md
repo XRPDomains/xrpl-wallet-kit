@@ -170,6 +170,26 @@ document.getElementById('pay-btn').addEventListener('click', async function () {
 });
 ```
 
+## Inline wallet picker
+
+```html
+<div id="wallet-picker"></div>
+<script>
+  var inline = new XRPLWalletKit.WalletInline({
+    manager: manager,
+    walletConnectUiMode: "group"
+  });
+
+  inline.on("connect", function (session) {
+    console.log("Connected:", session.account.address);
+  });
+
+  inline.mount("#wallet-picker");
+</script>
+```
+
+The inline picker uses normal document flow and does not create a backdrop or lock page scrolling.
+
 ## Available Global Exports
 
 The `XRPLWalletKit` global exposes:
@@ -182,6 +202,7 @@ XRPLWalletKit.createWalletClient(options)
 // Core classes
 XRPLWalletKit.WalletManager
 XRPLWalletKit.WalletModal
+XRPLWalletKit.WalletInline
 XRPLWalletKit.WalletButton
 XRPLWalletKit.WalletToast
 

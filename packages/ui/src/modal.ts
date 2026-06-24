@@ -1,13 +1,13 @@
 import QRCodeStyling from "qr-code-styling";
 import QRCode from "qrcode";
 import { WalletKitErrorCode, getErrorMessage, isWalletKitError } from "@xrpl-wallet-kit/core";
-import type { WalletAdapter, WalletMetadata, WalletNetwork } from "@xrpl-wallet-kit/core";
+import type { WalletAdapter, WalletMetadata, WalletNetwork, WalletSession } from "@xrpl-wallet-kit/core";
 import { resolveWalletUiOptions } from "./config";
 import { resolveWalletUiMessages } from "./locales";
 import { darkTheme, lightTheme } from "./themes";
 import { ensureWalletStyle, getWalletStyleId, lockPageScroll, unlockPageScroll } from "./dom";
 import { QR_DARK, QR_LIGHT, QR_SIZE, WALLETCONNECT_GROUP_ICON } from "./icons";
-import type { WalletUiConfig, WalletUiGroup, WalletUiLayout, WalletUiOptions, WalletUiSize, WalletUiTextSize, WalletUiTheme, WalletUiThemeMode } from "./types";
+import type { WalletInlineOptions, WalletInlineTarget, WalletUiConfig, WalletUiGroup, WalletUiLayout, WalletUiOptions, WalletUiSize, WalletUiTextSize, WalletUiTheme, WalletUiThemeMode } from "./types";
 
 type WalletModalView = "list" | "connect" | "qr";
 
@@ -26,9 +26,14 @@ type WalletQrState =
     | { status: "timeout"; adapterId?: string; walletName: string }
     | { status: "error"; adapterId?: string; walletName: string; message: string; uri?: string; deeplink?: string };
 
-export class WalletModal {
-    private options: WalletUiOptions;
-    private root?: HTMLDivElement;
+type WalletPickerPresentation = "modal" | "inline";
+let walletPickerInstanceId = 0;
+
+class WalletPickerView {
+    protected options: WalletUiOptions;
+    protected root?: HTMLDivElement;
+    protected readonly presentation: WalletPickerPresentation;
+    private readonly titleId: string;
     private qrUri: string;
     private qrCopied: boolean;
     private qrLightMode: boolean;
@@ -38,6 +43,7 @@ export class WalletModal {
     private offEvents: Array<() => void>;
     private openHandlers: Set<() => void>;
     private closeHandlers: Set<() => void>;
+    private connectHandlers: Set<(session: WalletSession) => void>;
     private onDocumentKeyDown: (event: KeyboardEvent) => void;
     private lastFocusedElement: HTMLElement | null = null;
     private qrCopyResetTimer?: number;
@@ -47,7 +53,7 @@ export class WalletModal {
     private cachedStyle = "";
     private closeTimer?: number;
 
-    constructor(options: WalletUiOptions) {
+    constructor(options: WalletUiOptions, presentation: WalletPickerPresentation) {
         this.qrUri = "";
         this.qrCopied = false;
         this.qrLightMode = false;
@@ -55,12 +61,15 @@ export class WalletModal {
         this.offEvents = [];
         this.openHandlers = new Set();
         this.closeHandlers = new Set();
+        this.connectHandlers = new Set();
+        this.presentation = presentation;
+        this.titleId = `xwk-title-${++walletPickerInstanceId}`;
         this.onDocumentKeyDown = (event) => this.handleDocumentKeyDown(event);
         this.options = { manager: options.manager, mount: options.mount, ...resolveWalletUiOptions(options) };
         this.offEvents.push(options.manager.on("qr", ({ adapterId, uri, deeplink }) => this.showQr(adapterId, uri, deeplink)), options.manager.on("connecting", ({ adapterId, recovering }) => {
             if (!recovering)
                 this.setLoading(adapterId);
-        }), options.manager.on("connected", ({ adapterId }) => this.handleConnected(adapterId)), options.manager.on("error", ({ adapterId, error }) => this.setError(error, adapterId)));
+        }), options.manager.on("connected", ({ adapterId, session }) => this.handleConnected(adapterId, session ?? options.manager.getSession())), options.manager.on("error", ({ adapterId, error }) => this.setError(error, adapterId)));
     }
     autoOpen() {
         this.open();
@@ -68,7 +77,7 @@ export class WalletModal {
     open() {
         this.activeGroupId = undefined;
         this.lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        this.mount("list");
+        this.renderView("list");
         this.openHandlers.forEach((handler) => handler());
         void this.refreshAvailability();
         if (this.pendingQr) {
@@ -87,7 +96,8 @@ export class WalletModal {
         const root = this.root;
         if (!root?.isConnected) {
             this.root = undefined;
-            unlockPageScroll();
+            if (this.presentation === "modal")
+                unlockPageScroll();
             if (restoreFocus)
                 this.restoreFocus();
             if (notify)
@@ -102,13 +112,14 @@ export class WalletModal {
             root.remove();
             if (this.root === root)
                 this.root = undefined;
-            unlockPageScroll();
+            if (this.presentation === "modal")
+                unlockPageScroll();
             if (restoreFocus)
                 this.restoreFocus();
             if (notify)
                 this.closeHandlers.forEach((handler) => handler());
         };
-        if (!animate || this.prefersReducedMotion()) {
+        if (this.presentation === "inline" || !animate || this.prefersReducedMotion()) {
             finishClose();
             return;
         }
@@ -127,15 +138,26 @@ export class WalletModal {
         this.offEvents.splice(0).forEach((off) => off());
         this.openHandlers.clear();
         this.closeHandlers.clear();
+        this.connectHandlers.clear();
     }
     isOpen(): boolean {
         return Boolean(this.root?.isConnected);
     }
-    on(event: "open" | "close", handler: () => void): () => void {
+    on(event: "open" | "close", handler: () => void): () => void;
+    on(event: "connect", handler: (session: WalletSession) => void): () => void;
+    on(event: "open" | "close" | "connect", handler: (() => void) | ((session: WalletSession) => void)): () => void {
+        if (event === "connect") {
+            const connectHandler = handler as (session: WalletSession) => void;
+            this.connectHandlers.add(connectHandler);
+            return () => {
+                this.connectHandlers.delete(connectHandler);
+            };
+        }
         const handlers = event === "open" ? this.openHandlers : this.closeHandlers;
-        handlers.add(handler);
+        const lifecycleHandler = handler as () => void;
+        handlers.add(lifecycleHandler);
         return () => {
-            handlers.delete(handler);
+            handlers.delete(lifecycleHandler);
         };
     }
     onClose(handler: () => void): () => void {
@@ -170,7 +192,10 @@ export class WalletModal {
             const adapter = this.options.manager.getAdapter(id);
             try {
                 if (this.shouldDelegateToWalletConnectModal(wallet, adapter)) {
-                    this.close(false, false, false);
+                    if (this.presentation === "modal")
+                        this.close(false, false, false);
+                    else
+                        this.activeRequestAdapterId = id;
                     await this.waitForPaint();
                     await this.options.manager.connect(id);
                     return;
@@ -200,7 +225,7 @@ export class WalletModal {
         if (this.root?.dataset.xwkView === "qr" && groupId && this.getGroups().some((group) => group.id === groupId)) {
             void this.options.manager.cancelPendingConnection();
             this.resetQrState();
-            this.mount("list", false);
+            this.renderView("list", false);
             this.showWalletGroup(groupId);
             return;
         }
@@ -309,16 +334,18 @@ export class WalletModal {
         button.setAttribute("title", this.qrLightMode ? "Use dark QR" : "Use light QR");
         button.setAttribute("aria-pressed", String(this.qrLightMode));
     }
-    private mount(view: WalletModalView, animate = true) {
+    protected renderView(view: WalletModalView, animate = true) {
         const pendingQr = this.pendingQr;
         const activeRequestAdapterId = this.activeRequestAdapterId;
         this.close(false, false, false);
         this.pendingQr = pendingQr;
         this.activeRequestAdapterId = activeRequestAdapterId;
-        this.removeExistingOverlays();
-        lockPageScroll();
+        if (this.presentation === "modal") {
+            this.removeExistingOverlays();
+            lockPageScroll();
+        }
         this.root = document.createElement("div");
-        this.root.className = "xwk-overlay";
+        this.root.className = this.presentation === "inline" ? "xwk-overlay xwk-inline" : "xwk-overlay";
         this.root.dataset.xwkView = view;
         this.root.dataset.xwkState = animate ? "opening" : "open";
         this.root.innerHTML = this.renderShell();
@@ -329,16 +356,18 @@ export class WalletModal {
                     this.root.dataset.xwkState = "open";
             });
         }
-        this.root.addEventListener("click", (event) => {
-            if (event.target === this.root)
-                this.close();
-        });
-        document.addEventListener("keydown", this.onDocumentKeyDown);
+        if (this.presentation === "modal") {
+            this.root.addEventListener("click", (event) => {
+                if (event.target === this.root)
+                    this.close();
+            });
+            document.addEventListener("keydown", this.onDocumentKeyDown);
+        }
         this.bind();
     }
     private ensureMounted(view: WalletModalView) {
         if (!this.root?.isConnected || !this.root.querySelector(".xwk-modal")) {
-            this.mount(view);
+            this.renderView(view);
             return;
         }
         this.setView(view);
@@ -377,6 +406,8 @@ export class WalletModal {
         }
     }
     private focusInitialElement() {
+        if (this.presentation === "inline")
+            return;
         window.setTimeout(() => {
             if (!this.root?.isConnected)
                 return;
@@ -461,7 +492,7 @@ export class WalletModal {
         this.activeGroupId = undefined;
         this.resetQrState();
         if (!this.root?.querySelector(".xwk-list")) {
-            this.mount("list", false);
+            this.renderView("list", false);
             return;
         }
         this.ensureMounted("list");
@@ -602,10 +633,19 @@ export class WalletModal {
     private isDefaultWalletConnectUiMode(): boolean {
         return !this.options.walletConnectUiMode || this.options.walletConnectUiMode === "default";
     }
-    private handleConnected(adapterId: string) {
+    private handleConnected(adapterId: string, session: WalletSession | null) {
         if (this.isStaleAdapterEvent(adapterId))
             return;
         this.activeRequestAdapterId = undefined;
+        if (session)
+            this.connectHandlers.forEach((handler) => handler(session));
+        if (this.presentation === "inline") {
+            this.showList();
+            const status = this.root?.querySelector(".xwk-status");
+            if (status)
+                status.textContent = this.messages().connected;
+            return;
+        }
         this.close(false, true);
     }
     private isStaleAdapterEvent(adapterId: string) {
@@ -661,6 +701,17 @@ export class WalletModal {
             return "Wallet request failed. Please try again.";
         return `${normalized.slice(0, 177).trimEnd()}...`;
     }
+    private renderShellAttributes(className: string) {
+        const semantics = this.presentation === "modal"
+            ? `role="dialog" aria-modal="true"`
+            : `role="region"`;
+        return `class="${className}" ${semantics} aria-labelledby="${this.titleId}" tabindex="-1"`;
+    }
+    private renderHeaderEnd() {
+        if (this.presentation === "inline")
+            return `<span class="xwk-header-spacer" aria-hidden="true"></span>`;
+        return `<button class="xwk-close" data-xwk-close aria-label="${this.escapeHtml(this.messages().close)}">&times;</button>`;
+    }
     private renderShell() {
         const messages = this.messages();
         const theme = this.resolveTheme();
@@ -668,7 +719,7 @@ export class WalletModal {
         const size = this.options.size ?? "default";
         const textSize = this.options.textSize ?? "sm";
         this.ensureStyles(theme, layout, size, textSize);
-        return `<section class="xwk-modal xwk-layout-${layout}" role="dialog" aria-modal="true" aria-labelledby="xwk-title" tabindex="-1"><div class="xwk-header"><button class="xwk-back xwk-hidden" data-xwk-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button><div class="xwk-title" id="xwk-title">${this.escapeHtml(this.options.title ?? messages.connectWallet)}</div><button class="xwk-close" data-xwk-close aria-label="${this.escapeHtml(messages.close)}">&times;</button></div><div class="xwk-body"><div class="xwk-list">${this.renderNetworkBadge()}<div class="xwk-grid">${this.renderWalletList(layout)}</div><div class="xwk-status" role="status" aria-live="polite"></div></div><div class="xwk-connect xwk-hidden"><div class="xwk-spinner" aria-hidden="true"><div class="xwk-connect-icon"></div></div><strong class="xwk-connect-name"></strong><p class="xwk-connect-status" role="status" aria-live="polite">${this.escapeHtml(messages.approveRequest)}</p></div><div class="xwk-qr xwk-hidden"><h3 class="xwk-qr-title"></h3><div class="xwk-qr-code">${this.renderQrLoading()}</div><p class="xwk-qr-help">${this.escapeHtml(messages.waitingForWalletConnectUri)}</p></div></div><div class="xwk-footer">${this.escapeHtml(this.options.footerText ?? "XRPL Wallet Kit")}</div></section>`;
+        return `<section ${this.renderShellAttributes(`xwk-modal xwk-layout-${layout}`)}><div class="xwk-header"><button class="xwk-back xwk-hidden" data-xwk-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button><div class="xwk-title" id="${this.titleId}">${this.escapeHtml(this.options.title ?? messages.connectWallet)}</div>${this.renderHeaderEnd()}</div><div class="xwk-body"><div class="xwk-list">${this.renderNetworkBadge()}<div class="xwk-grid">${this.renderWalletList(layout)}</div><div class="xwk-status" role="status" aria-live="polite"></div></div><div class="xwk-connect xwk-hidden"><div class="xwk-spinner" aria-hidden="true"><div class="xwk-connect-icon"></div></div><strong class="xwk-connect-name"></strong><p class="xwk-connect-status" role="status" aria-live="polite">${this.escapeHtml(messages.approveRequest)}</p></div><div class="xwk-qr xwk-hidden"><h3 class="xwk-qr-title"></h3><div class="xwk-qr-code">${this.renderQrLoading()}</div><p class="xwk-qr-help">${this.escapeHtml(messages.waitingForWalletConnectUri)}</p></div></div><div class="xwk-footer">${this.escapeHtml(this.options.footerText ?? "XRPL Wallet Kit")}</div></section>`;
     }
     private renderNetworkBadge() {
         const network = this.options.manager.getNetwork();
@@ -765,13 +816,13 @@ export class WalletModal {
                     ? messages.pleaseTryAgain
                     : messages.waitingForWalletConnectUri;
         if (!this.root?.isConnected) {
-            this.mount("qr");
+            this.renderView("qr");
         }
         if (!this.root)
             return;
         this.root.dataset.xwkView = "qr";
         this.ensureStyles(theme, layout, size, textSize);
-        this.root.innerHTML = `<section class="xwk-modal xwk-qr-modal" role="dialog" aria-modal="true" aria-labelledby="xwk-title" tabindex="-1"><div class="xwk-header"><button class="xwk-back" data-xwk-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button><div class="xwk-title" id="xwk-title">${this.escapeHtml(state.walletName)}</div><button class="xwk-close" data-xwk-close aria-label="${this.escapeHtml(messages.close)}">&times;</button></div><div class="xwk-body"><div class="xwk-qr xwk-standalone-qr"><div class="xwk-qr-card"><div class="xwk-qr-code-wrap"><div class="xwk-qr-code"${qrCodeAttributes}>${qrContent}</div>${qrThemeToggle}</div>${qrFallback}${actions}</div><p class="xwk-qr-help">${this.escapeHtml(helpText)}</p><span class="xwk-sr-only">${this.escapeHtml(messages.qrSrHint)}</span><span class="xwk-sr-only" aria-live="assertive" data-xwk-copy-live></span></div></div><div class="xwk-footer">${this.escapeHtml(this.options.footerText ?? "XRPL Wallet Kit")}</div></section>`;
+        this.root.innerHTML = `<section ${this.renderShellAttributes("xwk-modal xwk-qr-modal")}><div class="xwk-header"><button class="xwk-back" data-xwk-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button><div class="xwk-title" id="${this.titleId}">${this.escapeHtml(state.walletName)}</div>${this.renderHeaderEnd()}</div><div class="xwk-body"><div class="xwk-qr xwk-standalone-qr"><div class="xwk-qr-card"><div class="xwk-qr-code-wrap"><div class="xwk-qr-code"${qrCodeAttributes}>${qrContent}</div>${qrThemeToggle}</div>${qrFallback}${actions}</div><p class="xwk-qr-help">${this.escapeHtml(helpText)}</p><span class="xwk-sr-only">${this.escapeHtml(messages.qrSrHint)}</span><span class="xwk-sr-only" aria-live="assertive" data-xwk-copy-live></span></div></div><div class="xwk-footer">${this.escapeHtml(this.options.footerText ?? "XRPL Wallet Kit")}</div></section>`;
         this.bindChrome();
     }
     private renderQrLoading() {
@@ -790,13 +841,13 @@ export class WalletModal {
         const walletName = wallet?.name ?? adapterId;
         const statusText = this.getConnectStatusText(wallet, adapterId);
         if (!this.root?.isConnected) {
-            this.mount("connect");
+            this.renderView("connect");
         }
         if (!this.root)
             return;
         this.root.dataset.xwkView = "connect";
         this.ensureStyles(theme, layout, size, textSize);
-        this.root.innerHTML = `<section class="xwk-modal xwk-connect-modal" role="dialog" aria-modal="true" aria-labelledby="xwk-title" tabindex="-1"><div class="xwk-header"><button class="xwk-back" data-xwk-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button><div class="xwk-title" id="xwk-title">${this.escapeHtml(messages.connect)}</div><button class="xwk-close" data-xwk-close aria-label="${this.escapeHtml(messages.close)}">&times;</button></div><div class="xwk-body"><div class="xwk-connect xwk-standalone-connect"><div class="xwk-spinner" aria-hidden="true"><div class="xwk-connect-icon">${this.renderWalletIcon(wallet)}</div></div><strong class="xwk-connect-name">${this.escapeHtml(walletName)}</strong><p class="xwk-connect-status" role="status" aria-live="polite">${this.escapeHtml(statusText)}</p></div></div><div class="xwk-footer">${this.escapeHtml(this.options.footerText ?? "XRPL Wallet Kit")}</div></section>`;
+        this.root.innerHTML = `<section ${this.renderShellAttributes("xwk-modal xwk-connect-modal")}><div class="xwk-header"><button class="xwk-back" data-xwk-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button><div class="xwk-title" id="${this.titleId}">${this.escapeHtml(messages.connect)}</div>${this.renderHeaderEnd()}</div><div class="xwk-body"><div class="xwk-connect xwk-standalone-connect"><div class="xwk-spinner" aria-hidden="true"><div class="xwk-connect-icon">${this.renderWalletIcon(wallet)}</div></div><strong class="xwk-connect-name">${this.escapeHtml(walletName)}</strong><p class="xwk-connect-status" role="status" aria-live="polite">${this.escapeHtml(statusText)}</p></div></div><div class="xwk-footer">${this.escapeHtml(this.options.footerText ?? "XRPL Wallet Kit")}</div></section>`;
         this.bindChrome();
     }
     private getConnectStatusText(wallet: WalletMetadata | undefined, adapterId: string) {
@@ -852,7 +903,8 @@ export class WalletModal {
         ensureWalletStyle(getWalletStyleId("xwk-modal", styles), styles);
     }
     private renderMobileSheetOverrides(theme: Required<WalletUiTheme>) {
-        return `.xwk-modal:focus{outline:none}.xwk-sr-only{border:0!important;clip:rect(0 0 0 0)!important;height:1px!important;margin:-1px!important;overflow:hidden!important;padding:0!important;position:absolute!important;white-space:nowrap!important;width:1px!important}.xwk-error-text,.xwk-connect-status.xwk-error-text,.xwk-qr-loading.xwk-error-text{color:${theme.error}!important}.xwk-close,.xwk-back{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;appearance:none;background:transparent!important;border:0!important;box-shadow:none!important;margin:0;outline:none!important}.xwk-close:focus-visible,.xwk-back:focus-visible{outline:2px solid ${theme.accent}!important;outline-offset:0}@media(max-width:640px){.xwk-overlay{padding:max(12px,env(safe-area-inset-top)) 0 0!important;place-items:end center!important}.xwk-modal{align-self:end!important;border-bottom:0!important;border-bottom-left-radius:0!important;border-bottom-right-radius:0!important;border-left:0!important;border-right:0!important;border-top-left-radius:${theme.radius}!important;border-top-right-radius:${theme.radius}!important;height:auto!important;max-height:calc(100dvh - env(safe-area-inset-top))!important;max-width:none!important;width:100vw!important}.xwk-header{border-top-left-radius:${theme.radius};border-top-right-radius:${theme.radius}}.xwk-body{padding-bottom:max(6px,calc(6px + env(safe-area-inset-bottom)))!important}.xwk-overlay[data-xwk-view="list"] .xwk-body{padding-bottom:max(2px,calc(2px + env(safe-area-inset-bottom)))!important}.xwk-network-row{margin:-4px 0 8px!important}.xwk-overlay[data-xwk-view="list"] .xwk-footer{padding-top:6px!important}}`;
+        const inlineOverrides = `.xwk-inline{background:transparent!important;display:block!important;inset:auto!important;opacity:1!important;overflow:visible!important;padding:0!important;place-items:initial!important;position:relative!important;z-index:auto!important}.xwk-inline .xwk-modal{border:1px solid ${theme.border}!important;border-radius:${theme.radius}!important;box-shadow:none!important;max-height:none!important;max-width:none!important;opacity:1!important;transform:none!important;transition:none!important;width:100%!important}.xwk-inline .xwk-body{max-height:none!important}.xwk-inline .xwk-header-spacer{display:block;height:44px;width:44px}.xwk-inline[data-xwk-state="closing"] .xwk-modal{opacity:1!important;transform:none!important}`;
+        return `.xwk-modal:focus{outline:none}.xwk-sr-only{border:0!important;clip:rect(0 0 0 0)!important;height:1px!important;margin:-1px!important;overflow:hidden!important;padding:0!important;position:absolute!important;white-space:nowrap!important;width:1px!important}.xwk-error-text,.xwk-connect-status.xwk-error-text,.xwk-qr-loading.xwk-error-text{color:${theme.error}!important}.xwk-close,.xwk-back{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;appearance:none;background:transparent!important;border:0!important;box-shadow:none!important;margin:0;outline:none!important}.xwk-close:focus-visible,.xwk-back:focus-visible{outline:2px solid ${theme.accent}!important;outline-offset:0}@media(max-width:640px){.xwk-overlay{padding:max(12px,env(safe-area-inset-top)) 0 0!important;place-items:end center!important}.xwk-modal{align-self:end!important;border-bottom:0!important;border-bottom-left-radius:0!important;border-bottom-right-radius:0!important;border-left:0!important;border-right:0!important;border-top-left-radius:${theme.radius}!important;border-top-right-radius:${theme.radius}!important;height:auto!important;max-height:calc(100dvh - env(safe-area-inset-top))!important;max-width:none!important;width:100vw!important}.xwk-header{border-top-left-radius:${theme.radius};border-top-right-radius:${theme.radius}}.xwk-body{padding-bottom:max(6px,calc(6px + env(safe-area-inset-bottom)))!important}.xwk-overlay[data-xwk-view="list"] .xwk-body{padding-bottom:max(2px,calc(2px + env(safe-area-inset-bottom)))!important}.xwk-network-row{margin:-4px 0 8px!important}.xwk-overlay[data-xwk-view="list"] .xwk-footer{padding-top:6px!important}}${inlineOverrides}`;
     }
     private renderWalletList(layout: WalletUiLayout) {
         const groups = this.getGroups();
@@ -1051,7 +1103,36 @@ export class WalletModal {
         });
     }
 }
+
+export class WalletModal extends WalletPickerView {
+    constructor(options: WalletUiOptions) {
+        super(options, "modal");
+    }
+}
+
+export class WalletInline extends WalletPickerView {
+    constructor(options: WalletInlineOptions) {
+        super(options, "inline");
+    }
+    mount(target: WalletInlineTarget) {
+        const element = typeof target === "string"
+            ? document.querySelector<HTMLElement>(target)
+            : target;
+        if (!element)
+            throw new Error(`WalletInline mount target was not found: ${String(target)}`);
+        this.options = { ...this.options, mount: element };
+        this.open();
+    }
+    isMounted() {
+        return this.isOpen();
+    }
+}
+
 export function createWalletModal(options: WalletUiOptions) {
     const modal = new WalletModal(options);
     return modal;
+}
+
+export function createWalletInline(options: WalletInlineOptions) {
+    return new WalletInline(options);
 }

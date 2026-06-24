@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { WalletMetadata } from "../packages/core/src";
-import { WalletButton, WalletButtonController } from "../packages/ui/src/index";
+import { WalletButton, WalletButtonController, WalletInline, XrplWalletInline } from "../packages/ui/src/index";
 import { WalletModal } from "../packages/ui/src/modal";
 import { WalletToast } from "../packages/ui/src/toast";
 import { lightTheme } from "../packages/ui/src/themes";
@@ -16,6 +16,40 @@ const manager = {
 
 test("UI package exports WalletButton alias for vanilla imports", () => {
   assert.equal(WalletButton, WalletButtonController);
+});
+
+test("UI package exports WalletInline and its XRPL alias", () => {
+  assert.equal(WalletInline, XrplWalletInline);
+});
+
+test("WalletInline reuses wallet rendering without modal-only chrome", () => {
+  const wallet: WalletMetadata = {
+    id: "xaman",
+    name: "Xaman",
+    type: "mobile",
+    group: "Recommended",
+    recommended: true
+  };
+  const modal = new WalletModal({
+    manager: manager as never,
+    themeMode: "light"
+  }) as unknown as {
+    renderWallet(wallet: WalletMetadata, layout: "list"): string;
+  };
+  const inline = new WalletInline({
+    manager: manager as never,
+    themeMode: "light"
+  }) as unknown as {
+    renderShell(): string;
+    renderWallet(wallet: WalletMetadata, layout: "list"): string;
+    renderMobileSheetOverrides(theme: typeof lightTheme): string;
+  };
+
+  assert.equal(inline.renderWallet(wallet, "list"), modal.renderWallet(wallet, "list"));
+  assert.match(inline.renderShell(), /role="region"/);
+  assert.doesNotMatch(inline.renderShell(), /aria-modal="true"|data-xwk-close/);
+  assert.match(inline.renderMobileSheetOverrides(lightTheme), /\.xwk-inline\{[^}]*position:relative!important/);
+  assert.match(inline.renderMobileSheetOverrides(lightTheme), /\.xwk-inline \.xwk-modal\{[^}]*width:100%!important/);
 });
 
 test("WalletModal buttons defend against host button CSS", () => {

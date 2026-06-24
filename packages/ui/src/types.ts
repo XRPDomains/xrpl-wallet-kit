@@ -107,6 +107,19 @@ export interface WalletModalController {
   onClose(handler: () => void): () => void;
 }
 
+export type WalletInlineTarget = string | HTMLElement;
+
+export interface WalletInlineOptions extends Omit<WalletUiOptions, "mount"> {
+  mount?: HTMLElement;
+}
+
+export interface WalletInlineController {
+  mount(target: WalletInlineTarget): void;
+  destroy(): void;
+  isMounted(): boolean;
+  on(event: "connect", handler: (session: WalletSession) => void): () => void;
+}
+
 export interface WalletButtonOptions {
   manager: WalletManager;
   modal: WalletModalController;

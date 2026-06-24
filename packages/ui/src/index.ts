@@ -9,5 +9,6 @@ export * from "./balance";
 export * from "./icons";
 
 export { WalletModal as XrplWalletModal } from "./modal";
+export { WalletInline as XrplWalletInline } from "./modal";
 export { WalletButtonController as XrplWalletButton, WalletButtonController as WalletButton } from "./button";
 export { WalletToast as XrplWalletToast } from "./toast";
