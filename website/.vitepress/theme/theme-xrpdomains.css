@@ -1,0 +1,503 @@
+/* ═══════════════════════════════════════════════════════════════
+   XRPDomains Docs Theme  — applied via html.xd-theme class
+   Brief: XRPDomains-Docs-Design-Brief.md
+   Default (amber) theme in custom.css is untouched.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 1. Brief tokens — light mode ──────────────────────────── */
+.xd-theme {
+  /* Brief semantic tokens */
+  --xd-bg:           #fafbfc;
+  --xd-surface:      #ffffff;
+  --xd-surface-elev: #f3f5f8;
+  --xd-border:       rgba(15,23,42,0.08);
+  --xd-ink:          #0f172a;
+  --xd-ink-soft:     #334155;
+  --xd-mute:         #64748b;
+  --xd-accent:       #0284c7;
+  --xd-accent-soft:  #0ea5e9;
+  --xd-warn:         #d97706;
+  --xd-success:      #059669;
+  --xd-danger:       #dc2626;
+
+  /* Map xwk-* tokens so existing custom.css rules pick up new palette */
+  --xwk-primary-600:  #0284c7;
+  --xwk-primary-500:  #0ea5e9;
+  --xwk-primary-100:  rgba(2,132,199,0.09);
+  --xwk-primary-50:   rgba(2,132,199,0.04);
+  --xwk-bg:           #fafbfc;
+  --xwk-surface:      #ffffff;
+  --xwk-surface-2:    #f3f5f8;
+  --xwk-ink:          #0f172a;
+  --xwk-muted:        #334155;
+  --xwk-subtle:       #64748b;
+  --xwk-accent:       #0284c7;
+  --xwk-border:       rgba(15,23,42,0.08);
+  --xwk-border-soft:  rgba(15,23,42,0.05);
+
+  /* VitePress brand → cyan */
+  --vp-c-brand-1:    #0284c7;
+  --vp-c-brand-2:    #0ea5e9;
+  --vp-c-brand-3:    #38bdf8;
+  --vp-c-brand-soft: rgba(2,132,199,0.10);
+
+  /* VitePress surfaces */
+  --vp-c-bg:         #fafbfc;
+  --vp-c-bg-soft:    #ffffff;
+  --vp-c-bg-mute:    #f3f5f8;
+  --vp-c-bg-elv:     #ffffff;
+
+  /* VitePress borders + text */
+  --vp-c-divider:    rgba(15,23,42,0.08);
+  --vp-c-border:     rgba(15,23,42,0.08);
+  --vp-c-text-1:     #0f172a;
+  --vp-c-text-2:     #334155;
+  --vp-c-text-3:     #64748b;
+
+  /* VitePress callout colors */
+  --vp-c-tip-1:          #0284c7;
+  --vp-c-tip-2:          #0284c7;
+  --vp-c-tip-bg:         rgba(2,132,199,0.07);
+  --vp-c-tip-border:     rgba(2,132,199,0.22);
+  --vp-c-warning-1:      #d97706;
+  --vp-c-warning-2:      #d97706;
+  --vp-c-warning-bg:     rgba(217,119,6,0.07);
+  --vp-c-warning-border: rgba(217,119,6,0.22);
+  --vp-c-danger-1:       #dc2626;
+  --vp-c-danger-2:       #dc2626;
+  --vp-c-danger-bg:      rgba(220,38,38,0.07);
+  --vp-c-danger-border:  rgba(220,38,38,0.22);
+
+  /* Fonts */
+  --vp-font-family-base: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --vp-font-family-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* Motion easing from brief */
+  --xd-ease:     cubic-bezier(0.22, 1, 0.36, 1);
+  --xd-dur-fast: 150ms;
+  --xd-dur-mid:  280ms;
+}
+
+/* ── 2. Brief tokens — dark mode ────────────────────────────── */
+.dark.xd-theme {
+  --xd-bg:           #0e111a;
+  --xd-surface:      #1c2434;
+  --xd-surface-elev: rgba(255,255,255,0.04);
+  --xd-border:       rgba(255,255,255,0.06);
+  --xd-ink:          #e8eaf0;
+  --xd-ink-soft:     rgba(255,255,255,0.70);
+  --xd-mute:         rgba(255,255,255,0.45);
+  --xd-accent:       #25aae1;
+  --xd-accent-soft:  #5dc8f0;
+  --xd-warn:         #fbbf24;
+  --xd-success:      #34d399;
+  --xd-danger:       #f87171;
+
+  --xwk-primary-600:  #25aae1;
+  --xwk-primary-500:  #5dc8f0;
+  --xwk-primary-100:  rgba(37,170,225,0.12);
+  --xwk-primary-50:   rgba(37,170,225,0.07);
+  --xwk-bg:           #0e111a;
+  --xwk-surface:      #1c2434;
+  --xwk-surface-2:    rgba(255,255,255,0.04);
+  --xwk-ink:          #e8eaf0;
+  --xwk-muted:        rgba(255,255,255,0.70);
+  --xwk-subtle:       rgba(255,255,255,0.45);
+  --xwk-accent:       #25aae1;
+  --xwk-border:       rgba(255,255,255,0.06);
+  --xwk-border-soft:  rgba(255,255,255,0.04);
+
+  --vp-c-brand-1:    #25aae1;
+  --vp-c-brand-2:    #5dc8f0;
+  --vp-c-brand-3:    #7dd3f4;
+  --vp-c-brand-soft: rgba(37,170,225,0.12);
+
+  --vp-c-bg:         #0e111a;
+  --vp-c-bg-soft:    #1c2434;
+  --vp-c-bg-mute:    rgba(255,255,255,0.04);
+  --vp-c-bg-elv:     #1c2434;
+
+  --vp-c-divider:    rgba(255,255,255,0.06);
+  --vp-c-border:     rgba(255,255,255,0.06);
+  --vp-c-text-1:     #e8eaf0;
+  --vp-c-text-2:     rgba(255,255,255,0.70);
+  --vp-c-text-3:     rgba(255,255,255,0.45);
+
+  --vp-c-tip-1:          #5dc8f0;
+  --vp-c-tip-2:          #5dc8f0;
+  --vp-c-tip-bg:         rgba(37,170,225,0.08);
+  --vp-c-tip-border:     rgba(37,170,225,0.22);
+  --vp-c-warning-1:      #fbbf24;
+  --vp-c-warning-2:      #fbbf24;
+  --vp-c-warning-bg:     rgba(251,191,36,0.08);
+  --vp-c-warning-border: rgba(251,191,36,0.22);
+  --vp-c-danger-1:       #f87171;
+  --vp-c-danger-2:       #f87171;
+  --vp-c-danger-bg:      rgba(248,113,113,0.08);
+  --vp-c-danger-border:  rgba(248,113,113,0.22);
+}
+
+/* ── 3. Typography ──────────────────────────────────────────── */
+
+/* h1 — Plus Jakarta Sans, large, bold */
+.xd-theme .vp-doc h1 {
+  font-family: var(--vp-font-family-base);
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  color: var(--xd-ink);
+}
+
+/* h2 — JetBrains Mono, uppercase, accent color */
+.xd-theme .vp-doc h2 {
+  font-family: var(--vp-font-family-mono);
+  font-size: clamp(14px, 2vw, 18px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--xd-accent);
+  border-top: 1px solid var(--xd-border);
+  padding-top: 28px;
+  margin-top: 40px;
+}
+
+/* h3 — JetBrains Mono, uppercase, softer */
+.xd-theme .vp-doc h3 {
+  font-family: var(--vp-font-family-mono);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--xd-ink-soft);
+}
+
+/* h4 — Plus Jakarta Sans, semi-bold */
+.xd-theme .vp-doc h4 {
+  font-family: var(--vp-font-family-base);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--xd-ink);
+}
+
+/* Body prose */
+.xd-theme .vp-doc p,
+.xd-theme .vp-doc li {
+  font-family: var(--vp-font-family-base);
+  font-size: 15.5px;
+  line-height: 1.75;
+  color: var(--xd-ink-soft);
+  max-width: 72ch;
+}
+
+/* Lead paragraph (first p after h1) */
+.xd-theme .vp-doc h1 + p {
+  font-size: 17px;
+  color: var(--xd-ink-soft);
+  line-height: 1.7;
+}
+
+/* ── 4. Inline code ─────────────────────────────────────────── */
+/* Override custom.css which colors inline code amber */
+.xd-theme .vp-doc :not(pre) > code {
+  background:    var(--xd-surface-elev);
+  color:         var(--xd-ink);
+  border:        1px solid var(--xd-border);
+  border-radius: 4px;
+  padding:       2px 6px;
+  font-family:   var(--vp-font-family-mono);
+  font-size:     13.5px;
+}
+
+/* ── 5. Code blocks ─────────────────────────────────────────── */
+.xd-theme .vp-doc div[class*='language-'] {
+  border-radius: 10px;
+  border:        1px solid var(--xd-border);
+  background:    var(--xd-surface-elev);
+  overflow:      hidden;
+}
+
+/* Language label */
+.xd-theme .vp-doc div[class*='language-'] span.lang {
+  font-family: var(--vp-font-family-mono);
+  font-size:   11px;
+  color:       var(--xd-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Copy button — ghost pill, visible on hover only.
+   Use background-color (NOT background shorthand) so VitePress's
+   background-image SVG icon is preserved. */
+.xd-theme .vp-doc div[class*='language-']:not(:hover) .copy {
+  opacity: 0;
+}
+.xd-theme .vp-doc div[class*='language-'] .copy {
+  background-color: transparent;
+  border:           1px solid var(--xd-border);
+  border-radius:    999px;
+  color:            var(--xd-mute);
+  transition:       opacity     var(--xd-dur-fast) var(--xd-ease),
+                    background-color var(--xd-dur-fast) var(--xd-ease);
+}
+.xd-theme .vp-doc div[class*='language-'] .copy:hover {
+  background-color: var(--xd-surface);
+  color:            var(--xd-accent);
+}
+/* "Copied" state — keep icon visible, tint green */
+.xd-theme .vp-doc div[class*='language-'] .copy.copied {
+  opacity:          1 !important;
+  background-color: var(--xd-surface);
+  color:            var(--xd-success);
+}
+
+/* Code font */
+.xd-theme .vp-doc pre code {
+  font-family:  var(--vp-font-family-mono);
+  font-size:    13.5px;
+  line-height:  1.65;
+}
+
+/* Horizontal scroll on narrow viewports */
+.xd-theme .vp-doc div[class*='language-'] pre {
+  overflow-x: auto;
+}
+
+/* ── 6. Callouts ─────────────────────────────────────────────── */
+/* Left-border style per brief — override custom.css rounded border */
+.xd-theme .vp-doc .custom-block {
+  border:        none;
+  border-left:   3px solid currentColor;
+  border-radius: 0 8px 8px 0;
+  padding:       14px 18px;
+}
+
+.xd-theme .vp-doc .custom-block.tip     { color: var(--vp-c-tip-1);     background: var(--vp-c-tip-bg);     border-color: var(--vp-c-tip-1); }
+.xd-theme .vp-doc .custom-block.warning { color: var(--vp-c-warning-1); background: var(--vp-c-warning-bg); border-color: var(--vp-c-warning-1); }
+.xd-theme .vp-doc .custom-block.danger  { color: var(--vp-c-danger-1);  background: var(--vp-c-danger-bg);  border-color: var(--vp-c-danger-1); }
+.xd-theme .vp-doc .custom-block.info    { color: var(--vp-c-tip-1);     background: var(--vp-c-tip-bg);     border-color: var(--vp-c-tip-1); }
+
+.xd-theme .vp-doc .custom-block-title {
+  font-family:    var(--vp-font-family-mono);
+  font-size:      12px;
+  font-weight:    700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.xd-theme .vp-doc .custom-block p {
+  color:    inherit;
+  max-width: none;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+/* ── 7. Tables ───────────────────────────────────────────────── */
+.xd-theme .vp-doc table {
+  border-collapse: separate;
+  border-spacing:  0;
+  border:          1px solid var(--xd-border);
+  border-radius:   10px;
+  overflow:        hidden;
+  width:           100%;
+}
+
+.xd-theme .vp-doc th {
+  background:      var(--xd-surface-elev);
+  color:           var(--xd-ink);
+  font-family:     var(--vp-font-family-mono);
+  font-size:       12px;
+  font-weight:     600;
+  text-transform:  uppercase;
+  letter-spacing:  0.05em;
+  padding:         10px 14px;
+  border-bottom:   1px solid var(--xd-border);
+}
+
+.xd-theme .vp-doc td {
+  padding:         10px 14px;
+  border-bottom:   1px solid var(--xd-border);
+  color:           var(--xd-ink-soft);
+  font-size:       14px;
+}
+
+.xd-theme .vp-doc tr:last-child td { border-bottom: none; }
+
+.xd-theme .vp-doc tr:hover td {
+  background: var(--xd-surface-elev);
+}
+
+/* Mono for hash / identifier / numeric cells */
+.xd-theme .vp-doc td code {
+  font-family: var(--vp-font-family-mono);
+  font-size:   12.5px;
+}
+
+/* ── 8. Links ────────────────────────────────────────────────── */
+.xd-theme .vp-doc a {
+  color:                    var(--xd-accent);
+  text-decoration:          underline;
+  text-decoration-style:    dotted;
+  text-decoration-color:    var(--xd-accent);
+  text-underline-offset:    3px;
+  text-decoration-thickness: 1px;
+  transition: text-decoration-style var(--xd-dur-fast) var(--xd-ease),
+              color               var(--xd-dur-fast) var(--xd-ease);
+}
+.xd-theme .vp-doc a:hover {
+  color:                 var(--xd-accent-soft);
+  text-decoration-style: solid;
+}
+
+/* ── 9. Sidebar ──────────────────────────────────────────────── */
+/* Active item: cyan left border, not background highlight */
+.xd-theme .VPSidebarItem.is-active > .item {
+  background:    transparent;
+  border-radius: 0;
+  border-left:   2px solid var(--xd-accent);
+  padding-left:  10px;
+}
+
+.xd-theme .VPSidebarItem.is-active > .item > .VPLink,
+.xd-theme .VPSidebarItem.is-active > .item > .text {
+  color:       var(--xd-accent) !important;
+  font-weight: 500;
+}
+
+/* Hover state */
+.xd-theme .VPSidebarItem > .item:hover {
+  background: var(--xd-surface-elev);
+  border-radius: 6px;
+}
+
+/* ── 10. Nav bar ─────────────────────────────────────────────── */
+.xd-theme .VPNav {
+  border-bottom: 1px solid var(--xd-border);
+  backdrop-filter: none; /* brief: no heavy glass in docs */
+}
+
+.dark.xd-theme .VPNav {
+  background: rgba(14,17,26,0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.xd-theme .VPNavBarMenuLink.active,
+.xd-theme .VPNavBarMenuLink:hover {
+  color: var(--xd-accent) !important;
+}
+
+/* ── 11. Hero section ───────────────────────────────────────── */
+.xd-theme .VPHero .name {
+  -webkit-text-fill-color: var(--xd-ink);
+  color:                   var(--xd-ink);
+  background:              none;
+  -webkit-background-clip: unset;
+  background-clip:         unset;
+}
+
+.xd-theme .VPHero .tagline {
+  color: var(--xd-mute);
+}
+
+.xd-theme .VPHero .VPButton.brand {
+  background-color: var(--xd-accent);
+  border-color:     var(--xd-accent);
+  color:            #ffffff;
+  transition:       background-color var(--xd-dur-fast) var(--xd-ease),
+                    border-color     var(--xd-dur-fast) var(--xd-ease);
+}
+.xd-theme .VPHero .VPButton.brand:hover {
+  background-color: var(--xd-accent-soft);
+  border-color:     var(--xd-accent-soft);
+}
+
+/* ── 12. Feature cards ──────────────────────────────────────── */
+.xd-theme .VPFeature {
+  border:          1px solid var(--xd-border);
+  border-radius:   14px;
+  background:      var(--xd-surface);
+  transition:      border-color     var(--xd-dur-fast) var(--xd-ease),
+                   transform        var(--xd-dur-fast) var(--xd-ease),
+                   background-color var(--xd-dur-fast) var(--xd-ease);
+}
+.xd-theme .VPFeature:hover {
+  border-color: var(--xd-accent);
+  background:   var(--xd-surface);
+  transform:    translateY(-1px);
+}
+
+.xd-theme .VPFeature .title { color: var(--xd-ink); }
+.xd-theme .VPFeature .details { color: var(--xd-ink-soft); }
+
+/* ── 13. Badges / pills ─────────────────────────────────────── */
+/* Usage: <span class="xd-badge xd-badge--accent">New</span> */
+.xd-theme .xd-badge {
+  display:        inline-flex;
+  align-items:    center;
+  border-radius:  999px;
+  font-family:    var(--vp-font-family-mono);
+  font-size:      11px;
+  font-weight:    500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding:        3px 10px;
+  line-height:    1.4;
+}
+
+.xd-theme .xd-badge--default {
+  background: var(--xd-surface-elev);
+  color:      var(--xd-mute);
+  border:     1px solid var(--xd-border);
+}
+.xd-theme .xd-badge--accent {
+  background: var(--xd-accent);
+  color:      #ffffff;
+  border:     none;
+}
+.xd-theme .xd-badge--beta {
+  background: rgba(139,92,246,0.12);
+  color:      #8b5cf6;
+  border:     1px solid rgba(139,92,246,0.25);
+}
+.xd-theme .xd-badge--new {
+  background: rgba(5,150,105,0.10);
+  color:      #059669;
+  border:     1px solid rgba(5,150,105,0.22);
+}
+
+/* ── 14. Scrollbar ──────────────────────────────────────────── */
+.xd-theme ::-webkit-scrollbar-thumb {
+  background: var(--xd-border);
+}
+.xd-theme ::-webkit-scrollbar-thumb:hover {
+  background: var(--xd-mute);
+}
+
+/* ── 15. Blockquote ─────────────────────────────────────────── */
+.xd-theme .vp-doc blockquote {
+  border-left:  3px solid var(--xd-accent);
+  background:   none;
+  padding:      4px 0 4px 18px;
+  color:        var(--xd-mute);
+  font-style:   normal;
+}
+.xd-theme .vp-doc blockquote p {
+  color: var(--xd-mute);
+}
+
+/* ── 16. Footer ─────────────────────────────────────────────── */
+.xd-theme .VPFooter {
+  border-top: 1px solid var(--xd-border);
+  color:      var(--xd-mute);
+}
+
+/* ── 17. Motion — reduced-motion override ───────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .xd-theme .VPFeature,
+  .xd-theme .VPHero .VPButton,
+  .xd-theme .vp-doc a,
+  .xd-theme .vp-doc div[class*='language-'] .copy {
+    transition: none;
+  }
+}

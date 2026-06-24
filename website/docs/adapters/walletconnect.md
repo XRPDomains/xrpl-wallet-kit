@@ -200,7 +200,7 @@ await manager.autoReconnect();
 
 **Session lost after page refresh?** Call `manager.autoReconnect()` on startup. WalletConnect sessions are persisted in `localStorage` and restored without re-approval.
 
-**Warning: `requiredNamespaces are deprecated`?** Upgrade to `@xrpl-wallet-kit/adapter-walletconnect` ≥ 0.1.0-beta — all namespaces are now declared as optional.
+**Warning: `requiredNamespaces are deprecated`?** Upgrade to `@xrpl-wallet-kit/adapter-walletconnect` ≥ 0.1.3 — all namespaces are now declared as optional.
 
 **Stale pairing/proposal error on reconnect?** The adapter automatically clears stale WalletConnect proposals and pairings before retrying. If reconnect still fails, call `manager.disconnect()` and start a fresh connection.
 

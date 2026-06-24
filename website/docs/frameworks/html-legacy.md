@@ -5,8 +5,8 @@ Use XRPL Wallet Kit on pages that cannot use a bundler — a classic CMS site, a
 ## Load the IIFE Bundle
 
 ```html
-<!-- From CDN (replace x.x.x with the latest version) -->
-<script src="https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@x.x.x/dist/xrpl-wallet-kit.iife.min.js"></script>
+<!-- From CDN (pinned to the current stable release) -->
+<script src="https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@0.1.3/dist/xrpl-wallet-kit.iife.min.js"></script>
 ```
 
 Or self-host the file — copy it from `node_modules/@xrpl-wallet-kit/browser/dist/` to your server:

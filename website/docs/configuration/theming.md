@@ -61,6 +61,10 @@ const modal = new WalletModal({
 
 `themeMode: "auto"` follows `prefers-color-scheme`. If `themeName` is not set, the kit uses `lightTheme` or `darkTheme` based on the resolved mode.
 
+::: tip Try it live
+Use the **[Theme Builder](/docs/theme-builder)** to preview all presets and token changes in real time — then copy the generated config directly into your project.
+:::
+
 ## Preset Themes
 
 Use `themeName` when you want a named preset:

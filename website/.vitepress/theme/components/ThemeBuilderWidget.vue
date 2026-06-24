@@ -131,6 +131,16 @@
                 </div>
               </div>
               <div class="tb-section">
+                <div class="tb-section-title">Error</div>
+                <div class="tb-color-row">
+                  <input type="color" class="tb-color-input" :value="config.error || (config.mode === 'dark' ? '#fbbf24' : '#b45309')"
+                    @input="setConfig('error', ($event.target as HTMLInputElement).value)" />
+                  <input type="text" class="tb-color-text" :value="config.error" placeholder="default"
+                    @input="setConfig('error', ($event.target as HTMLInputElement).value)" />
+                  <button v-if="config.error" class="tb-reset-btn" @click="setConfig('error', '')">✕</button>
+                </div>
+              </div>
+              <div class="tb-section">
                 <div class="tb-section-title">Background</div>
                 <div class="tb-color-row">
                   <input type="color" class="tb-color-input"
@@ -335,6 +345,7 @@ const config = reactive({
   accent:       '#0078ae',
   accentText:   '',
   success:      '',
+  error:        '',
   background:   '',
   foreground:   '',
   muted:        '',
@@ -379,6 +390,7 @@ const mountRef      = ref<HTMLElement | null>(null)
 let modalInstance:  any = null
 let buttonInstance: any = null
 let kitBundle:      any = null
+const KIT_BUNDLE_VERSION = '0.1.3'
 let inlineObserver: MutationObserver | null = null
 
 // ── Options ───────────────────────────────────────────────────
@@ -453,6 +465,7 @@ const fontOptions = [
 const BLANK = {
   accentText: '',
   success: '',
+  error: '',
   background: '',
   foreground: '',
   muted: '',
@@ -503,6 +516,7 @@ const codeSnippet = computed(() => {
     if (config.accent       !== '#0078ae') themeLines.push(`    accent: "${config.accent}",`)
     if (config.accentText)                 themeLines.push(`    accentText: "${config.accentText}",`)
     if (config.success)                    themeLines.push(`    success: "${config.success}",`)
+    if (config.error)                      themeLines.push(`    error: "${config.error}",`)
     if (config.radius       !== '14px')    themeLines.push(`    radius: "${config.radius}",`)
     if (config.walletRadius !== '10px')    themeLines.push(`    walletRadius: "${config.walletRadius}",`)
     if (config.background)                 themeLines.push(`    background: "${config.background}",`)
@@ -549,15 +563,19 @@ async function copyCode() {
 // ── IIFE loader ───────────────────────────────────────────────
 function loadKit(): Promise<void> {
   return new Promise((resolve, reject) => {
-    if ((window as any).XRPLWalletKit) {
+    if (
+      (window as any).XRPLWalletKit &&
+      (window as any).__XRPL_WALLET_KIT_WEBSITE_BUNDLE_VERSION__ === KIT_BUNDLE_VERSION
+    ) {
       kitBundle = (window as any).XRPLWalletKit
       kitLoaded.value = true
       return resolve()
     }
     const script = document.createElement('script')
-    script.src = `${import.meta.env.BASE_URL}xrpl-wallet-kit.iife.min.js?v=4`
+    script.src = `${import.meta.env.BASE_URL}xrpl-wallet-kit.iife.min.js?v=${KIT_BUNDLE_VERSION}`
     script.onload = () => {
       kitBundle = (window as any).XRPLWalletKit
+      ;(window as any).__XRPL_WALLET_KIT_WEBSITE_BUNDLE_VERSION__ = KIT_BUNDLE_VERSION
       kitLoaded.value = true
       resolve()
     }

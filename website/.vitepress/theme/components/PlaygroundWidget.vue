@@ -107,6 +107,7 @@ const kitLoaded  = ref(false)
 let modalInstance: any = null
 let buttonInstance: any = null
 let kitBundle: any = null
+const KIT_BUNDLE_VERSION = '0.1.3'
 
 // ── Preview mode CSS class ────────────────────────────────────
 const previewModeClass = computed(() =>
@@ -154,16 +155,20 @@ async function copyCode() {
 // ── Load IIFE bundle once ────────────────────────────────────
 function loadKit(): Promise<void> {
   return new Promise((resolve, reject) => {
-    if ((window as any).XRPLWalletKit) {
+    if (
+      (window as any).XRPLWalletKit &&
+      (window as any).__XRPL_WALLET_KIT_WEBSITE_BUNDLE_VERSION__ === KIT_BUNDLE_VERSION
+    ) {
       kitBundle = (window as any).XRPLWalletKit
       kitLoaded.value = true
       return resolve()
     }
     // Served from website/public/ (built locally — no CDN dependency)
     const script = document.createElement('script')
-    script.src = `${import.meta.env.BASE_URL}xrpl-wallet-kit.iife.min.js?v=4`
+    script.src = `${import.meta.env.BASE_URL}xrpl-wallet-kit.iife.min.js?v=${KIT_BUNDLE_VERSION}`
     script.onload = () => {
       kitBundle = (window as any).XRPLWalletKit
+      ;(window as any).__XRPL_WALLET_KIT_WEBSITE_BUNDLE_VERSION__ = KIT_BUNDLE_VERSION
       kitLoaded.value = true
       resolve()
     }

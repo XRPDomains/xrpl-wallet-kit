@@ -109,8 +109,8 @@ npm install ripple-keypairs verify-xrpl-signature xrpl
 For pages that cannot use a bundler, load the IIFE bundle from a CDN or copy it to your server:
 
 ```html
-<!-- From CDN (replace x.x.x with the latest version) -->
-<script src="https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@x.x.x/dist/xrpl-wallet-kit.iife.min.js"></script>
+<!-- From CDN (pinned to the current stable release) -->
+<script src="https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@0.1.3/dist/xrpl-wallet-kit.iife.min.js"></script>
 
 <!-- Or host it yourself -->
 <script src="/assets/xrpl-wallet-kit.iife.min.js"></script>
