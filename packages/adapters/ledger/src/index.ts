@@ -1,7 +1,3 @@
-import Xrp from "@ledgerhq/hw-app-xrp";
-import TransportWebHID from "@ledgerhq/hw-transport-webhid";
-import TransportWebUSB from "@ledgerhq/hw-transport-webusb";
-import { Client, encode } from "xrpl";
 import { BaseWalletAdapter, createWalletError } from "@xrpl-wallet-kit/core";
 import type {
   ConnectOptions,
@@ -21,7 +17,11 @@ export const LEDGER_ICON =
 
 const DEFAULT_TIMEOUT = 60_000;
 const DEFAULT_ACCOUNT_INDEX = 0;
-type LedgerTransport = ConstructorParameters<typeof Xrp>[0];
+type LedgerTransport = { close(): Promise<void> };
+type LedgerXrpApp = {
+  getAddress(path: string, verify: boolean, askChainCode: boolean): Promise<{ address: string; publicKey: string }>;
+  signTransaction(path: string, signingBlob: string): Promise<string>;
+};
 
 export enum LedgerDeviceState {
   NOT_CONNECTED = "NOT_CONNECTED",
@@ -81,7 +81,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
   private session?: LedgerSession;
   private network?: XrplNetwork;
   private transport?: LedgerTransport;
-  private xrp?: Xrp;
+  private xrp?: LedgerXrpApp;
   private derivationPath: string;
 
   constructor(private options: LedgerAdapterOptions = {}) {
@@ -183,6 +183,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
     const cleanupAfter = !this.transport;
     try {
       if (!this.transport || !this.xrp) {
+        const Xrp = await loadLedgerXrpApp();
         this.transport = await this.createTransport();
         this.xrp = new Xrp(this.transport);
       }
@@ -216,6 +217,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
     }
 
     this.transport = await this.createTransport();
+    const Xrp = await loadLedgerXrpApp();
     this.xrp = new Xrp(this.transport);
     const account = await this.withTimeout(
       this.xrp.getAddress(this.derivationPath, false, false),
@@ -236,6 +238,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
     if (!this.xrp || !this.session) throw createWalletError.notConnected();
     if (!this.network) throw createWalletError.connectionFailed(this.metadata.name, new Error("XRPL network is required for Ledger signing"));
 
+    const { Client, encode } = await import("xrpl");
     const client = new Client(this.network.rpcUrl);
     await client.connect();
     try {
@@ -243,7 +246,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
       const prepared = await client.autofill({
         ...txJson,
         Account: typeof txJson.Account === "string" ? txJson.Account : this.session.address
-      } as Parameters<Client["autofill"]>[0]);
+      } as any) as unknown as Record<string, unknown>;
 
       const txForSigning = { ...prepared } as Record<string, unknown>;
       delete txForSigning.TxnSignature;
@@ -252,7 +255,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
       const publicKey = this.session.publicKey ?? (await this.xrp.getAddress(this.derivationPath, false, false)).publicKey;
       txForSigning.SigningPubKey = publicKey.toUpperCase();
 
-      const signingBlob = encode(txForSigning as unknown as Parameters<typeof encode>[0]).toUpperCase();
+      const signingBlob = encode(txForSigning as never).toUpperCase();
       const signature = await this.withTimeout(
         this.xrp.signTransaction(this.derivationPath, signingBlob),
         "Ledger signing timeout. Please confirm the transaction on your Ledger device."
@@ -264,7 +267,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
         ...txForSigning,
         TxnSignature: signature.toUpperCase()
       };
-      const txBlob = encode(signedTx as Parameters<typeof encode>[0]);
+      const txBlob = encode(signedTx as never);
 
       if (!submit) {
         return {
@@ -298,7 +301,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
 
     if (this.options.preferWebHID !== false && support.webHID) {
       try {
-        return await TransportWebHID.create() as LedgerTransport;
+        return await createWebHIDTransport();
       } catch (error) {
         if (!support.webUSB) throw error;
       }
@@ -306,13 +309,13 @@ export class LedgerAdapter extends BaseWalletAdapter {
 
     if (support.webUSB) {
       try {
-        return await TransportWebUSB.create() as LedgerTransport;
+        return await createWebUSBTransport();
       } catch (error) {
         if (!support.webHID || this.options.preferWebHID !== false) throw error;
       }
     }
 
-    if (support.webHID) return TransportWebHID.create() as Promise<LedgerTransport>;
+    if (support.webHID) return createWebHIDTransport();
     throw createWalletError.walletNotAvailable("Ledger", new Error("No compatible Ledger transport is available"));
   }
 
@@ -365,6 +368,21 @@ export class LedgerAdapter extends BaseWalletAdapter {
 
 export function createLedgerAdapter(options?: LedgerAdapterOptions) {
   return new LedgerAdapter(options);
+}
+
+async function loadLedgerXrpApp(): Promise<new (transport: LedgerTransport) => LedgerXrpApp> {
+  const module = await import("@ledgerhq/hw-app-xrp");
+  return module.default as unknown as new (transport: LedgerTransport) => LedgerXrpApp;
+}
+
+async function createWebHIDTransport(): Promise<LedgerTransport> {
+  const module = await import("@ledgerhq/hw-transport-webhid");
+  return module.default.create() as Promise<LedgerTransport>;
+}
+
+async function createWebUSBTransport(): Promise<LedgerTransport> {
+  const module = await import("@ledgerhq/hw-transport-webusb");
+  return module.default.create() as Promise<LedgerTransport>;
 }
 
 function getDerivationPath(accountIndex: number): string {

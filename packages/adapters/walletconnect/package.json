@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/adapter-walletconnect",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "WalletConnect adapter for XRPL Wallet Kit, including supported XRPL wallet profiles.",
   "license": "MIT",
   "type": "module",
@@ -20,7 +20,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@xrpl-wallet-kit/core": "0.1.1",
+    "@xrpl-wallet-kit/core": "0.1.2",
     "@walletconnect/modal": "^2.7.0",
     "@walletconnect/sign-client": "^2.23.9",
     "@walletconnect/types": "^2.23.9",

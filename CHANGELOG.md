@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+### Fixed
+
+- Lazy-load Ledger browser transport dependencies so `@xrpl-wallet-kit/client` can be imported in Node.js and SSR environments.
+
 ## 0.1.1
 
 ### Fixed

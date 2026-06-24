@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/browser",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Browser-ready XRPL Wallet Kit bundle for vanilla JavaScript and legacy HTML sites.",
   "license": "MIT",
   "type": "module",
@@ -24,7 +24,7 @@
     "build": "vite build --mode readable && vite build --mode minified && tsc -p tsconfig.json --emitDeclarationOnly"
   },
   "dependencies": {
-    "@xrpl-wallet-kit/client": "0.1.1",
+    "@xrpl-wallet-kit/client": "0.1.2",
     "buffer": "^6.0.3"
   },
   "devDependencies": {
