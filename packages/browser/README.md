@@ -5,7 +5,7 @@ Browser-ready XRPL Wallet Kit bundle for vanilla JavaScript and legacy HTML site
 ## Install
 
 ```bash
-npm install @xrpl-wallet-kit/browser@beta
+npm install @xrpl-wallet-kit/browser
 ```
 
 The package publishes:
@@ -23,7 +23,7 @@ The package publishes:
   const kit = window.XRPLWalletKit.createWalletKit({
     appName: "My XRPL App",
     network: "mainnet",
-    autoConnect: true,
+    autoReconnect: true,
     walletConnectProjectId: "YOUR_WALLETCONNECT_PROJECT_ID",
     ui: {
       layout: "list",

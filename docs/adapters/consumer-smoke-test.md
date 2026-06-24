@@ -1,6 +1,6 @@
 # Consumer Type Smoke Test
 
-Use this before publishing a beta package.
+Use this before publishing a public package release.
 
 1. Build packages:
 

@@ -38,7 +38,7 @@ Use the readable `xrpl-wallet-kit.iife.js` while debugging, and the minified fil
   const kit = window.XRPLWalletKit.createWalletKit({
     appName: "My XRPL App",
     network: "mainnet",
-    autoConnect: true,
+    autoReconnect: true,
     walletConnectProjectId: "YOUR_WALLETCONNECT_PROJECT_ID",
     ui: {
       layout: "list",

@@ -1,6 +1,6 @@
 # HTML/jQuery Browser Bundle Preview
 
-This example shows the beta browser-bundle integration style for legacy HTML or jQuery apps.
+This example shows the browser-bundle integration style for legacy HTML or jQuery apps.
 
 Build the bundle first:
 

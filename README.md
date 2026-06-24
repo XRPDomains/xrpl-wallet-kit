@@ -28,19 +28,19 @@ Adapters:
 ## Install
 
 ```bash
-npm install @xrpl-wallet-kit/client@beta
+npm install @xrpl-wallet-kit/client
 ```
 
 For React:
 
 ```bash
-npm install @xrpl-wallet-kit/client@beta @xrpl-wallet-kit/react@beta
+npm install @xrpl-wallet-kit/client @xrpl-wallet-kit/react
 ```
 
 For plain HTML or legacy jQuery sites:
 
 ```bash
-npm install @xrpl-wallet-kit/browser@beta
+npm install @xrpl-wallet-kit/browser
 ```
 
 ## Quick Start
@@ -51,7 +51,7 @@ import { createWalletKit } from "@xrpl-wallet-kit/client";
 const kit = createWalletKit({
   appName: "My XRPL App",
   network: "mainnet",
-  autoConnect: true,
+  autoReconnect: true,
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
   ui: {
     themeMode: "light",
@@ -78,7 +78,7 @@ For production apps with Vite, webpack, or another bundler, prefer importing onl
   const kit = window.XRPLWalletKit.createWalletKit({
     appName: "My XRPL App",
     network: "mainnet",
-    autoConnect: true,
+    autoReconnect: true,
     walletConnectProjectId: "YOUR_PROJECT_ID",
     ui: {
       showWeb3Name: true,
@@ -100,7 +100,7 @@ const kit = createWalletKit({
   appName: "My XRPL App",
   network: "mainnet",
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-  autoConnect: true
+  autoReconnect: true
 });
 
 export function App() {
