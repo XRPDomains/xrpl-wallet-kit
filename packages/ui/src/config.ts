@@ -1,6 +1,6 @@
 import type { WalletButtonConfig, WalletUiConfig, WalletUiOptions } from "./types";
 import { resolveWalletUiMessages } from "./locales";
-import { defaultFontFamily } from "./themes";
+import { resolveWalletTheme } from "./themes";
 export function resolveWalletUiOptions(overrides: (WalletUiConfig & Partial<Omit<WalletUiOptions, "manager" | "mount">>) = {}): Partial<Omit<WalletUiOptions, "manager" | "mount">> {
   const {
     mode,
@@ -11,7 +11,7 @@ export function resolveWalletUiOptions(overrides: (WalletUiConfig & Partial<Omit
     connectButton: _connectButton,
     accountPanel: _accountPanel,
     identity: _identity,
-    themeName: _themeName,
+    themeName,
     language,
     messages,
     transactionPreview
@@ -34,12 +34,9 @@ export function resolveWalletUiOptions(overrides: (WalletUiConfig & Partial<Omit
     title: modal?.title ?? overrides.title ?? resolvedMessages.connectWallet,
     footerText: modal?.footerText ?? overrides.footerText ?? "XRPL Wallet Kit",
     showWalletGroup: walletList?.showGroup ?? overrides.showWalletGroup ?? true,
+    themeName,
     theme: {
-      accent: "#0078ae",
-      radius: "14px",
-      walletRadius: "10px",
-      fontFamily: defaultFontFamily,
-      shadow: "none",
+      ...resolveWalletTheme({ mode: mode ?? overrides.themeMode ?? "light", themeName }),
       ...(overrides.theme ?? {}),
       ...(customTheme ?? {})
     }
@@ -55,11 +52,7 @@ export function resolveWalletButtonOptions(ui: WalletUiConfig = {}, overrides: W
   const identity = ui.identity ?? {};
   const { accountPanelMode: overrideAccountPanelMode, ...restOverrides } = overrides;
   const theme = {
-    accent: "#0078ae",
-    radius: "14px",
-    walletRadius: "10px",
-    fontFamily: defaultFontFamily,
-    shadow: "none",
+    ...resolveWalletTheme({ mode: ui.mode ?? overrides.themeMode ?? "light", themeName: ui.themeName }),
     ...(ui.customTheme ?? {}),
     ...(overrides.theme ?? {})
   };
@@ -81,6 +74,7 @@ export function resolveWalletButtonOptions(ui: WalletUiConfig = {}, overrides: W
     fallbackToAddress: identity.fallbackToAddress,
     identityResolver: identity.resolver,
     themeMode: ui.mode,
+    themeName: ui.themeName,
     ...restOverrides,
     accountPanelMode: overrideAccountPanelMode ?? accountPanel.mode ?? "modal",
     theme
@@ -108,11 +102,7 @@ export function createDefaultWalletButtonConfig(overrides: WalletButtonConfig = 
     messages,
     label: rest.label ?? messages.connectWallet,
     theme: {
-      accent: "#0078ae",
-      radius: "14px",
-      walletRadius: "10px",
-      fontFamily: defaultFontFamily,
-      shadow: "none",
+      ...resolveWalletTheme({ mode: rest.themeMode ?? "light", themeName: rest.themeName }),
       ...(theme ?? {})
     }
   };

@@ -70,7 +70,9 @@ interface WalletButtonOptions {
 
   // Theming
   themeMode?: "light" | "dark" | "auto";     // default: "light"
+  themeName?: "default" | "light" | "dark" | "xrpl" | "minimal" | "midnight" | "glass" | "rounded" | "crisp" | "soft";
   theme?: WalletUiTheme;            // token overrides (see Theming)
+  customTheme?: WalletUiTheme;      // token overrides applied after theme
 
   // Localization
   language?: WalletUiLocale;
@@ -193,8 +195,11 @@ const button = new WalletButton({
   modal,
   target,
   themeMode: "dark",
+  themeName: "midnight",
   theme: {
     accent: "#7c3aed",
+    accentText: "#ffffff",
+    success: "#34d399",
     radius: "999px",   // fully rounded
     fontFamily: "'Inter', sans-serif",
   },

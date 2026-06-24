@@ -63,3 +63,24 @@ const button = new WalletButton({
 ```
 
 See the project documentation for complete options, theming, i18n, and WalletConnect configuration.
+
+## Theming
+
+The UI shares one token system across `WalletModal`, `WalletInline`, `WalletButton`, account panels, and `WalletToast`.
+
+```ts
+const modal = new WalletModal({
+  manager,
+  themeName: "midnight",
+  theme: {
+    accent: "#3b82f6",
+    accentText: "#ffffff",
+    success: "#34d399",
+    overlayBlur: 12,
+  },
+});
+```
+
+Built-in presets: `default`, `light`, `dark`, `xrpl`, `minimal`, `midnight`, `glass`, `rounded`, `crisp`, and `soft`.
+
+Important tokens include `accent`, `accentText`, `success`, `error`, `surface`, `surfaceHover`, `border`, `overlay`, `overlayBlur`, `spinnerTrail`, `headerBackground`, `radius`, `walletRadius`, and `fontFamily`.

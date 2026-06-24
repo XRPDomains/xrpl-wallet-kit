@@ -153,7 +153,9 @@ function resolveToastOptions(options: CreateWalletKitOptions, modalUi: Partial<O
     language: modalUi.language,
     messages: modalUi.messages,
     themeMode: modalUi.themeMode,
+    themeName: modalUi.themeName,
     theme: modalUi.theme,
+    customTheme: modalUi.customTheme,
     ...toast
   };
 }

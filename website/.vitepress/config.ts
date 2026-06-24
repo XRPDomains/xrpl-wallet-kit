@@ -1,13 +1,18 @@
 import { defineConfig } from "vitepress";
 
 export default defineConfig({
+  base: "/xrpl-wallet-kit/",
+
   title: "XRPL Wallet Kit",
   description:
     "Framework-agnostic wallet adapter toolkit for XRPL browser dApps. Headless TypeScript core with optional prebuilt UI.",
 
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: "/logo.svg" }],
-    ["meta", { name: "theme-color", content: "#0078ae" }],
+    ["meta", { name: "theme-color", content: "#0284c7" }],
+    // Upgrade any http:// prefetch/preflight requests to https:// automatically.
+    // Prevents Mixed Content errors when the reverse proxy terminates TLS.
+    ["meta", { "http-equiv": "Content-Security-Policy", content: "upgrade-insecure-requests" }],
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:title", content: "XRPL Wallet Kit" }],
     [
@@ -17,7 +22,24 @@ export default defineConfig({
         content: "Wallet adapter toolkit for XRPL browser dApps",
       },
     ],
+    // XRPDomains theme fonts — Plus Jakarta Sans (body) + JetBrains Mono (headings/code)
+    ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
+    ["link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }],
+    [
+      "link",
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap",
+      },
+    ],
   ],
+
+  markdown: {
+    theme: {
+      dark:  "tokyo-night",
+      light: "github-light",
+    },
+  },
 
   themeConfig: {
     logo: "/logo.svg",
@@ -59,6 +81,8 @@ export default defineConfig({
         items: [
           { text: "React", link: "/docs/frameworks/react" },
           { text: "Next.js", link: "/docs/frameworks/next" },
+          { text: "Vue 3", link: "/docs/frameworks/vue" },
+          { text: "Nuxt 3", link: "/docs/frameworks/nuxt" },
           { text: "Vanilla TypeScript", link: "/docs/frameworks/vanilla" },
           { text: "HTML (Legacy / CDN)", link: "/docs/frameworks/html-legacy" },
         ],
@@ -91,7 +115,7 @@ export default defineConfig({
           { text: "WalletConnect", link: "/docs/adapters/walletconnect" },
           { text: "Crossmark", link: "/docs/adapters/crossmark" },
           { text: "Ledger (Hardware)", link: "/docs/adapters/ledger" },
-          { text: "Dropfi", link: "/docs/adapters/dropfi" },
+          { text: "DropFi", link: "/docs/adapters/dropfi" },
           { text: "XRPL Snap (MetaMask)", link: "/docs/adapters/xrpl-snap" },
           { text: "Otsu Wallet", link: "/docs/adapters/otsu" },
         ],

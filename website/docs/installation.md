@@ -49,7 +49,7 @@ All available adapters:
 | `@xrpl-wallet-kit/adapter-walletconnect` | WalletConnect v2 |
 | `@xrpl-wallet-kit/adapter-crossmark` | Crossmark (extension) |
 | `@xrpl-wallet-kit/adapter-ledger` | Ledger hardware wallet |
-| `@xrpl-wallet-kit/adapter-dropfi` | Dropfi |
+| `@xrpl-wallet-kit/adapter-dropfi` | DropFi (extension + mobile) |
 | `@xrpl-wallet-kit/adapter-xrpl-snap` | XRPL Snap (MetaMask) |
 | `@xrpl-wallet-kit/adapter-otsu` | Otsu Wallet |
 

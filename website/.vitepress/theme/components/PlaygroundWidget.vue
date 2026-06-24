@@ -161,7 +161,7 @@ function loadKit(): Promise<void> {
     }
     // Served from website/public/ (built locally — no CDN dependency)
     const script = document.createElement('script')
-    script.src = '/xrpl-wallet-kit.iife.min.js?v=4'
+    script.src = `${import.meta.env.BASE_URL}xrpl-wallet-kit.iife.min.js?v=4`
     script.onload = () => {
       kitBundle = (window as any).XRPLWalletKit
       kitLoaded.value = true

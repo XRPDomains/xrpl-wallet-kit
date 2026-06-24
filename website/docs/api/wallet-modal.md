@@ -29,8 +29,14 @@ interface WalletUiOptions {
   /** Light/dark/auto theme mode (default: "light") */
   themeMode?: "light" | "dark" | "auto";
 
+  /** Built-in theme preset name */
+  themeName?: "default" | "light" | "dark" | "xrpl" | "minimal" | "midnight" | "glass" | "rounded" | "crisp" | "soft";
+
   /** Theme color/font overrides applied on top of the active mode */
   theme?: WalletUiTheme;
+
+  /** Alias for theme overrides, useful when overriding a themeName preset */
+  customTheme?: WalletUiTheme;
 
   /** Wallet list layout (default: "list") */
   layout?: "list" | "grid" | "card" | "icon";
@@ -82,6 +88,7 @@ const modal = new WalletModal({ manager });
 const modal = new WalletModal({
   manager,
   themeMode: "dark",
+  themeName: "midnight",
   theme: { accent: "#10b981", radius: "20px" },
   title: "Connect your XRPL wallet",
 });
@@ -144,7 +151,7 @@ interface WalletUiConfig {
   /** Light/dark/auto mode */
   mode?: "light" | "dark" | "auto";
   /** Built-in theme preset name */
-  themeName?: "default" | "minimal" | "rounded" | "compact";
+  themeName?: "default" | "light" | "dark" | "xrpl" | "minimal" | "midnight" | "glass" | "rounded" | "crisp" | "soft";
   /** Theme token overrides */
   customTheme?: WalletUiTheme;
   /** Language locale */

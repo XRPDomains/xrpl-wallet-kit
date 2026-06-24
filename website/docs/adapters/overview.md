@@ -11,7 +11,7 @@ An adapter is the only layer in XRPL Wallet Kit that talks directly to a wallet 
 | [WalletConnect](/docs/adapters/walletconnect) | `@xrpl-wallet-kit/adapter-walletconnect` | Multi-wallet QR protocol | Browser |
 | [Crossmark](/docs/adapters/crossmark) | `@xrpl-wallet-kit/adapter-crossmark` | Browser extension | Browser |
 | [Ledger](/docs/adapters/ledger) | `@xrpl-wallet-kit/adapter-ledger` | Hardware wallet (USB/HID) | Browser |
-| [DropFi](/docs/adapters/dropfi) | `@xrpl-wallet-kit/adapter-dropfi` | Browser extension | Browser |
+| [DropFi](/docs/adapters/dropfi) | `@xrpl-wallet-kit/adapter-dropfi` | Extension + Mobile App | Browser / Mobile |
 | [XRPL Snap](/docs/adapters/xrpl-snap) | `@xrpl-wallet-kit/adapter-xrpl-snap` | MetaMask Snap | Browser |
 | [Otsu Wallet](/docs/adapters/otsu) | `@xrpl-wallet-kit/adapter-otsu` | Browser extension (MV3) | Browser |
 
@@ -104,7 +104,8 @@ await manager.autoReconnect();
 
 Restore behavior varies by wallet type:
 
-- **Browser extensions** (GemWallet, Crossmark, DropFi, Otsu): check whether the extension still reports the same active address — passive, no popup.
+- **Browser extensions** (GemWallet, Crossmark, Otsu): check whether the extension still reports the same active address — passive, no popup.
+- **DropFi**: same passive check via `isConnected()` — works identically for both the Chrome extension and the mobile in-app browser.
 - **Xaman**: verify via saved SDK state; no new QR or deep link needed.
 - **WalletConnect**: look up the stored session topic in the SignClient store; restore without re-approval if still valid.
 - **Hardware (Ledger)**: USB device must be re-connected and unlocked — no silent restore.

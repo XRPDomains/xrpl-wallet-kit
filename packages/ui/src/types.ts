@@ -4,7 +4,18 @@ export type WalletUiLayout = "list" | "card" | "grid" | "icon";
 export type WalletUiSize = "compact" | "default" | "wide";
 export type WalletUiThemeMode = "light" | "dark" | "auto";
 export type WalletUiTextSize = "sm" | "md" | "lg";
-export type WalletUiThemeName = "default" | "minimal" | "rounded" | "compact" | (string & {});
+export type WalletUiThemeName =
+  | "default"
+  | "light"
+  | "dark"
+  | "xrpl"
+  | "minimal"
+  | "midnight"
+  | "glass"
+  | "rounded"
+  | "crisp"
+  | "soft"
+  | (string & {});
 export type WalletConnectUiMode = "default" | "list" | "group";
 export type WalletConnectCta = "copy" | "open" | "both";
 export type WalletQrStyle = "standard" | "dots";
@@ -12,12 +23,15 @@ export type WalletToastPosition = "bottom-right" | "bottom-left" | "bottom-cente
 
 export interface WalletUiTheme {
   accent?: string;
+  accentText?: string;
   background?: string;
   foreground?: string;
   error?: string;
+  success?: string;
   muted?: string;
   border?: string;
   overlay?: string;
+  overlayBlur?: number;
   surface?: string;
   surfaceHover?: string;
   fallbackIconBackground?: string;
@@ -25,6 +39,8 @@ export interface WalletUiTheme {
   shadow?: string;
   radius?: string;
   walletRadius?: string;
+  spinnerTrail?: string;
+  headerBackground?: string;
   fontFamily?: string;
 }
 
@@ -43,8 +59,10 @@ export interface WalletUiOptions {
   size?: WalletUiSize;
   textSize?: WalletUiTextSize;
   walletConnectUiMode?: WalletConnectUiMode;
+  themeName?: WalletUiThemeName;
   themeMode?: WalletUiThemeMode;
   theme?: WalletUiTheme;
+  customTheme?: WalletUiTheme;
   wallets?: string[];
   groups?: WalletUiGroup[];
   title?: string;
@@ -61,7 +79,9 @@ export interface WalletToastConfig {
   position?: WalletToastPosition;
   explorerUrl?: (hash: string, network?: WalletNetwork) => string | undefined;
   themeMode?: WalletUiThemeMode;
+  themeName?: WalletUiThemeName;
   theme?: WalletUiTheme;
+  customTheme?: WalletUiTheme;
   language?: WalletUiLocale;
   messages?: WalletUiMessagesInput;
 }
@@ -139,7 +159,9 @@ export interface WalletButtonOptions {
   size?: WalletButtonSize;
   variant?: WalletButtonVariant;
   themeMode?: WalletUiThemeMode;
+  themeName?: WalletUiThemeName;
   theme?: WalletUiTheme;
+  customTheme?: WalletUiTheme;
   language?: WalletUiLocale;
   messages?: WalletUiMessagesInput;
   identityResolver?: WalletIdentityResolver;

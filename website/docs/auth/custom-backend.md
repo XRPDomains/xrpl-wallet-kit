@@ -60,7 +60,7 @@ router.post("/verify", async (req: Request, res: Response) => {
   const {
     message,
     signatureKind,    // "signature" | "signedTx"
-    signature,        // compact sig (GemWallet, Crossmark, Dropfi)
+    signature,        // compact sig (GemWallet, Crossmark, DropFi)
     txBlob,           // signed tx blob (Xaman, WalletConnect, XRPL Snap)
     address,
     publicKey,        // optional — forwarded when adapter provides it

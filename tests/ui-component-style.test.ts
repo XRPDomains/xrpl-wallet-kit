@@ -4,7 +4,7 @@ import type { WalletMetadata } from "../packages/core/src";
 import { WalletButton, WalletButtonController, WalletInline, XrplWalletInline } from "../packages/ui/src/index";
 import { WalletModal } from "../packages/ui/src/modal";
 import { WalletToast } from "../packages/ui/src/toast";
-import { lightTheme } from "../packages/ui/src/themes";
+import { lightTheme, resolveWalletTheme } from "../packages/ui/src/themes";
 
 const manager = {
   on: () => () => undefined,
@@ -141,22 +141,42 @@ test("WalletModal visual states use semantic theme tokens", () => {
     ...lightTheme,
     accent: "#123abc",
     error: "#cc3344",
+    success: "#11aa66",
     muted: "#556677",
-    border: "#ddeeff"
+    border: "#ddeeff",
+    spinnerTrail: "#ccddee",
+    headerBackground: "#f9fafb",
+    overlayBlur: 6
   };
   const styles = modal.renderStyles(theme, "list", "default", "sm");
   const mobileOverrides = modal.renderMobileSheetOverrides(theme);
 
+  assert.match(styles, /\.xwk-overlay\{[^}]*backdrop-filter:blur\(6px\)/);
+  assert.match(styles, /\.xwk-header\{[^}]*background:#f9fafb/);
   assert.match(styles, /\.xwk-status\.xwk-error,\.xwk-error-text\{color:#cc3344\}/);
   assert.match(styles, /\.xwk-spinner:before\{[^}]*border-top-color:#556677/);
-  assert.match(styles, /\.xwk-spinner:before\{[^}]*border-right-color:#ddeeff/);
+  assert.match(styles, /\.xwk-spinner:before\{[^}]*border-right-color:#ccddee/);
   assert.match(styles, /\.xwk-qr-code\{[^}]*color:#556677/);
-  assert.match(styles, /\.xwk-copied-icon\{color:#123abc/);
+  assert.match(styles, /\.xwk-copied-icon\{color:#11aa66/);
   assert.match(styles, /\.xwk-footer\{[^}]*font-size:11px/);
   assert.match(mobileOverrides, /\.xwk-error-text,\.xwk-connect-status\.xwk-error-text,\.xwk-qr-loading\.xwk-error-text\{color:#cc3344!important\}/);
   assert.match(mobileOverrides, /\.xwk-close:focus-visible,\.xwk-back:focus-visible\{outline:2px solid #123abc!important/);
   assert.match(modal.checkIcon(), /fill="currentColor"/);
   assert.doesNotMatch(styles, /#1d9bf0|#64748b|rgba\(148,163,184/);
+});
+
+test("themeName presets resolve before token overrides", () => {
+  const theme = resolveWalletTheme({
+    mode: "light",
+    themeName: "midnight",
+    theme: { accent: "#abcdef" },
+    customTheme: { success: "#00cc88" }
+  });
+
+  assert.equal(theme.background, "#0f1629");
+  assert.equal(theme.overlayBlur, 12);
+  assert.equal(theme.accent, "#abcdef");
+  assert.equal(theme.success, "#00cc88");
 });
 
 test("WalletModal renders recommended badge without duplicating recommended group label", () => {

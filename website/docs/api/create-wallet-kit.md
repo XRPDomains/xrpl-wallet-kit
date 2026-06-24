@@ -115,6 +115,7 @@ createWalletKit({
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
   modal: {
     mode: "dark",
+    themeName: "midnight",
     customTheme: { accent: "#7c3aed" },
     modal: { title: "Connect to MyApp", width: "default" },
     autoOpen: true,   // open the modal immediately on page load
@@ -123,6 +124,25 @@ createWalletKit({
 ```
 
 See [WalletUiConfig](/docs/api/wallet-modal#walletuiconfig) for the full interface.
+
+For app-wide UI settings, prefer the top-level `ui` option. It is shared by the modal, connect button, account panel, and toast:
+
+```ts
+createWalletKit({
+  wallets: "all",
+  walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
+  connectButton: "#connect-btn",
+  ui: {
+    mode: "dark",
+    themeName: "glass",
+    customTheme: {
+      accent: "#10b981",
+      accentText: "#ffffff",
+    },
+    toast: true,
+  },
+});
+```
 
 ## Selecting Specific Wallets
 

@@ -119,13 +119,14 @@ test("WalletButton pre-connect fallback icon renders SVG instead of label text",
   assert.doesNotMatch(html, /xwk-button-icon[^>]*>Connect Wallet</);
 });
 
-test("WalletButton copied icon follows theme accent", () => {
+test("WalletButton copied icon follows theme success token", () => {
   const button = createButton({
-    accent: "#123abc"
+    accent: "#123abc",
+    success: "#11aa66"
   }) as unknown as { renderStyles(): string; copiedIcon(): string };
   const styles = button.renderStyles();
 
-  assert.match(styles, /\.xwk-copied-icon\{color:#123abc/);
+  assert.match(styles, /\.xwk-copied-icon\{color:#11aa66/);
   assert.match(button.copiedIcon(), /fill="currentColor"/);
   assert.doesNotMatch(button.copiedIcon(), /#1d9bf0/);
 });

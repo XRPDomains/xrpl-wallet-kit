@@ -111,6 +111,26 @@
                 </div>
               </div>
               <div class="tb-section">
+                <div class="tb-section-title">Accent Text</div>
+                <div class="tb-color-row">
+                  <input type="color" class="tb-color-input" :value="config.accentText || '#ffffff'"
+                    @input="setConfig('accentText', ($event.target as HTMLInputElement).value)" />
+                  <input type="text" class="tb-color-text" :value="config.accentText" placeholder="default"
+                    @input="setConfig('accentText', ($event.target as HTMLInputElement).value)" />
+                  <button v-if="config.accentText" class="tb-reset-btn" @click="setConfig('accentText', '')">✕</button>
+                </div>
+              </div>
+              <div class="tb-section">
+                <div class="tb-section-title">Success</div>
+                <div class="tb-color-row">
+                  <input type="color" class="tb-color-input" :value="config.success || (config.mode === 'dark' ? '#34d399' : '#059669')"
+                    @input="setConfig('success', ($event.target as HTMLInputElement).value)" />
+                  <input type="text" class="tb-color-text" :value="config.success" placeholder="default"
+                    @input="setConfig('success', ($event.target as HTMLInputElement).value)" />
+                  <button v-if="config.success" class="tb-reset-btn" @click="setConfig('success', '')">✕</button>
+                </div>
+              </div>
+              <div class="tb-section">
                 <div class="tb-section-title">Background</div>
                 <div class="tb-color-row">
                   <input type="color" class="tb-color-input"
@@ -154,6 +174,17 @@
                 </div>
               </div>
               <div class="tb-section">
+                <div class="tb-section-title">Surface Hover</div>
+                <div class="tb-color-row">
+                  <input type="color" class="tb-color-input"
+                    :value="config.surfaceHover || (config.mode === 'dark' ? '#263244' : '#f1f5f9')"
+                    @input="setConfig('surfaceHover', ($event.target as HTMLInputElement).value)" />
+                  <input type="text" class="tb-color-text" :value="config.surfaceHover" placeholder="default"
+                    @input="setConfig('surfaceHover', ($event.target as HTMLInputElement).value)" />
+                  <button v-if="config.surfaceHover" class="tb-reset-btn" @click="setConfig('surfaceHover', '')">✕</button>
+                </div>
+              </div>
+              <div class="tb-section">
                 <div class="tb-section-title">Border</div>
                 <div class="tb-color-row">
                   <input type="color" class="tb-color-input" :value="config.border || '#e2e8f0'"
@@ -171,6 +202,34 @@
                   <input type="text" class="tb-color-text" :value="config.overlay" placeholder="rgba(0,0,0,0.5)"
                     @input="setConfig('overlay', ($event.target as HTMLInputElement).value)" />
                   <button v-if="config.overlay" class="tb-reset-btn" @click="setConfig('overlay', '')">✕</button>
+                </div>
+              </div>
+              <div class="tb-section">
+                <div class="tb-section-title">Overlay Blur <span class="tb-value">{{ config.overlayBlur }}px</span></div>
+                <input type="range" min="0" max="24" step="2" :value="config.overlayBlur"
+                  @input="setNumberConfig('overlayBlur', Number(($event.target as HTMLInputElement).value))"
+                  class="tb-range" />
+              </div>
+              <div class="tb-section">
+                <div class="tb-section-title">Header Background</div>
+                <div class="tb-color-row">
+                  <input type="color" class="tb-color-input"
+                    :value="config.headerBackground || (config.mode === 'dark' ? '#111827' : '#ffffff')"
+                    @input="setConfig('headerBackground', ($event.target as HTMLInputElement).value)" />
+                  <input type="text" class="tb-color-text" :value="config.headerBackground" placeholder="default"
+                    @input="setConfig('headerBackground', ($event.target as HTMLInputElement).value)" />
+                  <button v-if="config.headerBackground" class="tb-reset-btn" @click="setConfig('headerBackground', '')">✕</button>
+                </div>
+              </div>
+              <div class="tb-section">
+                <div class="tb-section-title">Spinner Trail</div>
+                <div class="tb-color-row">
+                  <input type="color" class="tb-color-input"
+                    :value="config.spinnerTrail || (config.mode === 'dark' ? '#1f2937' : '#e5e7eb')"
+                    @input="setConfig('spinnerTrail', ($event.target as HTMLInputElement).value)" />
+                  <input type="text" class="tb-color-text" :value="config.spinnerTrail" placeholder="default"
+                    @input="setConfig('spinnerTrail', ($event.target as HTMLInputElement).value)" />
+                  <button v-if="config.spinnerTrail" class="tb-reset-btn" @click="setConfig('spinnerTrail', '')">✕</button>
                 </div>
               </div>
             </div>
@@ -269,18 +328,25 @@ import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from
 const config = reactive({
   layout:       'list',
   mode:         'light',
+  themeName:    'default',
   size:         'default',
   btnVariant:   'default',
   btnSize:      'md',
   accent:       '#0078ae',
+  accentText:   '',
+  success:      '',
   background:   '',
   foreground:   '',
   muted:        '',
   surface:      '',
+  surfaceHover: '',
   border:       '',
   overlay:      '',
+  overlayBlur:  0,
   radius:       '14px',
   walletRadius: '10px',
+  spinnerTrail: '',
+  headerBackground: '',
   fontFamily:   '',
 })
 
@@ -384,13 +450,32 @@ const fontOptions = [
 ]
 
 // ── Presets ───────────────────────────────────────────────────
-const BLANK = { background: '', foreground: '', muted: '', surface: '', border: '', overlay: '', fontFamily: '' }
+const BLANK = {
+  accentText: '',
+  success: '',
+  background: '',
+  foreground: '',
+  muted: '',
+  surface: '',
+  surfaceHover: '',
+  border: '',
+  overlay: '',
+  overlayBlur: 0,
+  spinnerTrail: '',
+  headerBackground: '',
+  fontFamily: '',
+}
 
 const presets = [
-  { id: 'default',  label: 'Default',  config: { layout: 'list', mode: 'light', size: 'default', btnVariant: 'default', btnSize: 'md', accent: '#0078ae', radius: '14px', walletRadius: '10px', ...BLANK } },
-  { id: 'dark-pro', label: 'Dark Pro', config: { layout: 'grid', mode: 'dark',  size: 'default', btnVariant: 'pill',    btnSize: 'md', accent: '#7c3aed', radius: '12px', walletRadius: '8px',  ...BLANK } },
-  { id: 'rounded',  label: 'Rounded',  config: { layout: 'list', mode: 'light', size: 'default', btnVariant: 'pill',    btnSize: 'lg', accent: '#059669', radius: '24px', walletRadius: '20px', ...BLANK } },
-  { id: 'minimal',  label: 'Minimal',  config: { layout: 'list', mode: 'light', size: 'compact', btnVariant: 'minimal', btnSize: 'sm', accent: '#6b7280', radius: '6px',  walletRadius: '4px',  ...BLANK } },
+  { id: 'default',  label: 'Default',  config: { layout: 'list', mode: 'light', themeName: 'default', size: 'default', btnVariant: 'default', btnSize: 'md', accent: '#0078ae', radius: '14px', walletRadius: '10px', ...BLANK } },
+  { id: 'dark',     label: 'Dark',     config: { layout: 'list', mode: 'dark',  themeName: 'dark',    size: 'default', btnVariant: 'default', btnSize: 'md', accent: '#4aa3ff', radius: '14px', walletRadius: '10px', ...BLANK } },
+  { id: 'xrpl',     label: 'XRPL',     config: { layout: 'list', mode: 'light', themeName: 'xrpl',    size: 'default', btnVariant: 'default', btnSize: 'md', accent: '#0078ae', radius: '12px', walletRadius: '10px', ...BLANK } },
+  { id: 'minimal',  label: 'Minimal',  config: { layout: 'list', mode: 'light', themeName: 'minimal', size: 'compact', btnVariant: 'minimal', btnSize: 'sm', accent: '#0078ae', radius: '8px',  walletRadius: '8px',  ...BLANK } },
+  { id: 'midnight', label: 'Midnight', config: { layout: 'list', mode: 'dark',  themeName: 'midnight', size: 'default', btnVariant: 'pill',    btnSize: 'md', accent: '#3b82f6', radius: '16px', walletRadius: '12px', ...BLANK, overlayBlur: 12 } },
+  { id: 'glass',    label: 'Glass',    config: { layout: 'grid', mode: 'light', themeName: 'glass',   size: 'default', btnVariant: 'pill',    btnSize: 'md', accent: '#6366f1', radius: '20px', walletRadius: '14px', ...BLANK, overlayBlur: 20 } },
+  { id: 'rounded',  label: 'Rounded',  config: { layout: 'card', mode: 'light', themeName: 'rounded', size: 'default', btnVariant: 'pill',    btnSize: 'lg', accent: '#7c3aed', radius: '24px', walletRadius: '16px', ...BLANK } },
+  { id: 'crisp',    label: 'Crisp',    config: { layout: 'list', mode: 'light', themeName: 'crisp',   size: 'default', btnVariant: 'outline', btnSize: 'md', accent: '#111827', radius: '4px',  walletRadius: '4px',  ...BLANK } },
+  { id: 'soft',     label: 'Soft',     config: { layout: 'grid', mode: 'light', themeName: 'soft',    size: 'default', btnVariant: 'default', btnSize: 'md', accent: '#7c3aed', radius: '16px', walletRadius: '12px', ...BLANK } },
 ]
 
 function applyPreset(p: (typeof presets)[0]) {
@@ -403,28 +488,46 @@ function setConfig(key: keyof typeof config, value: string) {
   ;(config as any)[key] = value
 }
 
+function setNumberConfig(key: keyof typeof config, value: number) {
+  activePreset.value = 'custom'
+  ;(config as any)[key] = value
+}
+
 // ── Code snippet ──────────────────────────────────────────────
 const codeSnippet = computed(() => {
   const themeLines: string[] = []
-  if (config.accent       !== '#0078ae') themeLines.push(`    accent: "${config.accent}",`)
-  if (config.radius       !== '14px')    themeLines.push(`    radius: "${config.radius}",`)
-  if (config.walletRadius !== '10px')    themeLines.push(`    walletRadius: "${config.walletRadius}",`)
-  if (config.background)                 themeLines.push(`    background: "${config.background}",`)
-  if (config.foreground)                 themeLines.push(`    foreground: "${config.foreground}",`)
-  if (config.muted)                      themeLines.push(`    muted: "${config.muted}",`)
-  if (config.surface)                    themeLines.push(`    surface: "${config.surface}",`)
-  if (config.border)                     themeLines.push(`    border: "${config.border}",`)
-  if (config.overlay)                    themeLines.push(`    overlay: "${config.overlay}",`)
-  if (config.fontFamily)                 themeLines.push(`    fontFamily: "${config.fontFamily}",`)
+  const showThemeOverrides = activePreset.value === 'custom' ||
+    config.themeName === 'default' ||
+    config.themeName === 'light'
+  if (showThemeOverrides) {
+    if (config.accent       !== '#0078ae') themeLines.push(`    accent: "${config.accent}",`)
+    if (config.accentText)                 themeLines.push(`    accentText: "${config.accentText}",`)
+    if (config.success)                    themeLines.push(`    success: "${config.success}",`)
+    if (config.radius       !== '14px')    themeLines.push(`    radius: "${config.radius}",`)
+    if (config.walletRadius !== '10px')    themeLines.push(`    walletRadius: "${config.walletRadius}",`)
+    if (config.background)                 themeLines.push(`    background: "${config.background}",`)
+    if (config.foreground)                 themeLines.push(`    foreground: "${config.foreground}",`)
+    if (config.muted)                      themeLines.push(`    muted: "${config.muted}",`)
+    if (config.surface)                    themeLines.push(`    surface: "${config.surface}",`)
+    if (config.surfaceHover)               themeLines.push(`    surfaceHover: "${config.surfaceHover}",`)
+    if (config.border)                     themeLines.push(`    border: "${config.border}",`)
+    if (config.overlay)                    themeLines.push(`    overlay: "${config.overlay}",`)
+    if (config.overlayBlur)                themeLines.push(`    overlayBlur: ${config.overlayBlur},`)
+    if (config.spinnerTrail)               themeLines.push(`    spinnerTrail: "${config.spinnerTrail}",`)
+    if (config.headerBackground)           themeLines.push(`    headerBackground: "${config.headerBackground}",`)
+    if (config.fontFamily)                 themeLines.push(`    fontFamily: "${config.fontFamily}",`)
+  }
 
   const themeModeLine = config.mode   !== 'light'   ? `\n  themeMode: "${config.mode}",`   : ''
+  const themeNameLine = config.themeName !== 'default' && config.themeName !== 'light' ? `\n  themeName: "${config.themeName}",` : ''
   const layoutLine    = config.layout !== 'list'    ? `\n  layout: "${config.layout}",`    : ''
   const sizeLine      = config.size   !== 'default' ? `\n  size: "${config.size}",`        : ''
   const themePart     = themeLines.length ? `\n  theme: {\n${themeLines.join('\n')}\n  },` : ''
 
-  const modalSnippet = `const modal = new WalletModal({\n  manager,${themeModeLine}${layoutLine}${sizeLine}${themePart}\n})`
+  const modalSnippet = `const modal = new WalletModal({\n  manager,${themeModeLine}${themeNameLine}${layoutLine}${sizeLine}${themePart}\n})`
 
   const btnLines: string[] = []
+  if (config.themeName !== 'default' && config.themeName !== 'light') btnLines.push(`  themeName: "${config.themeName}",`)
   if (config.btnVariant !== 'default') btnLines.push(`  variant: "${config.btnVariant}",`)
   if (config.btnSize    !== 'md')      btnLines.push(`  size: "${config.btnSize}",`)
 
@@ -452,7 +555,7 @@ function loadKit(): Promise<void> {
       return resolve()
     }
     const script = document.createElement('script')
-    script.src = '/xrpl-wallet-kit.iife.min.js?v=4'
+    script.src = `${import.meta.env.BASE_URL}xrpl-wallet-kit.iife.min.js?v=4`
     script.onload = () => {
       kitBundle = (window as any).XRPLWalletKit
       kitLoaded.value = true
@@ -498,30 +601,34 @@ function renderPreview() {
   const manager = buildMockManager()
   if (!manager) return
 
-  const isDark = config.mode === 'dark' ||
-    (config.mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-
   const btnWrap = document.createElement('div')
   btnWrap.style.cssText = 'display:flex;align-items:center;justify-content:center;padding:32px 24px 16px;'
   mount.appendChild(btnWrap)
 
-  const themeObj: Record<string, string> = {
+  const themeObj: Record<string, string | number> = {
     accent:       config.accent,
     radius:       config.radius,
     walletRadius: config.walletRadius,
-    background:   config.background || (isDark ? '#111827' : '#ffffff'),
-    foreground:   config.foreground || (isDark ? '#f8fafc' : '#111827'),
   }
+  if (config.accentText) themeObj.accentText = config.accentText
+  if (config.success)    themeObj.success    = config.success
+  if (config.background) themeObj.background = config.background
+  if (config.foreground) themeObj.foreground = config.foreground
   if (config.muted)      themeObj.muted      = config.muted
   if (config.surface)    themeObj.surface     = config.surface
+  if (config.surfaceHover) themeObj.surfaceHover = config.surfaceHover
   if (config.border)     themeObj.border      = config.border
   if (config.overlay)    themeObj.overlay     = config.overlay
+  if (config.overlayBlur) themeObj.overlayBlur = config.overlayBlur
+  if (config.spinnerTrail) themeObj.spinnerTrail = config.spinnerTrail
+  if (config.headerBackground) themeObj.headerBackground = config.headerBackground
   if (config.fontFamily) themeObj.fontFamily  = config.fontFamily
 
   modalInstance = new WalletModal({
     manager,
     layout:    config.layout as any,
     size:      config.size   as any,
+    themeName: config.themeName as any,
     themeMode: config.mode   as any,
     theme:     themeObj,
     mount,
@@ -534,10 +641,11 @@ function renderPreview() {
   buttonInstance = new WalletButtonController({
     manager,
     modal:     modalInstance,
+    themeName: config.themeName as any,
     themeMode: config.mode     as any,
     variant:   config.btnVariant as any,
     size:      config.btnSize  as any,
-    theme: { accent: config.accent, radius: config.radius },
+    theme: themeObj,
   })
   buttonInstance.mount(btnWrap)
 

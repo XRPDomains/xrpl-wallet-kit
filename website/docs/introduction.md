@@ -47,7 +47,7 @@ The **core** package contains the manager, types, errors, and storage logic. It 
 | WalletConnect | `adapter-walletconnect` | Multi-wallet QR | ✅ | ✅ | ✅ |
 | Crossmark | `adapter-crossmark` | Browser Extension | ✅ | ✅ | ✅ |
 | Ledger | `adapter-ledger` | Hardware (USB/HID) | ✅ | ✅ | — |
-| Dropfi | `adapter-dropfi` | Mobile App | ✅ | ✅ | ✅ |
+| DropFi | `adapter-dropfi` | Extension + Mobile App | ✅ | ✅ | ✅ |
 | XRPL Snap | `adapter-xrpl-snap` | MetaMask Snap | ✅ | ✅ | ✅ |
 | Otsu Wallet | `adapter-otsu` | Browser Extension | ✅ | ✅ | ✅ |
 
@@ -65,8 +65,22 @@ For production apps using a bundler (Vite, webpack), import from individual pack
 The IIFE bundle includes everything and is intended for quick prototyping or legacy HTML pages.
 :::
 
+## Supported Frameworks
+
+XRPL Wallet Kit has no React dependency. The headless core works with any JavaScript environment.
+
+| Framework | Guide |
+|---|---|
+| React | [React guide](/docs/frameworks/react) |
+| Next.js | [Next.js guide](/docs/frameworks/next) |
+| Vue 3 | [Vue 3 guide](/docs/frameworks/vue) |
+| Nuxt 3 | [Nuxt 3 guide](/docs/frameworks/nuxt) |
+| Vanilla TypeScript | [Vanilla TS guide](/docs/frameworks/vanilla) |
+| Plain HTML / CDN | [HTML legacy guide](/docs/frameworks/html-legacy) |
+
 ## Next Steps
 
 - [Installation](/docs/installation) — install the packages
 - [Quick Start](/docs/quick-start) — connect your first wallet in 5 minutes
 - [Adapters](/docs/adapters/overview) — pick the wallets you want to support
+- [Theming](/docs/configuration/theming) — customize colors, fonts, and layout

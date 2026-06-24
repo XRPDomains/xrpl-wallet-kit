@@ -62,9 +62,9 @@ The `locale` option was renamed. Update your i18n configuration:
 
 ```ts
 // ❌ Before (beta)
-new WalletModal({ manager, locale: VI_VN });
+new WalletModal({ manager, locale: jaJPMessages });
 
 // ✅ After (v0.1.0)
-import { viVNMessages } from "@xrpl-wallet-kit/ui";
-new WalletModal({ manager, language: "vi-VN", messages: viVNMessages });
+import { jaJPMessages } from "@xrpl-wallet-kit/ui";
+new WalletModal({ manager, language: "ja-JP", messages: jaJPMessages });
 ```
