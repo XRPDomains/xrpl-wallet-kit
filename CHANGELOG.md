@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+### Fixed
+
+- Fixed npm package ESM output so published packages can be imported directly by Node.js and modern bundlers.
+
 ## 0.1.0
 
 First stable public release for XRPL Wallet Kit.
