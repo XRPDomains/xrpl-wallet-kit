@@ -941,7 +941,7 @@ async function resolveXrpDomainAvatar(endpoint: string, domain: string, signal: 
     const response = await fetch(url, { signal });
     if (!response.ok) return undefined;
     const json = await response.json();
-    return findAvatarUrl(json);
+    return normalizeAvatarUrl(findAvatarUrl(json), endpoint);
   } catch {
     return undefined;
   }
@@ -960,6 +960,24 @@ function findAvatarUrl(value: unknown): string | undefined {
   const resultAvatar = findAvatarUrl(record.result);
   if (resultAvatar) return resultAvatar;
   return undefined;
+}
+
+function normalizeAvatarUrl(value: string | undefined, endpoint: string): string | undefined {
+  if (!value) return undefined;
+  if (/^(?:https?:|data:|blob:|ipfs:|ar:)/i.test(value)) return value;
+  if (value.startsWith("//")) {
+    try {
+      return `${new URL(endpoint).protocol}${value}`;
+    } catch {
+      return value;
+    }
+  }
+  try {
+    const base = new URL(endpoint);
+    return new URL(value.replace(/^\/+/, ""), `${base.origin}/`).toString();
+  } catch {
+    return value;
+  }
 }
 
 export function createWalletButton(options: WalletButtonOptions) {

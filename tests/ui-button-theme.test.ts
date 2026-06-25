@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { WalletSession } from "../packages/core/src/types";
-import { WalletButtonController } from "../packages/ui/src/button";
+import { WalletButtonController, createXrpDomainsResolver } from "../packages/ui/src/button";
 
 function createButton(theme: Record<string, unknown>, overrides: Record<string, unknown> = {}) {
   const manager = {
@@ -227,6 +227,44 @@ test("WalletButton refreshIdentity bypasses cached identity", async () => {
 
   assert.deepEqual(calls, [{ force: undefined }, { force: true }]);
   assert.equal(button.identityName, "fresh.xrp");
+});
+
+test("XRP Domains resolver resolves relative avatar URLs against the profile endpoint origin", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = (globalThis as { window?: unknown }).window;
+  const requestedUrls: string[] = [];
+  (globalThis as { window?: unknown }).window = {
+    setTimeout,
+    clearTimeout
+  };
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    requestedUrls.push(url);
+    if (url.includes("/getName")) {
+      return {
+        ok: true,
+        json: async () => ({ data: "alice.xrp" })
+      } as Response;
+    }
+    return {
+      ok: true,
+      json: async () => ({ data: { profile_info: { avatar: "/avatars/alice.png" } } })
+    } as Response;
+  }) as typeof fetch;
+
+  try {
+    const resolver = createXrpDomainsResolver({
+      endpoint: "https://app.xrpdomains.xyz/api/xrplnft/getName",
+      profileEndpoint: "https://app.xrpdomains.xyz/api/xrplnft/getAddress"
+    });
+    const identity = await resolver("rTestAddress1234567890", createSession());
+
+    assert.equal(identity && typeof identity === "object" ? identity.avatar : undefined, "https://app.xrpdomains.xyz/avatars/alice.png");
+    assert.equal(requestedUrls.length, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    (globalThis as { window?: unknown }).window = originalWindow;
+  }
 });
 
 test("WalletButton balance refresh is event-driven when showBalance is enabled", async () => {

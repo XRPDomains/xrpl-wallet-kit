@@ -3,6 +3,7 @@ import test from "node:test";
 import { CrossmarkAdapter, type CrossmarkProvider } from "../packages/adapters/crossmark/src/index";
 import { DropFiAdapter, type DropFiProvider } from "../packages/adapters/dropfi/src/index";
 import { GemWalletAdapter, type GemWalletProvider } from "../packages/adapters/gemwallet/src/index";
+import { XamanAdapter, type XamanSdkLike } from "../packages/adapters/xaman/src/index";
 import { MemoryWalletStorage, WalletManager, WALLET_STORAGE_VERSION } from "../packages/core/src/index";
 import type { WalletAdapter, WalletSession } from "../packages/core/src/index";
 
@@ -40,6 +41,40 @@ test("GemWallet restoreSession returns null when the extension cannot provide an
   const restored = await new GemWalletAdapter({ provider }).restoreSession(session);
 
   assert.equal(restored, null);
+});
+
+test("Xaman restoreSession returns null when SDK state is not signed in", async () => {
+  const sdk = createXamanSdk();
+
+  const restored = await new XamanAdapter({ sdk }).restoreSession({
+    ...session,
+    adapterId: "xaman"
+  });
+
+  assert.equal(restored, null);
+});
+
+test("Xaman restoreSession requires the active SDK account to match the stored session", async () => {
+  const sdk = createXamanSdk({ account: "rOtherAddress", signedIn: true });
+
+  const restored = await new XamanAdapter({ sdk }).restoreSession({
+    ...session,
+    adapterId: "xaman"
+  });
+
+  assert.equal(restored, null);
+});
+
+test("Xaman restoreSession restores only when SDK state proves the stored account is active", async () => {
+  const sdk = createXamanSdk({ account: "rRestoreAddress", signedIn: true, networkType: "MAINNET" });
+
+  const restored = await new XamanAdapter({ sdk }).restoreSession({
+    ...session,
+    adapterId: "xaman"
+  });
+
+  assert.equal(restored?.account.address, "rRestoreAddress");
+  assert.equal(restored?.account.networkType, "MAINNET");
 });
 
 test("DropFi restoreSession accepts passive address state even when isConnected is false after reload", async () => {
@@ -222,6 +257,26 @@ test("DropFi restoreSession waits briefly for delayed extension injection", asyn
     else delete host.xrpl;
   }
 });
+
+function createXamanSdk(state: { account?: string; signedIn?: boolean; networkType?: string } = {}): XamanSdkLike {
+  return {
+    state: {
+      account: state.account,
+      signedIn: state.signedIn
+    },
+    user: {
+      account: state.account,
+      networkType: state.networkType
+    },
+    payload: {
+      createAndSubscribe: async () => ({
+        created: { uuid: "mock-xaman-payload" },
+        resolved: Promise.resolve()
+      }),
+      get: async () => null
+    }
+  };
+}
 
 test("DropFi prefers dedicated namespaces and ignores non-wallet window.xrpl", () => {
   const host = globalThis as typeof globalThis & {

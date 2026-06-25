@@ -109,6 +109,7 @@ export class XamanAdapter extends BaseWalletAdapter {
       this.auth = this.sdk as unknown as XamanPkceAuth;
     }
     const state = await this.checkXamanState({ network: session.account.network });
+    if (!state?.account?.address || state.account.address !== session.account.address) return null;
     const account = state?.account?.address ? { ...session.account, ...state.account } : session.account;
     return { account, session: { ...session, account }, raw: state?.raw ?? null };
   }
