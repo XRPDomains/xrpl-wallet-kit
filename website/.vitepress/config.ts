@@ -159,7 +159,7 @@ export default defineConfig({
 
     footer: {
       message: "Released under the MIT License.",
-      copyright: "Copyright © 2024 XRPL Wallet Kit Contributors",
+      copyright: `Copyright © ${new Date().getFullYear()} XRPL Wallet Kit Contributors`,
     },
 
     editLink: {
