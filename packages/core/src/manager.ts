@@ -5,6 +5,7 @@ import type { WalletKitLogger } from "./logger";
 import { DEFAULT_XRPL_NETWORKS, createNetworkRegistry, getHttpRpcUrl } from "./networks";
 import { normalizeTxResult, pickPath } from "./result";
 import { MemoryWalletStorage } from "./storage";
+import { WalletTransactionStore } from "./tx-store";
 import type { AddWalletTransactionRequest, AuthenticateRequest, AuthenticateResult, ConnectOptions, SignatureKind, SignAndSubmitRequest, SignMessageRequest, SignMessageResult, SignTransactionRequest, SignTransactionResult, StoredWalletSessionEnvelope, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletCapabilities, WalletManagerConfig, WalletNetwork, WalletSession, WalletStorage, WalletTransaction } from "./types";
 
 const SESSION_KEY = "session";
@@ -29,6 +30,7 @@ export class WalletManager extends WalletEventEmitter {
   private autoReconnectPromise?: Promise<WalletSession | null>;
   private transactions = new Map<string, WalletTransaction>();
   private pendingConfirmations = new Map<string, AbortController>();
+  private transactionStore?: WalletTransactionStore;
 
   constructor(private config: WalletManagerConfig) {
     super();
@@ -36,6 +38,13 @@ export class WalletManager extends WalletEventEmitter {
     this.networks = this.networkRegistry.list();
     this.storage = config.storage ?? new MemoryWalletStorage();
     this.logger = createWalletKitLogger(config.logger);
+    if (config.persistTransactions) {
+      const persistOptions = typeof config.persistTransactions === "object" ? config.persistTransactions : {};
+      this.transactionStore = new WalletTransactionStore({
+        ...persistOptions,
+        storage: persistOptions.storage ?? this.storage
+      });
+    }
     config.adapters?.forEach((adapter) => this.register(adapter));
   }
 
@@ -134,6 +143,7 @@ export class WalletManager extends WalletEventEmitter {
         }
         const enrichedSession = await this.enrichSession(this.withWalletMetadata(restored.session, adapter));
         this.setSession(enrichedSession);
+        await this.loadPersistedTransactions(enrichedSession);
         this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
         this.emit("connected", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
         return enrichedSession;
@@ -146,6 +156,7 @@ export class WalletManager extends WalletEventEmitter {
 
       const enrichedSession = await this.enrichSession(this.withWalletMetadata(session, adapter));
       this.setSession(enrichedSession);
+      await this.loadPersistedTransactions(enrichedSession);
       this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession, stale: true });
       this.emit("connected", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
       return enrichedSession;
@@ -187,6 +198,7 @@ export class WalletManager extends WalletEventEmitter {
           const enrichedSession = await this.enrichSession(this.withWalletMetadata(recovered.session, adapter));
           this.setSession(enrichedSession);
           await this.saveSession(enrichedSession);
+          await this.loadPersistedTransactions(enrichedSession);
           this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
           this.emit("connected", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
           return enrichedSession;
@@ -229,6 +241,7 @@ export class WalletManager extends WalletEventEmitter {
       const session = await this.enrichSession(this.withWalletMetadata(result.session ?? { adapterId, account: { ...result.account, network }, connectedAt: Date.now() }, adapter));
       this.setSession(session);
       await this.saveSession(session);
+      await this.loadPersistedTransactions(session);
       this.emit("connected", { adapterId, account: session.account, session });
       return session;
     } catch (error) {
@@ -286,6 +299,7 @@ export class WalletManager extends WalletEventEmitter {
     } finally {
       this.activeAdapterId = null;
       this.activeSession = null;
+      this.transactions.clear();
       await this.storage.removeItem(SESSION_KEY);
       this.emit("disconnected", { adapterId });
     }
@@ -406,12 +420,15 @@ export class WalletManager extends WalletEventEmitter {
       metadata: request.metadata ?? existing?.metadata
     };
     this.transactions.set(transaction.hash, transaction);
+    void this.persistTransaction(transaction).catch((error) => {
+      this.logger.debug(`Transaction persistence failed for ${transaction.hash}`, error);
+    });
 
     if (status === "confirmed") {
       this.emit("tx_confirmed", { adapterId: transaction.adapterId, account: transaction.account, hash: transaction.hash, result: transaction.result, transaction });
     } else if (status === "failed") {
       this.emit("tx_failed", { adapterId: transaction.adapterId, account: transaction.account, hash: transaction.hash, error: transaction.error ?? new Error("Transaction failed"), transaction });
-    } else {
+    } else if (status === "submitted") {
       this.emit("tx_submitted", { adapterId: transaction.adapterId, account: transaction.account, hash: transaction.hash, transaction });
       this.confirmTransaction(transaction);
     }
@@ -456,6 +473,7 @@ export class WalletManager extends WalletEventEmitter {
         }
       };
       void this.saveSession(this.activeSession);
+      void this.loadPersistedTransactions(this.activeSession);
     }
     this.emit("accountChanged", { adapterId, account, previousAccount });
   }
@@ -471,6 +489,7 @@ export class WalletManager extends WalletEventEmitter {
         }
       };
       void this.saveSession(this.activeSession);
+      void this.loadPersistedTransactions(this.activeSession);
     }
     this.emit("networkChanged", { adapterId, network, previousNetwork });
   }
@@ -618,6 +637,32 @@ export class WalletManager extends WalletEventEmitter {
       transactionResult: typeof transactionResult === "string" ? transactionResult : undefined,
       raw: response
     };
+  }
+
+  private async loadPersistedTransactions(session: WalletSession): Promise<void> {
+    if (!this.transactionStore) return;
+    const address = session.account.address;
+    if (!address) return;
+    const transactions = await this.transactionStore.get(address, this.transactionNetworkId(session.account));
+    this.transactions.clear();
+    transactions.forEach((transaction) => this.transactions.set(transaction.hash, transaction));
+    transactions.forEach((transaction) => {
+      if (transaction.status === "submitted") this.confirmTransaction(transaction);
+    });
+  }
+
+  private async persistTransaction(transaction: WalletTransaction): Promise<void> {
+    if (!this.transactionStore) return;
+    const account = transaction.account ?? this.getAccount() ?? undefined;
+    if (!account?.address) return;
+    await this.transactionStore.add(account.address, this.transactionNetworkId(account), {
+      ...transaction,
+      account
+    });
+  }
+
+  private transactionNetworkId(account?: WalletAccount): string {
+    return account?.network?.id ?? account?.network?.networkType ?? this.config.network ?? "mainnet";
   }
 
   private async fetchJsonRpc(rpcUrl: string, body: unknown, signal: AbortSignal | undefined, timeoutMs: number): Promise<Record<string, unknown>> {

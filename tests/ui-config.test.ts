@@ -34,3 +34,15 @@ test("resolveWalletButtonOptions maps account panel address QR config", () => {
   assert.equal(resolveWalletButtonOptions().showAddressQr, true);
   assert.equal(resolveWalletButtonOptions({ accountPanel: { showAddressQr: false } }).showAddressQr, false);
 });
+
+test("resolveWalletButtonOptions maps account panel recent transaction config", () => {
+  const options = resolveWalletButtonOptions({
+    accountPanel: {
+      showRecentTransactions: true,
+      maxVisibleTransactions: 3
+    }
+  });
+
+  assert.equal(options.showRecentTransactions, true);
+  assert.equal(options.maxVisibleTransactions, 3);
+});

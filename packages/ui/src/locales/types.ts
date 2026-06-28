@@ -52,6 +52,13 @@ export interface WalletUiMessages {
   showAddressQr: string;
   copying: string;
   viewExplorer: string;
+  recentTransactions: string;
+  noRecentTransactions: string;
+  transactionSubmitted: string;
+  transactionConfirmed: string;
+  transactionFailed: string;
+  transactionUnknown: string;
+  view: string;
   disconnect: string;
   disconnecting: string;
   notActivated: string;

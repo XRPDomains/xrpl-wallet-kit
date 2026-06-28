@@ -151,6 +151,8 @@ export interface WalletButtonOptions {
   fallbackToAddress?: boolean;
   copyAddress?: boolean;
   showAddressQr?: boolean;
+  showRecentTransactions?: boolean;
+  maxVisibleTransactions?: number;
   explorer?: boolean;
   disconnect?: boolean;
   accountPanel?: boolean;
@@ -169,6 +171,7 @@ export interface WalletButtonOptions {
   onIdentityChange?: (identity: WalletIdentity | null, session: WalletSession | null) => void;
   onBalanceChange?: (balance: WalletBalance | null, session: WalletSession | null) => void;
   explorerUrl?: (session: WalletSession) => string | undefined;
+  transactionExplorerUrl?: (hash: string, network?: WalletNetwork) => string | undefined;
   formatAddress?: (address: string) => string;
 }
 
@@ -228,6 +231,8 @@ export interface WalletAccountPanelUiConfig {
   showAvatar?: boolean;
   copyAddress?: boolean;
   showAddressQr?: boolean;
+  showRecentTransactions?: boolean;
+  maxVisibleTransactions?: number;
   disconnect?: boolean;
   explorer?: boolean;
 }

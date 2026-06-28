@@ -149,7 +149,7 @@ export interface TxResult {
   raw?: unknown;
 }
 
-export type WalletTransactionStatus = "submitted" | "confirmed" | "failed";
+export type WalletTransactionStatus = "submitted" | "confirmed" | "failed" | "unknown";
 
 export interface WalletTransaction {
   hash: string;
@@ -252,6 +252,11 @@ export interface WalletStorage {
   removeItem(key: string): void | Promise<void>;
 }
 
+export interface WalletTransactionPersistenceConfig {
+  max?: number;
+  storage?: WalletStorage;
+}
+
 export interface StoredWalletSessionEnvelope {
   version: number;
   session: WalletSession;
@@ -268,6 +273,7 @@ export interface WalletManagerConfig {
   adapters?: WalletAdapter[];
   storage?: WalletStorage;
   autoReconnect?: boolean;
+  persistTransactions?: boolean | WalletTransactionPersistenceConfig;
   recoveryRetryDelaysMs?: number[];
   accountStatus?: {
     enabled?: boolean;

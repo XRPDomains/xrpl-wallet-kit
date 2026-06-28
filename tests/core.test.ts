@@ -630,6 +630,35 @@ test("WalletManager emits transaction lifecycle events and stores submitted tran
   assert.deepEqual(manager.getTransactions().map((tx) => tx.hash), ["mock-hash", "manual-confirm", "manual-fail"]);
 });
 
+test("WalletManager persists and rehydrates recent transactions when enabled", async () => {
+  const storage = new MemoryWalletStorage();
+  const firstManager = new WalletManager({
+    appName: "Test",
+    adapters: [new MockAdapter()],
+    storage,
+    persistTransactions: true,
+    accountStatus: { enabled: false },
+    logger: { level: "silent" }
+  });
+  await firstManager.connect("mock", { network });
+  firstManager.addTransaction({ hash: "persisted-hash", status: "confirmed", confirmedAt: 10 });
+
+  const secondManager = new WalletManager({
+    appName: "Test",
+    adapters: [new MockAdapter()],
+    storage,
+    autoReconnect: true,
+    persistTransactions: true,
+    accountStatus: { enabled: false },
+    logger: { level: "silent" }
+  });
+  await secondManager.autoReconnect();
+
+  const [transaction] = secondManager.getTransactions();
+  assert.equal(transaction.hash, "persisted-hash");
+  assert.equal(transaction.status, "confirmed");
+});
+
 test("WalletManager confirms submitted transactions with best-effort polling", async () => {
   const originalFetch = globalThis.fetch;
   const confirmNetwork = { ...network, httpRpcUrl: "https://rpc.test" };

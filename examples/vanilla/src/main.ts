@@ -202,6 +202,7 @@ async function bootstrap(run = bootstrapRun) {
     appIcons: PREVIEW_CONFIG.metadata.icons,
     network: getSelectedNetwork(),
     autoReconnect: true,
+    persistTransactions: true,
     storage: createBrowserWalletStorage("xwk.preview."),
     adapters
   });
@@ -622,7 +623,9 @@ function getWalletUiOptions() {
 function getWalletButtonOptions() {
   return createDefaultWalletButtonConfig({
     themeMode: uiTheme.value as WalletUiThemeMode,
-    showBalance: true
+    showBalance: true,
+    showRecentTransactions: true,
+    maxVisibleTransactions: 5
   });
 }
 

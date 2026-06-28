@@ -7,4 +7,5 @@ export * from "./networks";
 export * from "./result";
 export * from "./storage";
 export * from "./types";
+export * from "./tx-store";
 export * from "./utils";

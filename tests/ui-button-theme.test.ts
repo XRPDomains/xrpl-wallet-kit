@@ -407,3 +407,57 @@ test("WalletButton address QR trigger can be disabled", () => {
 
   assert.doesNotMatch(button.renderPanelContent(session), /data-xwk-address-qr/);
 });
+
+test("WalletButton recent transactions are opt-in and render compact rows", () => {
+  const session = createSession();
+  const manager = {
+    on: () => () => undefined,
+    getSession: () => session,
+    getAccount: () => session.account,
+    getTransactions: () => [
+      { hash: "ABCDEF1234567890", status: "submitted", submittedAt: 3, account: session.account },
+      { hash: "CONFIRMED123456", status: "confirmed", submittedAt: 1, confirmedAt: 2, account: session.account }
+    ]
+  };
+  const hidden = createButton({}, { manager }) as unknown as {
+    renderButton(): string;
+    renderPanelContent(session: WalletSession): string;
+  };
+  const visible = createButton({}, {
+    manager,
+    showRecentTransactions: true,
+    transactionExplorerUrl: (hash: string) => `https://example.test/tx/${hash}`
+  }) as unknown as {
+    renderButton(): string;
+    renderPanelContent(session: WalletSession): string;
+  };
+
+  assert.doesNotMatch(hidden.renderButton(), /xwk-button-pending-dot/);
+  assert.doesNotMatch(hidden.renderPanelContent(session), /xwk-tx-section/);
+  assert.match(visible.renderButton(), /xwk-button-pending-dot/);
+  assert.match(visible.renderPanelContent(session), /xwk-tx-section/);
+  assert.match(visible.renderPanelContent(session), /data-xwk-tx-toggle/);
+  assert.match(visible.renderPanelContent(session), /aria-expanded="true"/);
+  assert.match(visible.renderPanelContent(session), /Submitted/);
+  assert.match(visible.renderPanelContent(session), /https:\/\/example\.test\/tx\/ABCDEF1234567890/);
+});
+
+test("WalletButton hides recent transactions section when enabled but empty", () => {
+  const session = createSession();
+  const manager = {
+    on: () => () => undefined,
+    getSession: () => session,
+    getAccount: () => session.account,
+    getTransactions: () => []
+  };
+  const button = createButton({}, {
+    manager,
+    showRecentTransactions: true
+  }) as unknown as {
+    renderButton(): string;
+    renderPanelContent(session: WalletSession): string;
+  };
+
+  assert.doesNotMatch(button.renderButton(), /xwk-button-pending-dot/);
+  assert.doesNotMatch(button.renderPanelContent(session), /xwk-tx-section/);
+});
