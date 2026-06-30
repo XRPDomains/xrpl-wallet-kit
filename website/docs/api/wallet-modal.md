@@ -186,6 +186,8 @@ interface WalletUiConfig {
     variant?: "default" | "pill" | "minimal" | "outline";
     accountStatus?: "full" | "address" | "icon";
     showBalance?: boolean;
+    showRecentTransactions?: boolean;
+    maxVisibleTransactions?: number;
     showAdapterIcon?: boolean;
     showChevron?: boolean;
   };
@@ -195,6 +197,8 @@ interface WalletUiConfig {
     showAvatar?: boolean;
     copyAddress?: boolean;
     showAddressQr?: boolean;
+    showRecentTransactions?: boolean;
+    maxVisibleTransactions?: number;
     disconnect?: boolean;
     explorer?: boolean;
   };
@@ -278,6 +282,9 @@ interface WalletButtonOptions {
   accountPanel?: boolean;
   accountPanelMode?: "dropdown" | "modal";
   showBalance?: boolean;
+  showRecentTransactions?: boolean;
+  maxVisibleTransactions?: number;
+  transactionExplorerUrl?: (hash: string, network?: WalletNetwork) => string | undefined;
   size?: "sm" | "md" | "lg";
   variant?: "default" | "pill" | "minimal" | "outline";
   themeMode?: "light" | "dark" | "auto";

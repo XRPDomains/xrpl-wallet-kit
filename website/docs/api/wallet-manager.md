@@ -91,6 +91,8 @@ const result = await manager.signAndSubmit({ txJson });
 // result.result   — ledger result code (e.g., "tesSUCCESS")
 ```
 
+When a transaction hash is returned, the manager emits `tx_submitted` and records the transaction in the recent transaction store if transaction persistence is enabled.
+
 ### signMessage()
 
 Sign an arbitrary UTF-8 message.
@@ -125,6 +127,27 @@ const availability = await manager.getWalletAvailability();
 // { xaman: true, gemwallet: false, crossmark: true, ... }
 ```
 
+### addTransaction()
+
+Add or update a transaction in the recent transaction store. Use this for custom transaction flows that do not go through `signAndSubmit()`.
+
+```ts
+manager.addTransaction({
+  hash: "A1B2...",
+  status: "submitted", // "submitted" | "confirmed" | "failed" | "unknown"
+  submittedAt: Date.now(),
+  account: manager.getSession()?.account,
+});
+```
+
+### getTransactions()
+
+Return recent transactions known to the manager. UI components such as `WalletButton` use this when `showRecentTransactions` is enabled.
+
+```ts
+const transactions = manager.getTransactions();
+```
+
 ### destroy()
 
 Tear down the manager: cancel pending connections, remove all event listeners, and clean up adapter resources.
@@ -141,6 +164,9 @@ manager.on("disconnect", () => { ... });
 manager.on("error", (error: WalletError) => { ... });
 manager.on("sessionRestored", (result: ConnectResult) => { ... });
 manager.on("availabilityChanged", (availability: Record<string, boolean>) => { ... });
+manager.on("tx_submitted", ({ transaction }) => { ... });
+manager.on("tx_confirmed", ({ transaction }) => { ... });
+manager.on("tx_failed", ({ transaction }) => { ... });
 ```
 
 ## Properties

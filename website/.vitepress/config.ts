@@ -94,6 +94,7 @@ export default defineConfig({
           { text: "Networks", link: "/docs/configuration/networks" },
           { text: "Localization (i18n)", link: "/docs/configuration/i18n" },
           { text: "Connect Button", link: "/docs/configuration/connect-button" },
+          { text: "Recent Transactions", link: "/docs/configuration/recent-transactions" },
           { text: "Identity & Avatar", link: "/docs/configuration/identity" },
         ],
       },

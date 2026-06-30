@@ -61,6 +61,11 @@ interface WalletButtonOptions {
   showBalance?: boolean;            // show XRP balance in panel (default: false)
   balanceResolver?: WalletBalanceResolver;    // custom balance fetcher
 
+  // Recent transactions
+  showRecentTransactions?: boolean; // show recent txs in account panel (default: false)
+  maxVisibleTransactions?: number;  // max rows to show before internal scroll (default: 5)
+  transactionExplorerUrl?: (hash: string, network?: WalletNetwork) => string | undefined;
+
   // Identity (web3 name)
   identityResolver?: WalletIdentityResolver; // custom name resolver
 
@@ -150,6 +155,22 @@ const button = new WalletButton({
   },
 });
 ```
+
+## Recent transactions
+
+Recent transactions are off by default. Enable them when you want the account panel to show submitted, confirmed, failed, or unknown transactions for the connected account.
+
+```ts
+const button = new WalletButton({
+  manager,
+  modal,
+  target,
+  showRecentTransactions: true,
+  maxVisibleTransactions: 5,
+});
+```
+
+See [Recent Transactions](/docs/configuration/recent-transactions) for automatic tracking, manual entries, statuses, and explorer link configuration.
 
 ## Custom identity (web3 name)
 
@@ -241,6 +262,7 @@ const kit = createWalletKit({
     size: "md",
     variant: "pill",
     showBalance: true,
+    showRecentTransactions: true,
     themeMode: "dark",
   },
 });
@@ -253,5 +275,6 @@ kit.button.updateOptions({ themeMode: "light" });
 
 - [WalletModal & WalletButton API](/docs/api/wallet-modal) — full API reference
 - [Theming](/docs/configuration/theming) — theme token reference
+- [Recent Transactions](/docs/configuration/recent-transactions) - account panel transaction history
 - [Vanilla TypeScript setup](/docs/frameworks/vanilla)
 - [createWalletKit](/docs/api/create-wallet-kit)

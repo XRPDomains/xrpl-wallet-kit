@@ -139,8 +139,43 @@ createWalletKit({
       accent: "#10b981",
       accentText: "#ffffff",
     },
+    accountPanel: {
+      showRecentTransactions: true,
+      maxVisibleTransactions: 5,
+    },
     toast: true,
   },
+});
+```
+
+## Recent Transactions in the Account Panel
+
+Recent transactions are opt-in. Enable them through the shared `ui.accountPanel` config when using the all-in-one kit:
+
+```ts
+const kit = createWalletKit({
+  wallets: "all",
+  walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
+  connectButton: "#connect-btn",
+  ui: {
+    accountPanel: {
+      showRecentTransactions: true,
+      maxVisibleTransactions: 5,
+    },
+  },
+});
+```
+
+When `showRecentTransactions` is enabled, `manager.signAndSubmit()` records submitted transactions with a hash and the account panel shows compact rows with status, shortened hash, relative time, and an explorer link. The section only appears when there are transactions for the active account/network.
+
+For custom flows, add entries manually:
+
+```ts
+kit.manager.addTransaction({
+  hash: "A1B2...",
+  status: "submitted",
+  submittedAt: Date.now(),
+  account: kit.getSession()?.account,
 });
 ```
 
