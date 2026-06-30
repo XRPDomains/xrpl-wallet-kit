@@ -43,8 +43,8 @@ The bridge hides the legacy button after the Wallet Kit button renders successfu
 Do not hardcode private keys, seeds, or secrets in frontend code. `xamanClientId` and `walletConnectProjectId` are public integration config values and should come from your app config.
 
 ```html
-<script src="/js/xrpl-wallet-kit.iife.min.js?v=0.1.3"></script>
-<script src="/js/xrpl-wallet-kit-legacy-bridge.js?v=0.1.3"></script>
+<script src="/js/xrpl-wallet-kit.iife.min.js?v=wallet-kit"></script>
+<script src="/js/xrpl-wallet-kit-legacy-bridge.js?v=wallet-kit"></script>
 ```
 
 After both scripts load, these globals are available:

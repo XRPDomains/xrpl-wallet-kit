@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/auth",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Sign-In with Wallet helpers for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
@@ -25,7 +25,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@xrpl-wallet-kit/core": "0.1.4"
+    "@xrpl-wallet-kit/core": "0.1.5"
   },
   "peerDependencies": {
     "ripple-keypairs": "^2.0.0",

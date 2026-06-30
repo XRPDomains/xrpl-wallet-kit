@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/adapter-crossmark",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Crossmark adapter for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@crossmarkio/sdk": "^0.4.0",
-    "@xrpl-wallet-kit/core": "0.1.4"
+    "@xrpl-wallet-kit/core": "0.1.5"
   },
   "publishConfig": {
     "access": "public"

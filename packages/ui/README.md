@@ -64,6 +64,22 @@ const button = new WalletButton({
 
 See the project documentation for complete options, theming, i18n, and WalletConnect configuration.
 
+## Recent Transactions and Toasts
+
+`WalletButton` can show a compact recent transaction section in the account panel when `showRecentTransactions` is enabled. It reads transactions from `WalletManager.getTransactions()` and updates when transaction lifecycle events fire.
+
+```ts
+const button = new WalletButton({
+  manager,
+  modal,
+  target: "#connect-wallet",
+  showRecentTransactions: true,
+  maxVisibleTransactions: 5,
+});
+```
+
+Use `WalletToast` when you want floating transaction notifications for submitted, confirmed, and failed transactions.
+
 ## Theming
 
 The UI shares one token system across `WalletModal`, `WalletInline`, `WalletButton`, account panels, and `WalletToast`.

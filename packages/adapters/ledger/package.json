@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/adapter-ledger",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Ledger hardware wallet adapter for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
@@ -25,7 +25,7 @@
     "@ledgerhq/hw-transport": "^6.28.0",
     "@ledgerhq/hw-transport-webhid": "^6.28.0",
     "@ledgerhq/hw-transport-webusb": "^6.28.0",
-    "@xrpl-wallet-kit/core": "0.1.4",
+    "@xrpl-wallet-kit/core": "0.1.5",
     "buffer": "^6.0.3"
   },
   "peerDependencies": {

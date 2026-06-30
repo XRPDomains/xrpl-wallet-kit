@@ -124,6 +124,22 @@ Enable built-in transaction notifications with `ui.toast: true`, or pass an obje
 
 The built-in confirmer is intentionally best-effort. When a submitted hash is available, the kit polls briefly through the network HTTP RPC URL. If the result is confirmed, the toast updates to confirmed; if the result is inconclusive, it stays submitted and provides a `View` link to the configured explorer.
 
+## Recent Transactions
+
+Enable account panel transaction history with `ui.accountPanel.showRecentTransactions: true`. The manager automatically records transactions submitted through `signAndSubmit()` when a hash is returned, and apps can register custom flows with `manager.addTransaction()`.
+
+```ts
+const kit = createWalletKit({
+  connectButton: "#connect-wallet",
+  ui: {
+    accountPanel: {
+      showRecentTransactions: true,
+      maxVisibleTransactions: 5
+    }
+  }
+});
+```
+
 ## Environment
 
 ```env
@@ -144,4 +160,6 @@ npm.cmd run build:browser
 
 ## Status
 
-`0.1.0` is the first stable public release. APIs are ready for real integrations, while the project remains pre-`1.0.0` and may still make carefully documented breaking changes before the long-term stable API.
+Current npm release: use the `latest` dist-tag unless your app needs a pinned version.
+
+`0.1.0` was the first stable public release. APIs are ready for real integrations, while the project remains pre-`1.0.0` and may still make carefully documented breaking changes before the long-term stable API.

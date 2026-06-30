@@ -3,7 +3,7 @@
 `@xrpl-wallet-kit/auth` adds Sign-In with Wallet (SIWW) to any XRPL dApp — framework-agnostic, headless, with pluggable server-side verification.
 
 ::: info Stable public release
-`@xrpl-wallet-kit/auth` is available on npm as part of the `0.1.3` stable public release. The project is still pre-`1.0.0`, so minor API additions may land before the long-term stable API.
+`@xrpl-wallet-kit/auth` is available on npm under the `latest` dist-tag. The project is still pre-`1.0.0`, so minor API additions may land before the long-term stable API.
 :::
 
 ## What it does

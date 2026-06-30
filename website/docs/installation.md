@@ -110,7 +110,7 @@ For pages that cannot use a bundler, load the IIFE bundle from a CDN or copy it 
 
 ```html
 <!-- From CDN (pinned to the current stable release) -->
-<script src="https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@0.1.3/dist/xrpl-wallet-kit.iife.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js"></script>
 
 <!-- Or host it yourself -->
 <script src="/assets/xrpl-wallet-kit.iife.min.js"></script>

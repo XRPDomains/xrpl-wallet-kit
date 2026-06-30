@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/next",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Next.js helpers for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
@@ -20,8 +20,8 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@xrpl-wallet-kit/core": "0.1.4",
-    "@xrpl-wallet-kit/react": "0.1.4"
+    "@xrpl-wallet-kit/core": "0.1.5",
+    "@xrpl-wallet-kit/react": "0.1.5"
   },
   "peerDependencies": {
     "next": ">=14",
