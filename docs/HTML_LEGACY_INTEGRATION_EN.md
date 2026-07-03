@@ -10,14 +10,13 @@ Build the browser bundle from the wallet kit repository:
 npm run build:browser
 ```
 
-Copy these files into your public directory, for example `/js/`:
+Copy the browser bundle into your public directory, for example `/js/`:
 
 ```txt
 packages/browser/dist/xrpl-wallet-kit.iife.min.js
-packages/browser/dist/xrpl-wallet-kit-legacy-bridge.js
 ```
 
-`xrpl-wallet-kit.iife.min.js` is the main SDK. `xrpl-wallet-kit-legacy-bridge.js` is the helper for legacy websites.
+`xrpl-wallet-kit.iife.min.js` is the main SDK and is enough for normal HTML integrations. `xrpl-wallet-kit-legacy-bridge.js` is optional: use it only when an older page needs `window.XRPLWalletKitLegacyBridge` helpers for an existing legacy button or wallet facade.
 
 ## 2. Add a Mount Point
 
@@ -44,13 +43,23 @@ Do not hardcode private keys, seeds, or secrets in frontend code. `xamanClientId
 
 ```html
 <script src="/js/xrpl-wallet-kit.iife.min.js?v=wallet-kit"></script>
-<script src="/js/xrpl-wallet-kit-legacy-bridge.js?v=wallet-kit"></script>
 ```
 
-After both scripts load, these globals are available:
+After the script loads, this global is available:
 
 ```js
 window.XRPLWalletKit
+```
+
+If you need the optional legacy bridge, load it after the main SDK:
+
+```html
+<script src="/js/xrpl-wallet-kit-legacy-bridge.js?v=wallet-kit"></script>
+```
+
+This adds:
+
+```js
 window.XRPLWalletKitLegacyBridge
 ```
 

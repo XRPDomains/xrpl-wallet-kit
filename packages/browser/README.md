@@ -12,7 +12,7 @@ The package publishes:
 
 - `dist/xrpl-wallet-kit.iife.js`
 - `dist/xrpl-wallet-kit.iife.min.js`
-- `dist/xrpl-wallet-kit-legacy-bridge.js`
+- `dist/xrpl-wallet-kit-legacy-bridge.js` optional compatibility helper
 
 ## Basic HTML
 
@@ -40,7 +40,7 @@ The package publishes:
 
 ## Legacy Bridge
 
-Use `xrpl-wallet-kit-legacy-bridge.js` when a legacy page needs a smaller integration surface around the browser bundle. The bridge is intended for Legacy HTML apps that want to mount the connect button and read wallet state without migrating the whole app at once.
+Most HTML integrations only need `xrpl-wallet-kit.iife.min.js`. Use `xrpl-wallet-kit-legacy-bridge.js` only when an older page needs compatibility helpers around the browser bundle. The bridge is intended for Legacy HTML apps that want to mount beside an existing connect button, map older adapter ids, sync session state into legacy callbacks, or patch an existing wallet facade without migrating the whole app at once.
 
 ## Notes
 

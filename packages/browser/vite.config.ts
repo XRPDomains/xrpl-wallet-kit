@@ -3,6 +3,9 @@ import type { Plugin } from "vite";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+const packageJson = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")) as { version: string };
+const bundleBanner = `/*! @xrpl-wallet-kit/browser v${packageJson.version} | MIT | https://github.com/XRPDomains/xrpl-wallet-kit */`;
+
 function emitLegacyBridge(): Plugin {
   return {
     name: "emit-legacy-bridge",
@@ -16,11 +19,24 @@ function emitLegacyBridge(): Plugin {
   };
 }
 
+function prependBundleBanner(): Plugin {
+  return {
+    name: "prepend-bundle-banner",
+    generateBundle(_, bundle) {
+      for (const asset of Object.values(bundle)) {
+        if (asset.type !== "chunk") continue;
+        const code = asset.code.replace(bundleBanner, "").trimStart();
+        asset.code = `${bundleBanner}\n${code}`;
+      }
+    }
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const minified = mode === "minified";
 
   return {
-    plugins: [emitLegacyBridge()],
+    plugins: [emitLegacyBridge(), prependBundleBanner()],
     build: {
       outDir: "dist",
       emptyOutDir: !minified,

@@ -10,14 +10,15 @@ Build the browser package:
 npm.cmd run build:browser
 ```
 
-Copy these files to your site assets:
+Copy the browser bundle to your site assets:
 
 ```text
 packages/browser/dist/xrpl-wallet-kit.iife.min.js
-packages/browser/dist/xrpl-wallet-kit-legacy-bridge.js
 ```
 
 Use the readable `xrpl-wallet-kit.iife.js` while debugging, and the minified file in production.
+
+`xrpl-wallet-kit-legacy-bridge.js` is optional. Use it only when an older page needs the compatibility helpers exposed by `window.XRPLWalletKitLegacyBridge`, such as mounting beside an existing legacy button or patching an existing wallet facade.
 
 ## 2. Add a Mount Element
 

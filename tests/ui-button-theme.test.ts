@@ -82,7 +82,8 @@ test("WalletButton account actions defend against host button CSS", () => {
   assert.match(styles, /\.xwk-account-panel-actions span\{[^}]*text-overflow:ellipsis/);
   assert.match(styles, /\.xwk-account-name-address\{[^}]*font-size:16px/);
   assert.match(styles, /\.xwk-account-name-address\{[^}]*max-width:min\(260px,100%\)/);
-  assert.match(styles, /\.xwk-address-qr-trigger\{[^}]*height:34px/);
+  assert.match(styles, /\.xwk-address-qr-trigger\{[^}]*height:40px/);
+  assert.match(styles, /\.xwk-address-qr-trigger\{[^}]*min-height:40px/);
   assert.match(styles, /\.xwk-address-qr-trigger\{[^}]*overflow:visible/);
   assert.match(styles, /\.xwk-address-qr-trigger svg\{display:block;height:17px;overflow:visible;width:17px/);
   assert.match(styles, /\.xwk-account-balance\{[^}]*align-items:center/);
@@ -94,6 +95,10 @@ test("WalletButton account actions defend against host button CSS", () => {
   assert.match(styles, /\.xwk-account-warning\{[^}]*display:flex/);
   assert.match(styles, /\.xwk-account-warning\{[^}]*justify-content:center/);
   assert.match(styles, /\.xwk-account-warning\{[^}]*min-height:54px/);
+  assert.match(styles, /\.xwk-account-dropdown-header\{[^}]*grid-template-columns:44px minmax\(0,1fr\) 44px/);
+  assert.match(styles, /\.xwk-tx-list\{[^}]*grid-template-rows:1fr/);
+  assert.match(styles, /\.xwk-tx-list\.closed\{grid-template-rows:0fr/);
+  assert.match(styles, /\.xwk-tx-list-inner\{[^}]*overflow:hidden/);
   assert.match(styles, /\.xwk-account-close,\.xwk-account-back\{[^}]*appearance:none/);
   assert.match(styles, /\.xwk-account-close:focus-visible,\.xwk-account-back:focus-visible\{outline:2px solid/);
 });
