@@ -390,7 +390,7 @@ const mountRef      = ref<HTMLElement | null>(null)
 let modalInstance:  any = null
 let buttonInstance: any = null
 let kitBundle:      any = null
-const KIT_BUNDLE_VERSION = '0.1.3'
+const KIT_BUNDLE_VERSION = '0.1.5'
 let inlineObserver: MutationObserver | null = null
 
 // ── Options ───────────────────────────────────────────────────
@@ -498,6 +498,9 @@ function applyPreset(p: (typeof presets)[0]) {
 
 function setConfig(key: keyof typeof config, value: string) {
   activePreset.value = 'custom'
+  if (key === 'mode') {
+    config.themeName = value === 'dark' ? 'dark' : 'default'
+  }
   ;(config as any)[key] = value
 }
 
@@ -508,6 +511,7 @@ function setNumberConfig(key: keyof typeof config, value: number) {
 
 // ── Code snippet ──────────────────────────────────────────────
 const codeSnippet = computed(() => {
+  const sdkThemeName = getSdkThemeName()
   const themeLines: string[] = []
   const showThemeOverrides = activePreset.value === 'custom' ||
     config.themeName === 'default' ||
@@ -533,7 +537,7 @@ const codeSnippet = computed(() => {
   }
 
   const themeModeLine = config.mode   !== 'light'   ? `\n  themeMode: "${config.mode}",`   : ''
-  const themeNameLine = config.themeName !== 'default' && config.themeName !== 'light' ? `\n  themeName: "${config.themeName}",` : ''
+  const themeNameLine = sdkThemeName ? `\n  themeName: "${sdkThemeName}",` : ''
   const layoutLine    = config.layout !== 'list'    ? `\n  layout: "${config.layout}",`    : ''
   const sizeLine      = config.size   !== 'default' ? `\n  size: "${config.size}",`        : ''
   const themePart     = themeLines.length ? `\n  theme: {\n${themeLines.join('\n')}\n  },` : ''
@@ -541,7 +545,8 @@ const codeSnippet = computed(() => {
   const modalSnippet = `const modal = new WalletModal({\n  manager,${themeModeLine}${themeNameLine}${layoutLine}${sizeLine}${themePart}\n})`
 
   const btnLines: string[] = []
-  if (config.themeName !== 'default' && config.themeName !== 'light') btnLines.push(`  themeName: "${config.themeName}",`)
+  if (config.mode !== 'light') btnLines.push(`  themeMode: "${config.mode}",`)
+  if (sdkThemeName) btnLines.push(`  themeName: "${sdkThemeName}",`)
   if (config.btnVariant !== 'default') btnLines.push(`  variant: "${config.btnVariant}",`)
   if (config.btnSize    !== 'md')      btnLines.push(`  size: "${config.btnSize}",`)
 
@@ -602,6 +607,12 @@ function buildMockManager() {
   return new WalletManager({ adapters, network: 'mainnet' })
 }
 
+function getSdkThemeName(): string | undefined {
+  return config.themeName === 'default' || config.themeName === 'light'
+    ? undefined
+    : config.themeName
+}
+
 function renderPreview() {
   if (!kitBundle || !mountRef.value) return
 
@@ -618,6 +629,7 @@ function renderPreview() {
   const { WalletModal, WalletButtonController } = kitBundle
   const manager = buildMockManager()
   if (!manager) return
+  const sdkThemeName = getSdkThemeName()
 
   const btnWrap = document.createElement('div')
   btnWrap.style.cssText = 'display:flex;align-items:center;justify-content:center;padding:32px 24px 16px;'
@@ -646,7 +658,7 @@ function renderPreview() {
     manager,
     layout:    config.layout as any,
     size:      config.size   as any,
-    themeName: config.themeName as any,
+    themeName: sdkThemeName as any,
     themeMode: config.mode   as any,
     theme:     themeObj,
     mount,
@@ -659,7 +671,7 @@ function renderPreview() {
   buttonInstance = new WalletButtonController({
     manager,
     modal:     modalInstance,
-    themeName: config.themeName as any,
+    themeName: sdkThemeName as any,
     themeMode: config.mode     as any,
     variant:   config.btnVariant as any,
     size:      config.btnSize  as any,

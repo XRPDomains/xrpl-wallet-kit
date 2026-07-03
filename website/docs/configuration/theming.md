@@ -23,6 +23,36 @@ const modal = new WalletModal({
 
 `manager`, `themeMode`, and `themeName` are top-level options. They are not nested inside the `theme` object.
 
+When using the all-in-one `createWalletKit` helper, set the mode inside `ui`:
+
+```ts
+const kit = createWalletKit({
+  // adapters, network, etc.
+  ui: {
+    mode: "light", // "light" | "dark" | "auto"
+    customTheme: {
+      background: "#ffffff",
+      foreground: "#111827",
+    },
+  },
+});
+```
+
+When using lower-level constructors directly, use `themeMode` instead:
+
+```ts
+const modal = new WalletModal({
+  manager,
+  themeMode: "light",
+  theme: {
+    background: "#ffffff",
+    foreground: "#111827",
+  },
+});
+```
+
+Modals, account panels, and toasts may portal to `document.body`, so they do not inherit CSS scoped to your app root, such as `.app[data-theme="dark"]`. Pass theme values through kit configuration instead of relying on host selectors.
+
 ## Theme Tokens
 
 | Property | Default light | Default dark | Description |
