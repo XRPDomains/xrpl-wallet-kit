@@ -5,7 +5,7 @@ import type { WalletAdapter, WalletMetadata, WalletNetwork, WalletSession } from
 import { resolveWalletUiOptions } from "./config";
 import { resolveWalletUiMessages } from "./locales";
 import { resolveWalletTheme } from "./themes";
-import { ensureWalletStyle, getWalletStyleId, lockPageScroll, unlockPageScroll } from "./dom";
+import { ensureWalletStyle, lockPageScroll, unlockPageScroll } from "./dom";
 import { QR_DARK, QR_LIGHT, QR_SIZE, WALLETCONNECT_GROUP_ICON } from "./icons";
 import type { WalletInlineOptions, WalletInlineTarget, WalletUiConfig, WalletUiGroup, WalletUiLayout, WalletUiOptions, WalletUiSize, WalletUiTextSize, WalletUiTheme, WalletUiThemeMode } from "./types";
 
@@ -901,7 +901,7 @@ class WalletPickerView {
     }
     private ensureStyles(theme: Required<WalletUiTheme>, layout: WalletUiLayout, size: WalletUiSize, textSize: WalletUiTextSize) {
         const styles = `${this.renderStyles(theme, layout, size, textSize)}${this.renderMobileSheetOverrides(theme)}`;
-        ensureWalletStyle(getWalletStyleId("xwk-modal", styles), styles);
+        ensureWalletStyle("xwk-modal", styles);
     }
     private renderMobileSheetOverrides(theme: Required<WalletUiTheme>) {
         const inlineOverrides = `.xwk-inline{background:transparent!important;display:block!important;inset:auto!important;opacity:1!important;overflow:visible!important;padding:0!important;place-items:initial!important;position:relative!important;z-index:auto!important}.xwk-inline .xwk-modal{border:1px solid ${theme.border}!important;border-radius:${theme.radius}!important;box-shadow:none!important;max-height:none!important;max-width:none!important;opacity:1!important;transform:none!important;transition:none!important;width:100%!important}.xwk-inline .xwk-body{max-height:none!important}.xwk-inline .xwk-header-spacer{display:block;height:44px;width:44px}.xwk-inline[data-xwk-state="closing"] .xwk-modal{opacity:1!important;transform:none!important}`;

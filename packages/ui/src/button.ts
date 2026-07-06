@@ -2,7 +2,7 @@ import QRCodeStyling from "qr-code-styling";
 import { getExplorerAccountUrl, getExplorerTxUrl, getNativeAsset, isMainnetNetwork } from "@xrpl-wallet-kit/core";
 import type { WalletSession, WalletTransaction } from "@xrpl-wallet-kit/core";
 import { createXrpBalanceResolver } from "./balance";
-import { ensureWalletStyle, getWalletStyleId, lockPageScroll, unlockPageScroll } from "./dom";
+import { ensureWalletStyle, lockPageScroll, unlockPageScroll } from "./dom";
 import { QR_DARK, QR_LIGHT, QR_SIZE } from "./icons";
 import { resolveWalletUiMessages } from "./locales";
 import { resolveWalletTheme } from "./themes";
@@ -22,6 +22,8 @@ export class WalletButtonController {
   private balanceLoading = false;
   private activationStatus: "active" | "unfunded" | "unknown" = "unknown";
   private balanceRequest = 0;
+  private balanceDebounceTimer?: number;
+  private balanceDebounceSession: WalletSession | null = null;
   private readonly balanceRefreshTimers = new Set<number>();
   private panelOpen = false;
   private addressQrOpen = false;
@@ -103,6 +105,7 @@ export class WalletButtonController {
       this.identityResolvingKey = undefined;
       this.clearIdentitySettleTimer();
       this.clearBalanceRefreshTimers();
+      this.clearBalanceDebounce();
       this.balanceRequest += 1;
       this.balance = null;
       this.balanceLoading = false;
@@ -115,7 +118,7 @@ export class WalletButtonController {
     }));
     this.offEvents.push(options.manager.on("tx_confirmed", () => {
       this.clearBalanceRefreshTimers();
-      void this.resolveBalance(options.manager.getSession());
+      this.queueBalanceRefresh(options.manager.getSession());
       this.render();
     }));
     this.offEvents.push(options.manager.on("tx_failed", () => {
@@ -125,13 +128,13 @@ export class WalletButtonController {
       this.clearBalanceRefreshTimers();
       const session = options.manager.getSession();
       this.renderConnectedState(session);
-      void this.resolveBalance(session);
+      this.queueBalanceRefresh(session);
     }));
     this.offEvents.push(options.manager.on("networkChanged", () => {
       this.clearBalanceRefreshTimers();
       const session = options.manager.getSession();
       this.renderConnectedState(session);
-      void this.resolveBalance(session);
+      this.queueBalanceRefresh(session);
     }));
     this.offEvents.push(options.manager.on("error", () => {
       this.connecting = false;
@@ -188,6 +191,7 @@ export class WalletButtonController {
     this.identityRequest += 1;
     this.identityResolvingKey = undefined;
     this.clearBalanceRefreshTimers();
+    this.clearBalanceDebounce();
     if (this.copyResetTimer) window.clearTimeout(this.copyResetTimer);
     if (this.identitySettleTimer) window.clearTimeout(this.identitySettleTimer);
     this.offEvents.splice(0).forEach((off) => off());
@@ -198,9 +202,15 @@ export class WalletButtonController {
   render(): void {
     if (!this.target) return;
     this.target.innerHTML = "";
-    this.target.appendChild(this.createRoot());
-    this.syncAccountPanelPortal();
-    this.syncPanelListeners();
+    try {
+      this.target.appendChild(this.createRoot());
+      this.syncAccountPanelPortal();
+      this.syncPanelListeners();
+    } catch (error) {
+      this.removeAccountPanelPortal();
+      this.syncPanelScrollLock(false);
+      this.target.appendChild(this.createRenderFallback(error));
+    }
   }
 
   private createRoot(): HTMLElement {
@@ -216,6 +226,25 @@ export class WalletButtonController {
     });
     this.bindPanelActions(root);
     this.renderAddressQrIfNeeded(root);
+    return root;
+  }
+
+  private createRenderFallback(_error: unknown): HTMLElement {
+    const root = document.createElement("div");
+    root.className = "xwk-button-root";
+    try {
+      this.ensureStyles();
+    } catch {
+      // Keep the fallback available even if style generation is what failed.
+    }
+    root.innerHTML = `<button class="xwk-account-button" data-xwk-wallet-reset type="button"><span class="xwk-button-label">${this.escapeHtml("Reset wallet")}</span></button>`;
+    root.querySelector<HTMLButtonElement>("[data-xwk-wallet-reset]")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      this.connecting = false;
+      this.panelOpen = false;
+      this.addressQrOpen = false;
+      void this.options.manager.disconnect();
+    });
     return root;
   }
 
@@ -920,7 +949,7 @@ export class WalletButtonController {
       let timer = 0;
       timer = window.setTimeout(() => {
         this.balanceRefreshTimers.delete(timer);
-        void this.resolveBalance(this.options.manager.getSession());
+        this.queueBalanceRefresh(this.options.manager.getSession(), 0);
       }, delay);
       this.balanceRefreshTimers.add(timer);
     });
@@ -929,6 +958,29 @@ export class WalletButtonController {
   private clearBalanceRefreshTimers(): void {
     this.balanceRefreshTimers.forEach((timer) => window.clearTimeout(timer));
     this.balanceRefreshTimers.clear();
+  }
+
+  private queueBalanceRefresh(session: WalletSession | null, delay = 300): void {
+    if (!this.options.showBalance || !this.options.balanceResolver) return;
+    this.balanceDebounceSession = session;
+    this.clearBalanceDebounce();
+    if (typeof window === "undefined") {
+      void this.resolveBalance(this.balanceDebounceSession);
+      return;
+    }
+    this.balanceDebounceTimer = window.setTimeout(() => {
+      this.balanceDebounceTimer = undefined;
+      const nextSession = this.balanceDebounceSession;
+      this.balanceDebounceSession = null;
+      void this.resolveBalance(nextSession);
+    }, delay);
+  }
+
+  private clearBalanceDebounce(): void {
+    if (this.balanceDebounceTimer && typeof window !== "undefined") {
+      window.clearTimeout(this.balanceDebounceTimer);
+    }
+    this.balanceDebounceTimer = undefined;
   }
 
   private chevronIcon(): string {
@@ -977,7 +1029,7 @@ export class WalletButtonController {
 
   private ensureStyles(): void {
     const styles = this.renderStyles();
-    ensureWalletStyle(getWalletStyleId("xwk-button", styles), styles);
+    ensureWalletStyle("xwk-button", styles);
   }
 
   private renderStyles(): string {

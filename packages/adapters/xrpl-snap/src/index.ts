@@ -38,8 +38,8 @@ export class XrplSnapAdapter extends BaseWalletAdapter {
 
   async connect(options: ConnectOptions) {
     const ethereum = this.ethereum();
-    await ethereum.request({ method: "wallet_requestSnaps", params: { [this.snapId]: {} } });
-    const snap = await ethereum.request({ method: "wallet_invokeSnap", params: { snapId: this.snapId, request: { method: "xrpl_getAccount" } } });
+    await this.withAbort(ethereum.request({ method: "wallet_requestSnaps", params: { [this.snapId]: {} } }), options.signal);
+    const snap = await this.withAbort(ethereum.request({ method: "wallet_invokeSnap", params: { snapId: this.snapId, request: { method: "xrpl_getAccount" } } }), options.signal);
     const address = (snap as { account?: string }).account;
     if (!address) throw new Error("XRPL Snap did not return an XRPL address");
     this.activeAddress = address;
@@ -180,6 +180,36 @@ export class XrplSnapAdapter extends BaseWalletAdapter {
     const ethereum = this.options.ethereum ?? (globalThis as unknown as { ethereum?: Eip1193Provider }).ethereum;
     if (!ethereum && required) throw new Error("No MetaMask provider installed");
     return ethereum;
+  }
+
+  private withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (!signal) return promise;
+    if (signal.aborted) return Promise.reject(createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled")));
+    return new Promise<T>((resolve, reject) => {
+      let settled = false;
+      const cleanup = () => signal.removeEventListener("abort", abort);
+      const abort = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled")));
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      promise.then(
+        (value) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(value);
+        },
+        (error) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(error);
+        }
+      );
+    });
   }
 }
 

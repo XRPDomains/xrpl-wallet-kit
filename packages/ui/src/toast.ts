@@ -1,6 +1,6 @@
 import { getExplorerTxUrl } from "@xrpl-wallet-kit/core";
 import type { WalletNetwork, WalletTransaction } from "@xrpl-wallet-kit/core";
-import { ensureWalletStyle, getWalletStyleId } from "./dom";
+import { ensureWalletStyle } from "./dom";
 import { resolveWalletUiMessages } from "./locales";
 import { resolveWalletTheme } from "./themes";
 import type { ResolvedTheme } from "./themes";
@@ -151,7 +151,7 @@ export class WalletToast {
 
   private ensureStyles(): void {
     const styles = this.renderStyles();
-    ensureWalletStyle(getWalletStyleId("xwk-toast", styles), styles);
+    ensureWalletStyle("xwk-toast", styles);
   }
 
   private getExplorerUrl(hash: string, network?: WalletNetwork): string | undefined {

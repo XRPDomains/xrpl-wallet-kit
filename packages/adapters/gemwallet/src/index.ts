@@ -37,7 +37,7 @@ export class GemWalletAdapter extends BaseWalletAdapter {
     const provider = this.getProvider();
     if (!provider.isInstalled || !this.isInstalledResult(await provider.isInstalled())) throw new Error("Please install GemWallet Extension");
     if (!provider.getAddress) throw new Error("GemWallet provider is missing getAddress()");
-    const [address, publicKey, network] = await Promise.all([provider.getAddress(), this.getPublicKey(provider), provider.getNetwork?.()]);
+    const [address, publicKey, network] = await this.withAbort(Promise.all([provider.getAddress(), this.getPublicKey(provider), provider.getNetwork?.()]), options.signal);
     const accountAddress = address.result?.address;
     if (!accountAddress) throw new Error("GemWallet did not return an XRPL address");
     return { account: { address: accountAddress, publicKey: publicKey?.publicKey, network: options.network, networkType: this.networkName(network?.result?.network) }, raw: { address, publicKey: publicKey?.raw, network } };
@@ -197,6 +197,35 @@ export class GemWalletAdapter extends BaseWalletAdapter {
   }
   private networkName(network?: string | { name?: string }): string | undefined {
     return typeof network === "string" ? network : network?.name;
+  }
+  private withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (!signal) return promise;
+    if (signal.aborted) return Promise.reject(createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled")));
+    return new Promise<T>((resolve, reject) => {
+      let settled = false;
+      const cleanup = () => signal.removeEventListener("abort", abort);
+      const abort = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled")));
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      promise.then(
+        (value) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(value);
+        },
+        (error) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(error);
+        }
+      );
+    });
   }
 }
 export function createGemWalletAdapter(options?: { provider?: GemWalletProvider }) { return new GemWalletAdapter(options); }

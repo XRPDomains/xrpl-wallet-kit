@@ -7,7 +7,7 @@ Tài liệu này tổng hợp các phát hiện lỗi kỹ thuật ngầm (Code 
 
 ## 1. Rò Rỉ Bộ Nhớ DOM do CSS Injection (DOM Style Memory Leak)
 
-- [ ] **Khắc phục Rò rỉ Thẻ `<style>` liên tục:**
+- [x] **Khắc phục Rò rỉ Thẻ `<style>` liên tục:**
   * *Tệp tin ảnh hưởng:* [packages/ui/src/dom.ts](file:///c:/Users/PC/OneDrive/Develop/VibeCode/xrplWalletKit/packages/ui/src/dom.ts) (hàm `ensureWalletStyle`) và [packages/ui/src/modal.ts](file:///c:/Users/PC/OneDrive/Develop/VibeCode/xrplWalletKit/packages/ui/src/modal.ts) (hàm `ensureStyles`).
   * *Vấn đề:* Mỗi khi cấu hình theme hoặc layout thay đổi, hàm `getWalletStyleId()` sẽ băm (hash) chuỗi CSS mới để tạo ra một ID mới. Hàm `ensureWalletStyle()` kiểm tra sự tồn tại của thẻ style có ID này, nếu chưa có sẽ tạo mới và append vào `document.head`. Do các thẻ style cũ **không bao giờ bị gỡ bỏ**, việc chuyển đổi theme/layout nhiều lần sẽ sinh ra hàng chục thẻ `<style>` rác trong `document.head`, gây rò rỉ bộ nhớ và làm chậm quá trình phân tích CSSOM của trình duyệt.
   * *Giải pháp:* Thay vì dùng ID băm động, hãy sử dụng một thẻ style cố định duy nhất cho modal và ghi đè trực tiếp nội dung của nó:
@@ -23,6 +23,7 @@ Tài liệu này tổng hợp các phát hiện lỗi kỹ thuật ngầm (Code 
       if (element.textContent !== styles) element.textContent = styles;
     }
     ```
+  * *Coder update:* Đã bỏ `getWalletStyleId()` và chuyển `WalletModal`, `WalletButton`, `WalletToast` sang style id cố định (`xwk-modal`, `xwk-button`, `xwk-toast`). Test `tests/ui-dom.test.ts` đã kiểm tra style node được tái sử dụng và update nội dung thay vì tạo thêm node mới.
 
 ---
 
@@ -43,12 +44,13 @@ Tài liệu này tổng hợp các phát hiện lỗi kỹ thuật ngầm (Code 
       }
     }
     ```
+  * *Coder note:* Chưa code ở vòng này. Cần tách quyết định theo target: ESM package có thể lazy-load QR, nhưng browser IIFE/CDN hiện được thiết kế single-file/self-contained nên dynamic import có thể sinh chunk phụ hoặc làm khó tích hợp legacy HTML.
 
 ---
 
 ## 3. Quản Lý Trạng Thái Bất Đồng Bộ khi Hủy Kết Nối (Abort Connection Signal)
 
-- [ ] **Tích hợp triệt để AbortSignal vào các Wallet Adapter:**
+- [x] **Tích hợp triệt để AbortSignal vào các Wallet Adapter:**
   * *Tệp tin ảnh hưởng:* Các adapter trong `packages/core/src/adapters/` (GemWallet, Crossmark, Xaman).
   * *Vấn đề:* Thuộc tính `signal?: AbortSignal` đã được truyền vào hàm `connect()`, nhưng bên trong các adapter ví chưa lắng nghe sự kiện `abort` của signal này trong quá trình chờ người dùng duyệt popup. Kết quả là nếu người dùng đóng modal (hủy kết nối), tiến trình chờ phê duyệt ngầm của ví vẫn chạy và có thể throw lỗi không mong muốn sau đó.
   * *Giải pháp:* Trong mỗi adapter, đăng ký lắng nghe sự kiện `abort` để reject Promise kết nối ngay lập tức:
@@ -59,12 +61,13 @@ Tài liệu này tổng hợp các phát hiện lỗi kỹ thuật ngầm (Code 
       });
     }
     ```
+  * *Coder update:* Đã thêm abort guard cho `GemWallet`, `Crossmark`, `DropFi`, `Xaman`, `XRPL Snap` connect/recover path. WalletConnect đã có abort handling riêng từ trước. Guard không cố đóng popup native của extension, chỉ reject/ignore late result để UI không tự sync lại sau khi user đóng modal.
 
 ---
 
 ## 4. Tần Suất Yêu Cầu RPC quá cao (Rate Limiting & Debouncing Balance Refresh)
 
-- [ ] **Bảo vệ API Node bằng Debounce số dư:**
+- [x] **Bảo vệ API Node bằng Debounce số dư:**
   * *Tệp tin ảnh hưởng:* [packages/ui/src/button.ts](file:///c:/Users/PC/OneDrive/Develop/VibeCode/xrplWalletKit/packages/ui/src/button.ts) (hàm `resolveBalance`).
   * *Vấn đề:* Khi tài khoản, mạng lưới, hoặc nhiều giao dịch thay đổi liên tục, dApp gọi `resolveBalance()` dồn dập, tạo ra hàng loạt request RPC kiểm tra tài khoản lên các node công cộng (Public Nodes), dễ dẫn đến bị chặn IP (Rate Limit) hoặc làm chậm ứng dụng.
   * *Giải pháp:* Thiết lập cơ chế chống rung (Debounce) tối thiểu 1.5 giây cho các yêu cầu lấy số dư:
@@ -77,12 +80,14 @@ Tài liệu này tổng hợp các phát hiện lỗi kỹ thuật ngầm (Code 
       }, 300);
     }
     ```
+  * *Coder update:* Đã thêm debounce queue cho balance refresh do event nội bộ (`tx_confirmed`, `accountChanged`, `networkChanged`, delayed tx refresh). `refreshBalance()`/gọi trực tiếp vẫn chạy ngay để dApp chủ động refresh không bị trễ.
 
 ---
 
 ## 5. Kháng Lỗi khi Kết Nối Trực Quan Bị Hỏng (UI Error Boundaries)
 
-- [ ] **Bọc Try/Catch cho các Luồng Render HTML:**
+- [x] **Bọc Try/Catch cho các Luồng Render HTML:**
   * *Tệp tin ảnh hưởng:* [packages/ui/src/modal.ts](file:///c:/Users/PC/OneDrive/Develop/VibeCode/xrplWalletKit/packages/ui/src/modal.ts) và [packages/ui/src/button.ts](file:///c:/Users/PC/OneDrive/Develop/VibeCode/xrplWalletKit/packages/ui/src/button.ts) (hàm `render()`).
   * *Vấn đề:* Nếu xảy ra lỗi bất ngờ khi phân tích dữ liệu session hoặc phân giải tên miền Web3 từ API bên thứ ba, hàm `render()` sẽ crash và làm cho toàn bộ cây DOM của modal/button bị treo (giao diện đơ, không phản hồi).
   * *Giải pháp:* Bọc phần render chính trong khối `try/catch`. Nếu phát hiện crash, hiển thị một thông báo lỗi fallback nhẹ kèm nút bấm Disconnect/Reset để người dùng có thể tự giải thoát giao diện.
+  * *Coder update:* Đã bọc `WalletButtonController.render()` bằng fallback nhẹ. Nếu render button/account panel lỗi, UI hiển thị nút reset/disconnect thay vì treo cả cây DOM.

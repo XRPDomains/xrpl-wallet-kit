@@ -46,17 +46,19 @@ function installFakeDocument() {
   };
 }
 
-test("ensureWalletStyle moves reused active styles to the end of head", () => {
+test("ensureWalletStyle reuses stable style nodes and updates their content", () => {
   const dom = installFakeDocument();
   try {
-    ensureWalletStyle("xwk-button-light", ".xwk-account-button{color:black}");
-    ensureWalletStyle("xwk-button-dark", ".xwk-account-button{color:white}");
-    ensureWalletStyle("xwk-button-light", ".xwk-account-button{color:black}");
+    ensureWalletStyle("xwk-button", ".xwk-account-button{color:black}");
+    ensureWalletStyle("xwk-modal", ".xwk-modal{color:black}");
+    ensureWalletStyle("xwk-button", ".xwk-account-button{color:white}");
 
     assert.deepEqual(dom.children.map((child) => child.dataset.xwkStyle), [
-      "xwk-button-dark",
-      "xwk-button-light"
+      "xwk-modal",
+      "xwk-button"
     ]);
+    assert.equal(dom.children.length, 2);
+    assert.equal(dom.children[1]?.textContent, ".xwk-account-button{color:white}");
   } finally {
     dom.restore();
   }

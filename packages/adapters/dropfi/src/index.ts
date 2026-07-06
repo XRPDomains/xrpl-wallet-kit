@@ -64,13 +64,13 @@ export class DropFiAdapter extends BaseWalletAdapter {
 
   async connect(options: ConnectOptions) {
     const provider = this.provider();
-    const state = await this.initialize(provider);
-    const connected = await this.resolveConnected(provider, state);
+    const state = await this.withAbort(this.initialize(provider), options.signal);
+    const connected = await this.withAbort(this.resolveConnected(provider, state), options.signal);
     if (!connected) throw new Error("DropFi connection was rejected");
 
-    const address = await this.resolveAddress(provider, connected, state);
+    const address = await this.withAbort(this.resolveAddress(provider, connected, state), options.signal);
     if (!address) throw new Error("DropFi did not return an XRPL address");
-    const publicKey = await this.resolvePublicKey(provider, connected, state);
+    const publicKey = await this.withAbort(this.resolvePublicKey(provider, connected, state), options.signal);
     this.activeAddress = address;
 
     return { account: { address, publicKey, network: options.network, networkType: options.network?.networkType }, raw: { connected, address, publicKey } };
@@ -164,6 +164,36 @@ export class DropFiAdapter extends BaseWalletAdapter {
     } finally {
       if (timer) clearTimeout(timer);
     }
+  }
+
+  private withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (!signal) return promise;
+    if (signal.aborted) return Promise.reject(createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled")));
+    return new Promise<T>((resolve, reject) => {
+      let settled = false;
+      const cleanup = () => signal.removeEventListener("abort", abort);
+      const abort = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled")));
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      promise.then(
+        (value) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(value);
+        },
+        (error) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(error);
+        }
+      );
+    });
   }
 
   private provider(required?: true): DropFiProvider;

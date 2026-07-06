@@ -99,7 +99,7 @@ export class XamanAdapter extends BaseWalletAdapter {
   async connect(options: ConnectOptions) {
     await this.setPendingRecoveryMarker();
     try {
-      const result = await this.authorize();
+      const result = await this.withAbort(this.authorize(), options.signal);
       if (result instanceof Error) throw result;
       const connectResult = await this.createConnectResultFromAuth(result, options);
       this.clearPendingRecoveryMarker();
@@ -128,7 +128,7 @@ export class XamanAdapter extends BaseWalletAdapter {
   async recoverSession(options: ConnectOptions): Promise<ConnectResult | null> {
     if (!await this.hasPendingRecoveryMarker()) return null;
     try {
-      const result = await this.authorize();
+      const result = await this.withAbort(this.authorize(), options.signal);
       if (!result || result instanceof Error) {
         this.clearPendingRecoveryMarker();
         return null;
@@ -323,6 +323,36 @@ export class XamanAdapter extends BaseWalletAdapter {
     } catch {
       // Ignore storage restrictions in embedded browsers.
     }
+  }
+
+  private withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (!signal) return promise;
+    if (signal.aborted) return Promise.reject(createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled")));
+    return new Promise<T>((resolve, reject) => {
+      let settled = false;
+      const cleanup = () => signal.removeEventListener("abort", abort);
+      const abort = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled")));
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      promise.then(
+        (value) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(value);
+        },
+        (error) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(error);
+        }
+      );
+    });
   }
 
   private getPendingRecoveryKey(): string {
