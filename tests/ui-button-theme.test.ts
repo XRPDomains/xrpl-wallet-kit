@@ -97,8 +97,8 @@ test("WalletButton account actions defend against host button CSS", () => {
   assert.match(styles, /\.xwk-account-warning\{[^}]*justify-content:center/);
   assert.match(styles, /\.xwk-account-warning\{[^}]*min-height:54px/);
   assert.match(styles, /\.xwk-account-dropdown-header\{[^}]*grid-template-columns:44px minmax\(0,1fr\) 44px/);
-  assert.match(styles, /\.xwk-tx-list\{[^}]*grid-template-rows:1fr/);
-  assert.match(styles, /\.xwk-tx-list\.closed\{grid-template-rows:0fr/);
+  assert.match(styles, /\.xwk-tx-list\{[^}]*overflow:hidden/);
+  assert.match(styles, /\.xwk-tx-header-link\{[^}]*color:#4aa3ff/);
   assert.match(styles, /\.xwk-tx-list-inner\{[^}]*overflow:hidden/);
   assert.match(styles, /\.xwk-account-close,\.xwk-account-back\{[^}]*appearance:none/);
   assert.match(styles, /\.xwk-account-close:focus-visible,\.xwk-account-back:focus-visible\{outline:2px solid/);
@@ -183,7 +183,7 @@ test("WalletButton balance loading uses a tokenized skeleton placeholder", () =>
   assert.doesNotMatch(button.renderButton(), /xwk-balance-spinner/);
   assert.match(button.renderStyles(), /\.xwk-skeleton\{[^}]*background:linear-gradient/);
   assert.match(button.renderStyles(), /\.xwk-skeleton-button-balance\{height:12px;width:44px/);
-  assert.match(button.renderStyles(), /\.xwk-skeleton-balance\{height:18px;width:80px/);
+  assert.match(button.renderStyles(), /\.xwk-skeleton-balance\{height:14px;width:70px/);
   assert.match(button.renderStyles(), /\.xwk-skeleton-name\{height:24px;width:132px/);
 });
 
@@ -425,7 +425,7 @@ test("WalletButton balance refresh is event-driven when showBalance is enabled",
   }
 });
 
-test("WalletButton account panel can show address QR without duplicating identity layout", () => {
+test("WalletButton account panel uses unified address metadata and hides empty identity", () => {
   const session = createSession();
   const button = createButton({}, {
     manager: {
@@ -442,14 +442,15 @@ test("WalletButton account panel can show address QR without duplicating identit
   };
 
   const noIdentityHtml = button.renderPanelContent(session);
-  assert.match(noIdentityHtml, /xwk-account-name-with-qr/);
-  assert.match(noIdentityHtml, /xwk-account-name-address/);
+  assert.match(noIdentityHtml, /xwk-account-meta-pill/);
+  assert.match(noIdentityHtml, /xwk-pill-address/);
   assert.match(noIdentityHtml, /data-xwk-address-qr/);
-  assert.doesNotMatch(noIdentityHtml, /xwk-account-address/);
+  assert.doesNotMatch(noIdentityHtml, /xwk-account-name/);
 
   button.identityName = "xrpdomains.xrp";
   const identityHtml = button.renderPanelContent(session);
-  assert.match(identityHtml, /xwk-account-address/);
+  assert.match(identityHtml, /xwk-account-name/);
+  assert.match(identityHtml, /xwk-account-meta-pill/);
   assert.match(identityHtml, /data-xwk-address-qr/);
   assert.doesNotMatch(identityHtml, /xwk-account-name-with-qr/);
 
@@ -546,10 +547,40 @@ test("WalletButton recent transactions are opt-in and render compact rows", () =
   assert.doesNotMatch(hidden.renderPanelContent(session), /xwk-tx-section/);
   assert.match(visible.renderButton(), /xwk-button-pending-dot/);
   assert.match(visible.renderPanelContent(session), /xwk-tx-section/);
-  assert.match(visible.renderPanelContent(session), /data-xwk-tx-toggle/);
-  assert.match(visible.renderPanelContent(session), /aria-expanded="true"/);
+  assert.doesNotMatch(visible.renderPanelContent(session), /data-xwk-tx-toggle/);
   assert.match(visible.renderPanelContent(session), /Submitted/);
   assert.match(visible.renderPanelContent(session), /https:\/\/example\.test\/tx\/ABCDEF1234567890/);
+});
+
+test("WalletButton recent transactions preview is capped and history sub-view shows more rows", () => {
+  const session = createSession();
+  const transactions = Array.from({ length: 5 }, (_, index) => ({
+    hash: `HASH${index}ABCDEF123456`,
+    status: "confirmed" as const,
+    submittedAt: index + 1,
+    confirmedAt: index + 1,
+    account: session.account
+  }));
+  const manager = {
+    on: () => () => undefined,
+    getSession: () => session,
+    getAccount: () => session.account,
+    getTransactions: () => transactions
+  };
+  const button = createButton({}, {
+    manager,
+    showRecentTransactions: true
+  }) as unknown as {
+    renderPanelContent(session: WalletSession): string;
+    renderTransactionHistoryPanelContent(session: WalletSession): string;
+  };
+
+  const previewHtml = button.renderPanelContent(session);
+  assert.match(previewHtml, /data-xwk-tx-history/);
+  assert.equal((previewHtml.match(/xwk-tx-row /g) ?? []).length, 3);
+
+  const historyHtml = button.renderTransactionHistoryPanelContent(session);
+  assert.equal((historyHtml.match(/xwk-tx-row /g) ?? []).length, 5);
 });
 
 test("WalletButton hides recent transactions section when enabled but empty", () => {
