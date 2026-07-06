@@ -178,6 +178,12 @@ import { WalletButton } from "@xrpl-wallet-kit/react";
 
 // With options
 <WalletButton label="Connect XRPL Wallet" size="lg" variant="pill" />
+
+// Brand icon while disconnected
+<WalletButton
+  label="Connect"
+  icon={{ type: "image", src: "/brand-wallet.svg", alt: "MyApp wallet" }}
+/>
 ```
 
 **Props** (all optional):
@@ -187,6 +193,10 @@ type ReactWalletButtonProps = {
   label?: string;
   size?: "sm" | "md" | "lg";
   variant?: "default" | "pill" | "minimal" | "outline";
+  icon?: false
+    | { type: "default" }
+    | { type: "image"; src: string; alt?: string }
+    | { type: "html"; html: string; ariaLabel?: string };
   showAdapterIcon?: boolean;
   showChevron?: boolean;
 };

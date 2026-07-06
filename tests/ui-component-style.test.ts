@@ -4,7 +4,7 @@ import type { WalletMetadata } from "../packages/core/src";
 import { WalletButton, WalletButtonController, WalletInline, XrplWalletInline } from "../packages/ui/src/index";
 import { WalletModal } from "../packages/ui/src/modal";
 import { WalletToast } from "../packages/ui/src/toast";
-import { lightTheme, resolveWalletTheme } from "../packages/ui/src/themes";
+import { darkTheme, glassTheme, lightTheme, resolveWalletTheme } from "../packages/ui/src/themes";
 
 const manager = {
   on: () => () => undefined,
@@ -179,6 +179,15 @@ test("themeName presets resolve before token overrides", () => {
   assert.equal(theme.success, "#00cc88");
 });
 
+test("theme presets use refined surface, border, and glass tokens", () => {
+  assert.equal(lightTheme.border, "rgba(17,24,39,.08)");
+  assert.equal(lightTheme.surfaceHover, "rgba(17,24,39,.04)");
+  assert.equal(darkTheme.border, "rgba(248,250,252,.10)");
+  assert.equal(darkTheme.surfaceHover, "#263244");
+  assert.equal(glassTheme.overlayBlur, 24);
+  assert.equal(glassTheme.shadow, "0 0 0 1px rgba(255,255,255,.08), 0 12px 40px rgba(15,23,42,.24)");
+});
+
 test("WalletModal hides wallet group subtitles by default and keeps recommended badge", () => {
   const modal = new WalletModal({
     manager: manager as never,
@@ -265,6 +274,32 @@ test("WalletModal custom QR supports light QR mode without changing modal frame"
   assert.match(styles, /\.xwk-qr-card-actions-dual\{grid-template-columns:repeat\(auto-fit,minmax\(0,1fr\)\)\}/);
   assert.match(styles, /\.xwk-qr-card-actions-dual\{grid-template-columns:1fr\}/);
   assert.doesNotMatch(styles, /transition:[^}]*height/);
+});
+
+test("WalletModal custom QR loading uses a tokenized skeleton placeholder", () => {
+  const modal = new WalletModal({
+    manager: manager as never,
+    themeMode: "light"
+  }) as unknown as {
+    renderQrLoading(): string;
+    renderMobileSheetOverrides(theme: typeof lightTheme): string;
+  };
+  const html = modal.renderQrLoading();
+  const overrides = modal.renderMobileSheetOverrides({
+    ...lightTheme,
+    surface: "#f8fafc",
+    surfaceHover: "rgba(17,24,39,.04)"
+  });
+
+  assert.match(html, /xwk-qr-loading-skeleton/);
+  assert.match(html, /xwk-qr-skeleton/);
+  assert.match(overrides, /\.xwk-qr-loading-skeleton\{display:grid;height:100%;place-items:center;width:100%\}/);
+  assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*background:linear-gradient/);
+  assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*height:calc\(100% - 16px\)/);
+  assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*width:calc\(100% - 16px\)/);
+  assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*border-radius:12px/);
+  assert.match(overrides, /@keyframes xwk-qr-skeleton-pulse/);
+  assert.match(overrides, /prefers-reduced-motion:reduce[^`]*\.xwk-qr-skeleton\{animation:none!important\}/);
 });
 
 test("WalletModal installs shared styles instead of reinjecting inline style tags", () => {

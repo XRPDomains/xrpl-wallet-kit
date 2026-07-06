@@ -52,6 +52,19 @@ interface CreateWalletKitOptions extends CreateWalletClientOptions {
     cacheMs?: number;
   };
 }
+
+interface WalletKitConnectButtonConfig {
+  target?: string | HTMLElement;
+  label?: string;
+  icon?: false
+    | { type: "default" }
+    | { type: "image"; src: string; alt?: string }
+    | { type: "html"; html: string; ariaLabel?: string };
+  size?: "sm" | "md" | "lg";
+  variant?: "default" | "pill" | "minimal" | "outline";
+  showAdapterIcon?: boolean;
+  showChevron?: boolean;
+}
 ```
 
 ### `CreateWalletClientOptions`
@@ -142,6 +155,13 @@ createWalletKit({
     accountPanel: {
       showRecentTransactions: true,
       maxVisibleTransactions: 5,
+    },
+    connectButton: {
+      icon: {
+        type: "image",
+        src: "/brand-wallet.svg",
+        alt: "MyApp wallet",
+      },
     },
     toast: true,
   },

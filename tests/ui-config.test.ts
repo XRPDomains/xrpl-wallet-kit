@@ -8,6 +8,21 @@ test("resolveWalletButtonOptions defaults account panel mode to modal", () => {
   assert.equal(options.accountPanelMode, "modal");
 });
 
+test("resolveWalletButtonOptions preserves default button and account panel affordances", () => {
+  const options = resolveWalletButtonOptions({}, {
+    showBalance: true,
+    showRecentTransactions: true
+  });
+
+  assert.equal(options.showAdapterIcon, true);
+  assert.equal(options.showChevron, true);
+  assert.equal(options.copyAddress, true);
+  assert.equal(options.disconnect, true);
+  assert.equal(options.showAddressQr, true);
+  assert.equal(options.showBalance, true);
+  assert.equal(options.showRecentTransactions, true);
+});
+
 test("resolveWalletButtonOptions maps ui.accountPanel.mode to the button accountPanelMode", () => {
   const options = resolveWalletButtonOptions({
     accountPanel: {
@@ -45,4 +60,55 @@ test("resolveWalletButtonOptions maps account panel recent transaction config", 
 
   assert.equal(options.showRecentTransactions, true);
   assert.equal(options.maxVisibleTransactions, 3);
+});
+
+test("resolveWalletButtonOptions maps connect button custom icon config", () => {
+  const options = resolveWalletButtonOptions({
+    connectButton: {
+      icon: {
+        type: "image",
+        src: "/brand.svg",
+        alt: "Brand"
+      }
+    }
+  });
+
+  assert.deepEqual(options.icon, {
+    type: "image",
+    src: "/brand.svg",
+    alt: "Brand"
+  });
+});
+
+test("resolveWalletButtonOptions inherits shared theme mode and tokens", () => {
+  const options = resolveWalletButtonOptions({
+    themeMode: "dark",
+    theme: {
+      accent: "#123456"
+    },
+    customTheme: {
+      surface: "#0b1020"
+    }
+  });
+
+  assert.equal(options.themeMode, "dark");
+  assert.equal(options.theme?.accent, "#123456");
+  assert.equal(options.theme?.surface, "#0b1020");
+});
+
+test("resolveWalletButtonOptions lets direct button theme override shared theme", () => {
+  const options = resolveWalletButtonOptions({
+    themeMode: "dark",
+    theme: {
+      accent: "#123456"
+    }
+  }, {
+    themeMode: "light",
+    theme: {
+      accent: "#abcdef"
+    }
+  });
+
+  assert.equal(options.themeMode, "light");
+  assert.equal(options.theme?.accent, "#abcdef");
 });

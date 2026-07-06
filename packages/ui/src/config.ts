@@ -51,16 +51,19 @@ export function resolveWalletButtonOptions(ui: WalletUiConfig = {}, overrides: W
   const accountPanel = ui.accountPanel ?? {};
   const identity = ui.identity ?? {};
   const { accountPanelMode: overrideAccountPanelMode, ...restOverrides } = overrides;
+  const themeMode = ui.mode ?? ui.themeMode ?? overrides.themeMode ?? "light";
   const theme = {
-    ...resolveWalletTheme({ mode: ui.mode ?? overrides.themeMode ?? "light", themeName: ui.themeName }),
+    ...resolveWalletTheme({ mode: themeMode, themeName: ui.themeName }),
+    ...(ui.theme ?? {}),
     ...(ui.customTheme ?? {}),
     ...(overrides.theme ?? {})
   };
 
-  return createDefaultWalletButtonConfig({
+  return createDefaultWalletButtonConfig(compactWalletButtonConfig({
     language: ui.language,
     messages: resolveWalletUiMessages(ui.language, ui.messages),
     label: connectButton.label,
+    icon: connectButton.icon,
     showAdapterIcon: connectButton.showAdapterIcon,
     showChevron: connectButton.showChevron,
     showBalance: connectButton.showBalance,
@@ -75,19 +78,20 @@ export function resolveWalletButtonOptions(ui: WalletUiConfig = {}, overrides: W
     showWeb3Name: identity.enabled ?? true,
     fallbackToAddress: identity.fallbackToAddress,
     identityResolver: identity.resolver,
-    themeMode: ui.mode,
+    themeMode,
     themeName: ui.themeName,
     ...restOverrides,
     accountPanelMode: overrideAccountPanelMode ?? accountPanel.mode ?? "modal",
     theme
-  });
+  }));
 }
 
 export function createDefaultWalletButtonConfig(overrides: WalletButtonConfig = {}): WalletButtonConfig {
   const { theme, ...rest } = overrides;
   const messages = resolveWalletUiMessages(overrides.language, overrides.messages);
-  return {
+  return compactWalletButtonConfig({
     showWeb3Name: true,
+    icon: { type: "default" },
     showAdapterIcon: true,
     showChevron: true,
     showBalance: false,
@@ -109,6 +113,10 @@ export function createDefaultWalletButtonConfig(overrides: WalletButtonConfig = 
       ...resolveWalletTheme({ mode: rest.themeMode ?? "light", themeName: rest.themeName }),
       ...(theme ?? {})
     }
-  };
+  });
+}
+
+function compactWalletButtonConfig<T extends WalletButtonConfig>(config: T): T {
+  return Object.fromEntries(Object.entries(config).filter(([, value]) => value !== undefined)) as T;
 }
 

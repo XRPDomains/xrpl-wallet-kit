@@ -57,6 +57,8 @@ export function ensureWalletStyle(id: string, styles: string): void {
     element = document.createElement("style");
     element.dataset.xwkStyle = id;
     document.head.appendChild(element);
+  } else if (element.nextSibling) {
+    document.head.appendChild(element);
   }
   if (element.textContent !== styles) element.textContent = styles;
 }

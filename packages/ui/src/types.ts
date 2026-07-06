@@ -20,6 +20,10 @@ export type WalletConnectUiMode = "default" | "list" | "group";
 export type WalletConnectCta = "copy" | "open" | "both";
 export type WalletQrStyle = "standard" | "dots";
 export type WalletToastPosition = "bottom-right" | "bottom-left" | "bottom-center";
+export type WalletButtonIconConfig =
+  | { type: "default" }
+  | { type: "image"; src: string; alt?: string }
+  | { type: "html"; html: string; ariaLabel?: string };
 
 export interface WalletUiTheme {
   accent?: string;
@@ -145,6 +149,7 @@ export interface WalletButtonOptions {
   modal: WalletModalController;
   target?: WalletButtonTarget;
   label?: string;
+  icon?: WalletButtonIconConfig;
   showAdapterIcon?: boolean;
   showChevron?: boolean;
   showWeb3Name?: boolean;
@@ -213,6 +218,7 @@ export interface WalletConnectButtonUiConfig {
   size?: WalletButtonSize;
   variant?: WalletButtonVariant;
   accountStatus?: "full" | "address" | "icon";
+  icon?: WalletButtonIconConfig;
   showBalance?: boolean;
   showAdapterIcon?: boolean;
   showChevron?: boolean;
@@ -245,7 +251,9 @@ export interface WalletIdentityUiConfig {
 
 export interface WalletUiConfig {
   mode?: WalletUiThemeMode;
+  themeMode?: WalletUiThemeMode;
   themeName?: WalletUiThemeName;
+  theme?: WalletUiTheme;
   language?: WalletUiLocale;
   messages?: WalletUiMessagesInput;
   customTheme?: WalletUiTheme;

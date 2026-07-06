@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { WalletSession } from "../packages/core/src/types";
 import { WalletButtonController, createXrpDomainsResolver } from "../packages/ui/src/button";
+import { resolveWalletButtonOptions } from "../packages/ui/src/config";
 
 function createButton(theme: Record<string, unknown>, overrides: Record<string, unknown> = {}) {
   const manager = {
@@ -124,6 +125,35 @@ test("WalletButton pre-connect fallback icon renders SVG instead of label text",
   assert.doesNotMatch(html, /xwk-button-icon[^>]*>Connect Wallet</);
 });
 
+test("WalletButton supports custom pre-connect image and html icons", () => {
+  const imageButton = createButton({}, {
+    icon: {
+      type: "image",
+      src: "/brand.svg",
+      alt: "Brand wallet"
+    }
+  }) as unknown as { renderButton(): string };
+  const imageHtml = imageButton.renderButton();
+
+  assert.match(imageHtml, /xwk-button-icon-custom-image/);
+  assert.match(imageHtml, /src="\/brand\.svg"/);
+  assert.match(imageHtml, /aria-label="Brand wallet"/);
+  assert.doesNotMatch(imageHtml, /xwk-button-icon-svg-fallback/);
+
+  const htmlButton = createButton({}, {
+    icon: {
+      type: "html",
+      html: "<svg viewBox=\"0 0 16 16\"></svg>",
+      ariaLabel: "Custom"
+    }
+  }) as unknown as { renderButton(): string };
+  const customHtml = htmlButton.renderButton();
+
+  assert.match(customHtml, /xwk-button-icon-custom-html/);
+  assert.match(customHtml, /aria-label="Custom"/);
+  assert.match(customHtml, /<svg viewBox="0 0 16 16"><\/svg>/);
+});
+
 test("WalletButton copied icon follows theme success token", () => {
   const button = createButton({
     accent: "#123abc",
@@ -136,7 +166,7 @@ test("WalletButton copied icon follows theme success token", () => {
   assert.doesNotMatch(button.copiedIcon(), /#1d9bf0/);
 });
 
-test("WalletButton balance loading uses a stable small spinner", () => {
+test("WalletButton balance loading uses a tokenized skeleton placeholder", () => {
   const session = createSession();
   const button = createButton({}, {
     showBalance: true,
@@ -149,8 +179,83 @@ test("WalletButton balance loading uses a stable small spinner", () => {
 
   button.balanceLoading = true;
   assert.match(button.renderButton(), /xwk-button-balance-loading/);
-  assert.match(button.renderButton(), /xwk-balance-spinner/);
-  assert.match(button.renderStyles(), /\.xwk-balance-spinner\{[^}]*height:13px/);
+  assert.match(button.renderButton(), /xwk-skeleton-button-balance/);
+  assert.doesNotMatch(button.renderButton(), /xwk-balance-spinner/);
+  assert.match(button.renderStyles(), /\.xwk-skeleton\{[^}]*background:linear-gradient/);
+  assert.match(button.renderStyles(), /\.xwk-skeleton-button-balance\{height:12px;width:44px/);
+  assert.match(button.renderStyles(), /\.xwk-skeleton-balance\{height:18px;width:80px/);
+  assert.match(button.renderStyles(), /\.xwk-skeleton-name\{height:24px;width:132px/);
+});
+
+test("WalletButton submitted transaction status uses a subtle tokenized pulse", () => {
+  const button = createButton({}) as unknown as { renderStyles(): string };
+  const styles = button.renderStyles();
+
+  assert.match(styles, /\.xwk-tx-status\{[^}]*position:relative/);
+  assert.match(styles, /\.xwk-tx-row-submitted \.xwk-tx-status:before\{[^}]*animation:xwk-pulse-ring 1\.4s ease-out infinite/);
+  assert.match(styles, /@keyframes xwk-pulse-ring/);
+  assert.match(styles, /prefers-reduced-motion:reduce[^`]*\.xwk-tx-row-submitted \.xwk-tx-status:before\{animation:none/);
+});
+
+test("WalletButton pre-connect icon defaults to SVG and showAdapterIcon can hide it", () => {
+  const visible = createButton({}) as unknown as { renderButton(): string };
+  const hidden = createButton({}, { showAdapterIcon: false }) as unknown as { renderButton(): string };
+
+  assert.match(visible.renderButton(), /xwk-button-icon-svg-fallback/);
+  assert.match(visible.renderButton(), /<span class="xwk-button-label">Connect Wallet<\/span>/);
+  assert.doesNotMatch(hidden.renderButton(), /xwk-button-icon/);
+  assert.match(hidden.renderButton(), /<span class="xwk-button-label">Connect Wallet<\/span>/);
+});
+
+test("WalletButton keeps connected wallet affordances when resolved config has sparse UI input", () => {
+  const session = createSession();
+  const manager = {
+    on: () => () => undefined,
+    getSession: () => session,
+    getAccount: () => session.account,
+    getTransactions: () => [
+      {
+        hash: "ABCDEF1234567890",
+        status: "confirmed",
+        account: session.account,
+        submittedAt: Date.now()
+      }
+    ]
+  };
+  const options = resolveWalletButtonOptions({}, {
+    showBalance: true,
+    showRecentTransactions: true,
+    manager: manager as never,
+    modal: {
+      open: () => undefined,
+      close: () => undefined,
+      isOpen: () => false,
+      on: () => () => undefined,
+      onClose: () => () => undefined
+    } as never
+  });
+  const button = new WalletButtonController(options) as unknown as {
+    balance: { formatted: string } | null;
+    activationStatus: "active";
+    renderButton(): string;
+    renderPanelContent(session: WalletSession): string;
+  };
+
+  button.balance = { formatted: "2.0707 XRP" };
+  button.activationStatus = "active";
+
+  const buttonHtml = button.renderButton();
+  assert.match(buttonHtml, /xwk-button-icon/);
+  assert.match(buttonHtml, /rTestA/);
+  assert.match(buttonHtml, /2\.0707 XRP/);
+  assert.match(buttonHtml, /xwk-button-chevron/);
+  assert.doesNotMatch(buttonHtml, /GemWallet/);
+
+  const panelHtml = button.renderPanelContent(session);
+  assert.match(panelHtml, /data-xwk-address-qr/);
+  assert.match(panelHtml, /Copy address/);
+  assert.match(panelHtml, /Disconnect/);
+  assert.match(panelHtml, /xwk-tx-section/);
 });
 
 test("WalletButton exposes resolved balance on session only when showBalance is enabled", async () => {

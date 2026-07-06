@@ -62,6 +62,17 @@ const button = new WalletButton({
 });
 ```
 
+The disconnected button shows the built-in wallet SVG by default. Customize it only when you want a brand image or trusted inline SVG/HTML; use `showAdapterIcon: false` to hide the icon entirely.
+
+```ts
+new WalletButton({
+  manager,
+  modal,
+  target: "#connect-wallet",
+  icon: { type: "image", src: "/brand-wallet.svg", alt: "MyApp wallet" },
+});
+```
+
 See the project documentation for complete options, theming, i18n, and WalletConnect configuration.
 
 ## Recent Transactions and Toasts

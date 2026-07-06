@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 520" width="640" height="520" font-family="Inter, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/><stop offset="100%" stop-color="#1a2030"/>
+    </linearGradient>
+    <linearGradient id="modal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e293b"/><stop offset="100%" stop-color="#172035"/>
+    </linearGradient>
+    <filter id="sh"><feDropShadow dx="0" dy="20" stdDeviation="40" flood-color="#000" flood-opacity="0.7"/></filter>
+  </defs>
+
+  <rect width="640" height="520" fill="url(#bg)"/>
+  <rect width="640" height="520" fill="#000" opacity="0.5"/>
+
+  <!-- Modal shell -->
+  <rect x="185" y="60" width="270" height="380" rx="20" fill="url(#modal)" stroke="#2d3f5e" stroke-width="1" filter="url(#sh)"/>
+
+  <!-- TRUST LINE BANNER at top of modal (additive inject) -->
+  <rect x="185" y="60" width="270" height="56" rx="20" fill="#2d1f00"/>
+  <rect x="185" y="90" width="270" height="26" fill="#2d1f00"/>
+  <!-- Warning icon -->
+  <path d="M208 78 L216 92 L200 92 Z" fill="#f59e0b" opacity="0.2"/>
+  <path d="M208 79 L215 91 L201 91 Z" fill="none" stroke="#f59e0b" stroke-width="1.5"/>
+  <line x1="208" y1="83" x2="208" y2="87" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="208" cy="89.5" r="1" fill="#f59e0b"/>
+  <!-- Banner text -->
+  <text x="222" y="81" font-size="11" font-weight="600" fill="#fbbf24">Trust line required</text>
+  <text x="222" y="96" font-size="10" fill="#d97706">USDT (Bitstamp) not set up on your account</text>
+  <!-- Set up link -->
+  <text x="418" y="96" font-size="10" fill="#60a5fa" text-anchor="end">Set up →</text>
+  <!-- Border bottom of banner -->
+  <line x1="185" y1="116" x2="455" y2="116" stroke="#92400e" stroke-width="1" opacity="0.5"/>
+
+  <!-- Normal modal content (connect state) below the banner -->
+  <text x="320" y="145" font-size="14" font-weight="700" fill="#f1f5f9" text-anchor="middle">Connect Wallet</text>
+
+  <!-- Spinner connecting state -->
+  <circle cx="320" cy="210" r="28" fill="#1e2d47" stroke="#1e3a5f" stroke-width="1.5"/>
+  <!-- Xaman logo placeholder -->
+  <rect x="308" y="198" width="24" height="24" rx="6" fill="#2563eb"/>
+  <text x="320" y="215" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">X</text>
+  <!-- Spinner arc -->
+  <circle cx="320" cy="210" r="36" fill="none" stroke="#243047" stroke-width="2.5"/>
+  <path d="M320 174 A36 36 0 0 1 356 210" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round"/>
+
+  <text x="320" y="266" font-size="12" font-weight="600" fill="#e2e8f0" text-anchor="middle">Connecting to Xaman…</text>
+  <text x="320" y="284" font-size="11" fill="#64748b" text-anchor="middle">Open Xaman app and approve</text>
+  <text x="320" y="299" font-size="11" fill="#64748b" text-anchor="middle">the connection request</text>
+
+  <!-- Cancel button -->
+  <rect x="220" y="340" width="160" height="38" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="300" y="364" font-size="12" fill="#94a3b8" text-anchor="middle">Cancel</text>
+
+  <!-- Close button -->
+  <circle cx="440" cy="84" r="12" fill="#243047"/>
+  <text x="440" y="89" font-size="13" fill="#64748b" text-anchor="middle">✕</text>
+
+  <!-- ANNOTATIONS LEFT -->
+  <text x="16" y="78" font-size="10" fill="#f59e0b" font-weight="600">① TRUST LINE BANNER</text>
+  <text x="16" y="92" font-size="9.5" fill="#64748b">Inject vào đầu modal body</text>
+  <text x="16" y="105" font-size="9.5" fill="#64748b">Không thêm view state mới</text>
+  <text x="16" y="118" font-size="9.5" fill="#64748b">Nền amber #2d1f00</text>
+  <text x="16" y="131" font-size="9.5" fill="#64748b">slideDown 200ms ease-out</text>
+  <line x1="168" y1="88" x2="184" y2="88" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <text x="16" y="170" font-size="10" fill="#3b82f6" font-weight="600">② MODAL NỀN (GIỮA)</text>
+  <text x="16" y="184" font-size="9.5" fill="#64748b">View "connect" hiện tại</text>
+  <text x="16" y="197" font-size="9.5" fill="#64748b">Spinner vẫn hiện bình thường</text>
+  <text x="16" y="210" font-size="9.5" fill="#64748b">Banner chỉ đẩy content xuống</text>
+  <line x1="168" y1="184" x2="184" y2="184" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- ANNOTATIONS RIGHT -->
+  <text x="462" y="80" font-size="10" fill="#f59e0b" font-weight="600">③ SET UP LINK</text>
+  <text x="462" y="94" font-size="9.5" fill="#64748b">Opens TrustSet guide</text>
+  <text x="462" y="107" font-size="9.5" fill="#64748b">hoặc inline flow sau</text>
+  <line x1="455" y1="96" x2="461" y2="96" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <text x="462" y="140" font-size="10" fill="#3b82f6" font-weight="600">④ DISMISS</text>
+  <text x="462" y="154" font-size="9.5" fill="#64748b">Banner có nút X nhỏ</text>
+  <text x="462" y="167" font-size="9.5" fill="#64748b">để hide trong session</text>
+  <text x="462" y="180" font-size="9.5" fill="#64748b">session-scoped memory</text>
+
+  <!-- 2 STATE COMPARISON -->
+  <text x="16" y="390" font-size="10" fill="#64748b" font-weight="600">BEFORE / AFTER so sánh:</text>
+
+  <!-- Before (no banner) -->
+  <rect x="16" y="400" width="120" height="86" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="76" y="418" font-size="10" fill="#475569" text-anchor="middle" font-weight="600">WITHOUT</text>
+  <line x1="26" y1="424" x2="126" y2="424" stroke="#334155" stroke-width="1"/>
+  <text x="76" y="440" font-size="10" fill="#64748b" text-anchor="middle">Connect Wallet</text>
+  <circle cx="76" cy="462" r="10" fill="#1e3a5f" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="76" y="466" font-size="8" fill="#60a5fa" text-anchor="middle">X</text>
+  <text x="76" y="480" font-size="9" fill="#94a3b8" text-anchor="middle">Connecting…</text>
+
+  <!-- After (with banner) -->
+  <rect x="148" y="400" width="120" height="86" rx="10" fill="#1e293b" stroke="#92400e" stroke-width="1"/>
+  <rect x="148" y="400" width="120" height="28" rx="10" fill="#2d1f00"/>
+  <rect x="148" y="416" width="120" height="12" fill="#2d1f00"/>
+  <text x="208" y="416" font-size="8" fill="#fbbf24" text-anchor="middle">⚠ Trust line required</text>
+  <line x1="148" y1="428" x2="268" y2="428" stroke="#92400e" stroke-width="1"/>
+  <text x="208" y="442" font-size="10" fill="#475569" text-anchor="middle" font-weight="600">WITH BANNER</text>
+  <circle cx="208" cy="462" r="10" fill="#1e3a5f" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="208" y="466" font-size="8" fill="#60a5fa" text-anchor="middle">X</text>
+  <text x="208" y="480" font-size="9" fill="#94a3b8" text-anchor="middle">Connecting…</text>
+
+  <!-- SPEC BOX -->
+  <rect x="280" y="396" width="344" height="94" rx="8" fill="#0d1520" stroke="#1e293b" stroke-width="1"/>
+  <text x="296" y="413" font-size="10" fill="#475569" font-weight="700" letter-spacing="0.8">INTEGRATION SPEC</text>
+  <text x="296" y="430" font-size="10" fill="#94a3b8">Class: <tspan fill="#e2e8f0">.xwk-tlb</tspan>  ·  inject vào renderShell() body</text>
+  <text x="296" y="447" font-size="10" fill="#94a3b8">Trigger: prop <tspan fill="#e2e8f0">trustLineRequired?: TrustLine</tspan></text>
+  <text x="296" y="464" font-size="10" fill="#94a3b8">Animate: max-height 0→56px  ·  200ms ease-out</text>
+  <text x="296" y="481" font-size="10" fill="#94a3b8">Dismiss: <tspan fill="#e2e8f0">sessionStorage.setItem('xwk-tlb-hide', '1')</tspan></text>
+
+  <rect x="500" y="484" width="120" height="16" rx="4" fill="#1e293b"/>
+  <text x="560" y="496" font-size="9" fill="#475569" text-anchor="middle">FEATURE_UI_SPEC · P3-8</text>
+</svg>

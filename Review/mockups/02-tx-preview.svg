@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 560" width="640" height="560" font-family="Inter, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/><stop offset="100%" stop-color="#1a2540"/>
+    </linearGradient>
+    <linearGradient id="modal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e293b"/><stop offset="100%" stop-color="#172035"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f1929"/><stop offset="100%" stop-color="#111f33"/>
+    </linearGradient>
+    <linearGradient id="btn" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+    <filter id="sh"><feDropShadow dx="0" dy="20" stdDeviation="40" flood-color="#000" flood-opacity="0.7"/></filter>
+    <filter id="sh2"><feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="#6366f1" flood-opacity="0.25"/></filter>
+  </defs>
+
+  <rect width="640" height="560" fill="url(#bg)"/>
+  <!-- Overlay dim -->
+  <rect width="640" height="560" fill="#000" opacity="0.55"/>
+
+  <!-- Modal shell -->
+  <rect x="170" y="60" width="300" height="430" rx="20" fill="url(#modal)" stroke="#2d3f5e" stroke-width="1" filter="url(#sh)"/>
+
+  <!-- Header -->
+  <text x="320" y="100" font-size="15" font-weight="700" fill="#f1f5f9" text-anchor="middle">Review Transaction</text>
+  <line x1="190" y1="114" x2="450" y2="114" stroke="#243047" stroke-width="1"/>
+  <!-- Close -->
+  <circle cx="440" cy="84" r="13" fill="#243047"/>
+  <text x="440" y="90" font-size="14" fill="#64748b" text-anchor="middle">✕</text>
+
+  <!-- Wallet avatar + name row -->
+  <circle cx="295" cy="148" r="18" fill="#1e3a6e"/>
+  <text x="295" y="154" font-size="14" fill="#60a5fa" text-anchor="middle" font-weight="700">X</text>
+  <text x="320" y="140" font-size="12" fill="#94a3b8">Signing via</text>
+  <text x="320" y="156" font-size="13" font-weight="600" fill="#e2e8f0">Xaman Wallet</text>
+
+  <!-- Summary card -->
+  <rect x="190" y="172" width="260" height="80" rx="12" fill="url(#card)" stroke="#1e3354" stroke-width="1"/>
+  <text x="320" y="198" font-size="11" fill="#64748b" text-anchor="middle" font-weight="500">YOU ARE SENDING</text>
+  <text x="320" y="226" font-size="28" font-weight="800" fill="#f1f5f9" text-anchor="middle">50 XRP</text>
+  <text x="320" y="244" font-size="11" fill="#64748b" text-anchor="middle">≈ $27.50 USD</text>
+
+  <!-- Detail rows -->
+  <text x="200" y="276" font-size="11" fill="#64748b">To</text>
+  <text x="440" y="276" font-size="11" fill="#cbd5e1" text-anchor="end">rPT1Sjq2YGrBMTttX4GZHj…</text>
+  <line x1="190" y1="284" x2="450" y2="284" stroke="#1e293b" stroke-width="1"/>
+
+  <text x="200" y="304" font-size="11" fill="#64748b">Amount</text>
+  <text x="440" y="304" font-size="11" fill="#cbd5e1" text-anchor="end">50 XRP</text>
+  <line x1="190" y1="312" x2="450" y2="312" stroke="#1e293b" stroke-width="1"/>
+
+  <text x="200" y="332" font-size="11" fill="#64748b">Memo</text>
+  <text x="440" y="332" font-size="11" fill="#cbd5e1" text-anchor="end">Invoice #1042</text>
+  <line x1="190" y1="340" x2="450" y2="340" stroke="#1e293b" stroke-width="1"/>
+
+  <text x="200" y="360" font-size="11" fill="#64748b">Network Fee</text>
+  <text x="440" y="360" font-size="11" fill="#94a3b8" text-anchor="end">≈ 12 drops</text>
+  <line x1="190" y1="368" x2="450" y2="368" stroke="#1e293b" stroke-width="1"/>
+
+  <text x="200" y="388" font-size="11" fill="#64748b">Network</text>
+  <rect x="380" y="376" width="60" height="18" rx="9" fill="#10b981" opacity="0.15"/>
+  <circle cx="390" cy="385" r="4" fill="#10b981"/>
+  <text x="413" y="389" font-size="10" fill="#10b981" text-anchor="middle">Mainnet</text>
+
+  <!-- Cancel / Confirm buttons -->
+  <rect x="190" y="408" width="120" height="40" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="250" y="433" font-size="13" font-weight="600" fill="#94a3b8" text-anchor="middle">Cancel</text>
+
+  <rect x="320" y="408" width="130" height="40" rx="10" fill="url(#btn)" filter="url(#sh2)"/>
+  <text x="385" y="433" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">Confirm →</text>
+
+  <!-- ANNOTATION ARROWS & LABELS -->
+  <!-- Left side annotations -->
+  <text x="16" y="86" font-size="10" fill="#6366f1" font-weight="600">① MODAL HEADER</text>
+  <text x="16" y="100" font-size="9.5" fill="#64748b">Blur backdrop: blur(8px)</text>
+  <text x="16" y="113" font-size="9.5" fill="#64748b">Modal: scale(0.95→1) 250ms spring</text>
+  <line x1="155" y1="90" x2="169" y2="84" stroke="#6366f1" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <text x="16" y="168" font-size="10" fill="#6366f1" font-weight="600">② AMOUNT CARD</text>
+  <text x="16" y="182" font-size="9.5" fill="#64748b">Subtle inset shadow</text>
+  <text x="16" y="195" font-size="9.5" fill="#64748b">USD rate fetch async</text>
+  <line x1="155" y1="178" x2="189" y2="212" stroke="#6366f1" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <text x="16" y="280" font-size="10" fill="#6366f1" font-weight="600">③ DETAIL ROWS</text>
+  <text x="16" y="294" font-size="9.5" fill="#64748b">Truncate address 8+4 chars</text>
+  <text x="16" y="307" font-size="9.5" fill="#64748b">Tap address → copy full</text>
+  <line x1="155" y1="290" x2="189" y2="290" stroke="#6366f1" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <text x="16" y="430" font-size="10" fill="#6366f1" font-weight="600">④ ACTION BUTTONS</text>
+  <text x="16" y="444" font-size="9.5" fill="#64748b">Confirm: gradient glow shadow</text>
+  <text x="16" y="457" font-size="9.5" fill="#64748b">Disabled state khi đang sign</text>
+  <line x1="155" y1="440" x2="189" y2="428" stroke="#6366f1" stroke-width="1" stroke-dasharray="3,2"/>
+
+  <!-- Right annotations -->
+  <text x="456" y="100" font-size="10" fill="#6366f1" font-weight="600">LOADING STATE</text>
+  <text x="456" y="114" font-size="9.5" fill="#64748b">skeleton shimmer trên</text>
+  <text x="456" y="127" font-size="9.5" fill="#64748b">amount card nếu USD</text>
+  <text x="456" y="140" font-size="9.5" fill="#64748b">rate chưa load xong</text>
+
+  <text x="456" y="200" font-size="10" fill="#6366f1" font-weight="600">CONFIRM LOADING</text>
+  <text x="456" y="214" font-size="9.5" fill="#64748b">Button: spinner icon</text>
+  <text x="456" y="227" font-size="9.5" fill="#64748b">"Waiting for wallet…"</text>
+  <text x="456" y="240" font-size="9.5" fill="#64748b">Disable cả 2 buttons</text>
+
+  <!-- SPEC BOX BOTTOM -->
+  <rect x="16" y="500" width="608" height="46" rx="8" fill="#0d1520" stroke="#1e293b" stroke-width="1"/>
+  <text x="32" y="517" font-size="10" fill="#475569" font-weight="700" letter-spacing="0.8">ANIMATION SPEC</text>
+  <text x="32" y="533" font-size="10" fill="#94a3b8">Open: overlay fadeIn 200ms → modal scale(0.95→1) + translateY(8px→0) 250ms spring  ·  Close: reverse 180ms ease-in  ·  View: "preview" state in WalletModal</text>
+
+  <rect x="508" y="540" width="116" height="16" rx="4" fill="#1e293b"/>
+  <text x="566" y="552" font-size="9" fill="#475569" text-anchor="middle">FEATURE_UI_SPEC · P2-5</text>
+</svg>

@@ -185,6 +185,7 @@ interface WalletUiConfig {
     size?: "sm" | "md" | "lg";
     variant?: "default" | "pill" | "minimal" | "outline";
     accountStatus?: "full" | "address" | "icon";
+    icon?: WalletButtonIconConfig;
     showBalance?: boolean;
     showRecentTransactions?: boolean;
     maxVisibleTransactions?: number;
@@ -262,6 +263,8 @@ interface WalletButtonOptions {
   target?: string | HTMLElement;
   /** Connect label (default: "Connect Wallet") */
   label?: string;
+  /** Disconnected-state icon (default: built-in wallet icon) */
+  icon?: WalletButtonIconConfig;
   /** Show active wallet icon when connected */
   showAdapterIcon?: boolean;
   /** Show chevron on button */
@@ -296,6 +299,11 @@ interface WalletButtonOptions {
   explorerUrl?: (session: WalletSession) => string | undefined;
   formatAddress?: (address: string) => string;
 }
+
+type WalletButtonIconConfig =
+  | { type: "default" }
+  | { type: "image"; src: string; alt?: string }
+  | { type: "html"; html: string; ariaLabel?: string };
 ```
 
 ### Mount / Destroy

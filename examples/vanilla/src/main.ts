@@ -1,9 +1,9 @@
 import { WalletManager, createBrowserWalletStorage } from "../../../packages/core/src";
 import { Buffer } from "buffer";
 import { createWalletAuth, formatAuthMessage } from "../../../packages/auth/src";
-import { createDefaultWalletButtonConfig, createDefaultWalletUiConfig } from "../../../packages/ui/src";
+import { createDefaultWalletUiConfig, resolveWalletButtonOptions } from "../../../packages/ui/src";
 import type { TransactionPayload, WalletAdapter } from "../../../packages/core/src";
-import type { WalletUiLayout, WalletUiThemeMode } from "../../../packages/ui/src";
+import type { WalletUiConfig, WalletUiLayout, WalletUiThemeMode } from "../../../packages/ui/src";
 
 import "./styles.css";
 
@@ -595,8 +595,8 @@ function xrpToDrops(value: string) {
   return drops;
 }
 
-function getWalletUiOptions() {
-  return createDefaultWalletUiConfig({
+function getWalletUiConfig(): WalletUiConfig {
+  return {
     mode: uiTheme.value as WalletUiThemeMode,
     modal: {
       title: "Connect Wallet",
@@ -617,12 +617,15 @@ function getWalletUiOptions() {
         showLogo: false
       }
     }
-  });
+  };
+}
+
+function getWalletUiOptions() {
+  return createDefaultWalletUiConfig(getWalletUiConfig());
 }
 
 function getWalletButtonOptions() {
-  return createDefaultWalletButtonConfig({
-    themeMode: uiTheme.value as WalletUiThemeMode,
+  return resolveWalletButtonOptions(getWalletUiConfig(), {
     showBalance: true,
     showRecentTransactions: true,
     maxVisibleTransactions: 5

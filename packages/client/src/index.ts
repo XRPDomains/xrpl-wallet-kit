@@ -9,7 +9,7 @@ export * from "@xrpl-wallet-kit/adapter-xrpl-snap";
 export * from "@xrpl-wallet-kit/ui";
 
 import { WalletManager, createBrowserWalletStorage } from "@xrpl-wallet-kit/core";
-import type { WalletAdapter, WalletManagerConfig } from "@xrpl-wallet-kit/core";
+import type { WalletAdapter, WalletEventHandler, WalletEventName, WalletEvents, WalletManagerConfig } from "@xrpl-wallet-kit/core";
 import { createCrossmarkAdapter } from "@xrpl-wallet-kit/adapter-crossmark";
 import { createDropFiAdapter } from "@xrpl-wallet-kit/adapter-dropfi";
 import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
@@ -73,6 +73,18 @@ export interface CreateWalletKitOptions extends CreateWalletClientOptions {
   connectButton?: WalletButtonTarget | WalletKitConnectButtonConfig;
 }
 
+export type WalletKitStatus = "disconnected" | "connecting" | "connected";
+
+export interface WalletKitStateSnapshot<T extends WalletEventName = WalletEventName> {
+  status: WalletKitStatus;
+  session: ReturnType<WalletManager["getSession"]>;
+  account: ReturnType<WalletManager["getAccount"]>;
+  eventName?: T;
+  event?: WalletEvents[T];
+}
+
+export type WalletKitStateSubscriber = (snapshot: WalletKitStateSnapshot) => void;
+
 export function createWalletClient(options: CreateWalletClientOptions): WalletManager {
   let manager: WalletManager | undefined;
   const adapters = options.adapters ?? createDefaultAdapters(options, (event) => {
@@ -112,6 +124,8 @@ export function createWalletKit(options: CreateWalletKitOptions) {
     modal.autoOpen();
   }
 
+  const subscribe = createKitSubscriber(manager);
+
   return {
     manager,
     modal,
@@ -124,10 +138,65 @@ export function createWalletKit(options: CreateWalletKitOptions) {
     refreshBalance: () => button?.refreshBalance(),
     refreshAccount: () => button?.refreshAccount(),
     getSession: () => manager.getSession(),
+    on: manager.on.bind(manager),
+    off: manager.off.bind(manager),
+    once: manager.once.bind(manager),
+    subscribe,
     signAndSubmit: manager.signAndSubmit.bind(manager),
     signTransaction: manager.signTransaction.bind(manager),
     signMessage: manager.signMessage.bind(manager)
   };
+}
+
+function createKitSubscriber(manager: WalletManager) {
+  function snapshot<T extends WalletEventName>(eventName?: T, event?: WalletEvents[T]): WalletKitStateSnapshot<T> {
+    const status = eventName === "connecting"
+      ? "connecting"
+      : manager.getSession()
+        ? "connected"
+        : "disconnected";
+    return {
+      status,
+      session: manager.getSession(),
+      account: manager.getAccount(),
+      eventName,
+      event
+    };
+  }
+
+  function subscribe<T extends WalletEventName>(eventName: T, handler: WalletEventHandler<T>): () => void;
+  function subscribe(handler: WalletKitStateSubscriber): () => void;
+  function subscribe<T extends WalletEventName>(
+    eventNameOrHandler: T | WalletKitStateSubscriber,
+    maybeHandler?: WalletEventHandler<T>
+  ): () => void {
+    if (typeof eventNameOrHandler === "function") {
+      const handler = eventNameOrHandler;
+      const eventNames: WalletEventName[] = [
+        "connecting",
+        "connected",
+        "disconnected",
+        "session_restored",
+        "session_stale",
+        "session_expired",
+        "accountChanged",
+        "networkChanged"
+      ];
+      const unsubs = eventNames.map((eventName) => manager.on(eventName, (event) => {
+        handler(snapshot(eventName, event));
+      }));
+      handler(snapshot());
+      return () => unsubs.forEach((unsubscribe) => unsubscribe());
+    }
+
+    if (!maybeHandler) {
+      throw new TypeError("kit.subscribe(eventName, handler) requires a handler.");
+    }
+
+    return manager.on(eventNameOrHandler, maybeHandler);
+  }
+
+  return subscribe;
 }
 
 function scheduleAutoReconnect(manager: WalletManager): void {

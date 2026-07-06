@@ -43,6 +43,7 @@ When using `@xrpl-wallet-kit/client` defaults, Xaman is already included when co
 - Requires a Xaman API key or injected test SDK/auth objects.
 - Connection and signing may produce QR/deeplink flows. The adapter reports those through the manager/UI event path.
 - Pending mobile-return recovery markers use `WalletStorage` through the adapter's `recoveryStorage` option.
+- `restoreSession()` waits briefly for the Xaman OAuth/PKCE SDK to rehydrate remembered JWT state after page reload, then restores only when the active Xaman account matches the stored session.
 - `restoreSession()` and `recoverSession()` are best-effort and return `null` for normal stale or unavailable sessions.
 
 ## Testing

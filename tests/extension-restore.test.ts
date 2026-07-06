@@ -77,6 +77,36 @@ test("Xaman restoreSession restores only when SDK state proves the stored accoun
   assert.equal(restored?.account.networkType, "MAINNET");
 });
 
+test("Xaman restoreSession waits for OAuth state to hydrate after reload", async () => {
+  let resolveReady!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    resolveReady = resolve;
+  });
+  const sdk = createXamanSdk();
+  sdk.environment = { ready };
+  sdk.user = {
+    account: ready.then(() => "rRestoreAddress"),
+    networkType: ready.then(() => "MAINNET")
+  };
+
+  const timer = setTimeout(() => {
+    sdk.state = { account: "rRestoreAddress", signedIn: true };
+    resolveReady();
+  }, 20);
+
+  try {
+    const restored = await new XamanAdapter({ sdk }).restoreSession({
+      ...session,
+      adapterId: "xaman"
+    });
+
+    assert.equal(restored?.account.address, "rRestoreAddress");
+    assert.equal(restored?.account.networkType, "MAINNET");
+  } finally {
+    clearTimeout(timer);
+  }
+});
+
 test("DropFi restoreSession accepts passive address state even when isConnected is false after reload", async () => {
   const provider: DropFiProvider = {
     isDropFi: true,

@@ -38,6 +38,7 @@ interface WalletButtonOptions {
 
   // Label shown while disconnected
   label?: string;                   // default: "Connect Wallet" (localized)
+  icon?: WalletButtonIconConfig;    // disconnected-state icon (default: built-in wallet icon)
 
   // Connected-state display
   showAdapterIcon?: boolean;        // show wallet logo next to address (default: true)
@@ -87,6 +88,11 @@ interface WalletButtonOptions {
   onIdentityChange?: (identity: WalletIdentity | null, session: WalletSession | null) => void;
   onBalanceChange?: (balance: WalletBalance | null, session: WalletSession | null) => void;
 }
+
+type WalletButtonIconConfig =
+  | { type: "default" }
+  | { type: "image"; src: string; alt?: string }
+  | { type: "html"; html: string; ariaLabel?: string };
 ```
 
 ## Size variants
@@ -116,6 +122,52 @@ const button = new WalletButton({ manager, modal, target, variant: "minimal" });
 
 // Outline — border only, no fill
 const button = new WalletButton({ manager, modal, target, variant: "outline" });
+```
+
+## Custom disconnected icon
+
+By default, the disconnected button shows the kit's built-in wallet SVG because `showAdapterIcon` defaults to `true` and `icon` defaults to `{ type: "default" }`.
+
+Use `icon` only when the disconnected button should use your app or brand mark instead of the built-in wallet glyph. This only affects the pre-connect state. After a wallet connects, the button still prefers the active wallet/account icon.
+
+```ts
+const button = new WalletButton({
+  manager,
+  modal,
+  target,
+  label: "Connect",
+  icon: {
+    type: "image",
+    src: "/brand-wallet.svg",
+    alt: "MyApp wallet",
+  },
+});
+```
+
+To hide the button icon entirely, set `showAdapterIcon: false`:
+
+```ts
+const button = new WalletButton({
+  manager,
+  modal,
+  target,
+  showAdapterIcon: false,
+});
+```
+
+For advanced branding, pass trusted inline HTML. Keep it compact; the icon slot is fixed to avoid button layout shifts.
+
+```ts
+const button = new WalletButton({
+  manager,
+  modal,
+  target,
+  icon: {
+    type: "html",
+    ariaLabel: "MyApp",
+    html: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="..." /></svg>',
+  },
+});
 ```
 
 ## Account panel mode
@@ -257,12 +309,17 @@ import { createWalletKit } from "@xrpl-wallet-kit/client";
 
 const kit = createWalletKit({
   adapters: [/* ... */],
-  button: {
+  connectButton: {
     target: "#connect-btn-root",
     size: "md",
     variant: "pill",
     showBalance: true,
     showRecentTransactions: true,
+    icon: {
+      type: "image",
+      src: "/brand-wallet.svg",
+      alt: "MyApp wallet",
+    },
     themeMode: "dark",
   },
 });
