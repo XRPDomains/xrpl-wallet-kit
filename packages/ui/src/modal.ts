@@ -40,6 +40,7 @@ class WalletPickerView {
     private qrState?: WalletQrState;
     private pendingQr?: { adapterId: string; uri: string; deeplink?: string };
     private availability: Record<string, boolean>;
+    private availabilityLoading: boolean;
     private offEvents: Array<() => void>;
     private openHandlers: Set<() => void>;
     private closeHandlers: Set<() => void>;
@@ -58,6 +59,7 @@ class WalletPickerView {
         this.qrCopied = false;
         this.qrLightMode = false;
         this.availability = {};
+        this.availabilityLoading = false;
         this.offEvents = [];
         this.openHandlers = new Set();
         this.closeHandlers = new Set();
@@ -76,6 +78,7 @@ class WalletPickerView {
     }
     open() {
         this.activeGroupId = undefined;
+        this.availabilityLoading = true;
         this.lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         this.renderView("list");
         this.openHandlers.forEach((handler) => handler());
@@ -474,7 +477,12 @@ class WalletPickerView {
         return this.getWallets().filter((wallet) => !groupedIds.has(wallet.id));
     }
     private async refreshAvailability() {
-        this.availability = await this.options.manager.getWalletAvailability();
+        try {
+            this.availability = await this.options.manager.getWalletAvailability();
+        }
+        finally {
+            this.availabilityLoading = false;
+        }
         if (this.root?.dataset.xwkView !== "list")
             return;
         const grid = this.root.querySelector(".xwk-grid");
@@ -826,7 +834,7 @@ class WalletPickerView {
         this.bindChrome();
     }
     private renderQrLoading() {
-        return `<span class="xwk-qr-loading xwk-qr-loading-skeleton" role="status" aria-live="polite"><span class="xwk-qr-skeleton" aria-hidden="true"></span><span class="xwk-sr-only">${this.escapeHtml(this.messages().generatingQr)}</span></span>`;
+        return `<span class="xwk-qr-loading xwk-qr-loading-skeleton" role="status" aria-live="polite"><span class="xwk-skeleton xwk-skeleton-qr xwk-qr-skeleton" aria-hidden="true"></span><span class="xwk-sr-only">${this.escapeHtml(this.messages().generatingQr)}</span></span>`;
     }
     private renderQrCopyButtonContent() {
         const messages = this.messages();
@@ -905,7 +913,7 @@ class WalletPickerView {
     }
     private renderMobileSheetOverrides(theme: Required<WalletUiTheme>) {
         const inlineOverrides = `.xwk-inline{background:transparent!important;display:block!important;inset:auto!important;opacity:1!important;overflow:visible!important;padding:0!important;place-items:initial!important;position:relative!important;z-index:auto!important}.xwk-inline .xwk-modal{border:1px solid ${theme.border}!important;border-radius:${theme.radius}!important;box-shadow:none!important;max-height:none!important;max-width:none!important;opacity:1!important;transform:none!important;transition:none!important;width:100%!important}.xwk-inline .xwk-body{max-height:none!important}.xwk-inline .xwk-header-spacer{display:block;height:44px;width:44px}.xwk-inline[data-xwk-state="closing"] .xwk-modal{opacity:1!important;transform:none!important}`;
-        const skeletonOverrides = `.xwk-qr-loading-skeleton{display:grid;height:100%;place-items:center;width:100%}.xwk-qr-skeleton{animation:xwk-qr-skeleton-pulse 1.4s ease-in-out infinite;background:linear-gradient(90deg,${theme.surface} 25%,${theme.surfaceHover} 50%,${theme.surface} 75%);background-size:200% 100%;border-radius:12px;box-sizing:border-box;display:block;height:calc(100% - 16px);width:calc(100% - 16px)}@keyframes xwk-qr-skeleton-pulse{0%{background-position:200% 0}100%{background-position:-200% 0}}@media(prefers-reduced-motion:reduce){.xwk-qr-skeleton{animation:none!important}}`;
+        const skeletonOverrides = `.xwk-skeleton{animation:xwk-qr-skeleton-pulse 1.4s ease-in-out infinite;background:linear-gradient(90deg,${theme.surface} 25%,${theme.surfaceHover} 50%,${theme.surface} 75%);background-size:200% 100%;display:inline-block}.xwk-skeleton-circle{border-radius:999px}.xwk-skeleton-line{height:14px;border-radius:4px}.xwk-skeleton-pill{border-radius:999px}.xwk-skeleton-card,.xwk-skeleton-button{border-radius:${theme.walletRadius}}.xwk-skeleton-row{align-items:center;display:flex;gap:12px;width:100%}.xwk-qr-loading-skeleton{display:grid;height:100%;place-items:center;width:100%}.xwk-qr-skeleton{border-radius:12px;box-sizing:border-box;display:block;height:calc(100% - 16px);overflow:hidden;position:relative;width:calc(100% - 16px)}.xwk-qr-skeleton:before{background-image:radial-gradient(circle,${theme.muted} 0 2px,transparent 2.8px);background-size:14px 14px;content:"";inset:24px;opacity:.26;position:absolute}.xwk-wallet-badge-loading{color:transparent;min-width:72px;visibility:visible}.xwk-wallet-badge-loading:before{display:none}@keyframes xwk-qr-skeleton-pulse{0%{background-position:200% 0}100%{background-position:-200% 0}}@media(prefers-reduced-motion:reduce){.xwk-skeleton,.xwk-qr-skeleton{animation:none!important;background:${theme.surfaceHover}!important}}`;
         return `${skeletonOverrides}.xwk-modal:focus{outline:none}.xwk-sr-only{border:0!important;clip:rect(0 0 0 0)!important;height:1px!important;margin:-1px!important;overflow:hidden!important;padding:0!important;position:absolute!important;white-space:nowrap!important;width:1px!important}.xwk-error-text,.xwk-connect-status.xwk-error-text,.xwk-qr-loading.xwk-error-text{color:${theme.error}!important}.xwk-close,.xwk-back{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;appearance:none;background:transparent!important;border:0!important;box-shadow:none!important;margin:0;outline:none!important}.xwk-close:focus-visible,.xwk-back:focus-visible{outline:2px solid ${theme.accent}!important;outline-offset:0}@media(max-width:640px){.xwk-overlay{padding:max(12px,env(safe-area-inset-top)) 0 0!important;place-items:end center!important}.xwk-modal{align-self:end!important;border-bottom:0!important;border-bottom-left-radius:0!important;border-bottom-right-radius:0!important;border-left:0!important;border-right:0!important;border-top-left-radius:${theme.radius}!important;border-top-right-radius:${theme.radius}!important;height:auto!important;max-height:calc(100dvh - env(safe-area-inset-top))!important;max-width:none!important;width:100vw!important}.xwk-header{border-top-left-radius:${theme.radius};border-top-right-radius:${theme.radius}}.xwk-body{padding-bottom:max(6px,calc(6px + env(safe-area-inset-bottom)))!important}.xwk-overlay[data-xwk-view="list"] .xwk-body{padding-bottom:max(2px,calc(2px + env(safe-area-inset-bottom)))!important}.xwk-network-row{margin:-4px 0 8px!important}.xwk-overlay[data-xwk-view="list"] .xwk-footer{padding-top:6px!important}}${inlineOverrides}`;
     }
     private renderWalletList(layout: WalletUiLayout) {
@@ -952,8 +960,13 @@ class WalletPickerView {
         if (wallet.recommended)
             badges.push(`<span class="xwk-wallet-badge xwk-recommended">${this.escapeHtml(messages.recommended || "Recommended")}</span>`);
         if (isExtensionLike) {
-            const className = this.availability[wallet.id] ? "xwk-wallet-badge xwk-installed" : "xwk-wallet-badge";
-            badges.push(`<span class="${className}">${this.escapeHtml(messages.installed || "Installed")}</span>`);
+            if (this.availabilityLoading) {
+                badges.push(`<span class="xwk-wallet-badge xwk-wallet-badge-loading xwk-skeleton xwk-skeleton-pill" aria-hidden="true"></span>`);
+            }
+            else {
+                const className = this.availability[wallet.id] ? "xwk-wallet-badge xwk-installed" : "xwk-wallet-badge";
+                badges.push(`<span class="${className}">${this.escapeHtml(messages.installed || "Installed")}</span>`);
+            }
         }
         if (!badges.length)
             return "";

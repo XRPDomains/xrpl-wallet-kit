@@ -293,13 +293,36 @@ test("WalletModal custom QR loading uses a tokenized skeleton placeholder", () =
 
   assert.match(html, /xwk-qr-loading-skeleton/);
   assert.match(html, /xwk-qr-skeleton/);
+  assert.match(html, /xwk-skeleton-qr/);
   assert.match(overrides, /\.xwk-qr-loading-skeleton\{display:grid;height:100%;place-items:center;width:100%\}/);
-  assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*background:linear-gradient/);
+  assert.match(overrides, /\.xwk-skeleton\{[^}]*background:linear-gradient/);
   assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*height:calc\(100% - 16px\)/);
   assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*width:calc\(100% - 16px\)/);
+  assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*overflow:hidden/);
   assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*border-radius:12px/);
+  assert.match(overrides, /\.xwk-qr-skeleton:before\{[^}]*background-image:radial-gradient/);
   assert.match(overrides, /@keyframes xwk-qr-skeleton-pulse/);
-  assert.match(overrides, /prefers-reduced-motion:reduce[^`]*\.xwk-qr-skeleton\{animation:none!important\}/);
+  assert.match(overrides, /prefers-reduced-motion:reduce[^`]*\.xwk-skeleton,\.xwk-qr-skeleton\{animation:none!important/);
+});
+
+test("WalletModal wallet badge uses skeleton while availability is resolving", () => {
+  const modal = new WalletModal({
+    manager: manager as never,
+    themeMode: "light"
+  }) as unknown as {
+    availabilityLoading: boolean;
+    renderWalletBadges(wallet: { id: string; name: string; type: string; group: string }, layout: string): string;
+    renderMobileSheetOverrides(theme: typeof lightTheme): string;
+  };
+
+  modal.availabilityLoading = true;
+  const html = modal.renderWalletBadges({ id: "gemwallet", name: "GemWallet", type: "extension", group: "Extensions" }, "list");
+  const overrides = modal.renderMobileSheetOverrides(lightTheme);
+
+  assert.match(html, /xwk-wallet-badge-loading/);
+  assert.match(html, /xwk-skeleton-pill/);
+  assert.doesNotMatch(html, /Installed/);
+  assert.match(overrides, /\.xwk-wallet-badge-loading\{[^}]*min-width:72px/);
 });
 
 test("WalletModal installs shared styles instead of reinjecting inline style tags", () => {

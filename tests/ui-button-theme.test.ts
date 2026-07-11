@@ -187,6 +187,49 @@ test("WalletButton balance loading uses a tokenized skeleton placeholder", () =>
   assert.match(button.renderStyles(), /\.xwk-skeleton-name\{height:24px;width:132px/);
 });
 
+test("WalletButton connecting state uses stable skeleton primitives", () => {
+  const button = createButton({}) as unknown as { renderButton(): string; renderStyles(): string; connecting: boolean };
+
+  button.connecting = true;
+  const html = button.renderButton();
+  const styles = button.renderStyles();
+
+  assert.match(html, /aria-busy="true"/);
+  assert.match(html, /xwk-account-button-loading/);
+  assert.match(html, /xwk-skeleton-button-icon/);
+  assert.match(html, /xwk-skeleton-button-label/);
+  assert.doesNotMatch(html, /xwk-button-chevron/);
+  assert.match(styles, /\.xwk-skeleton-circle\{border-radius:999px\}/);
+  assert.match(styles, /\.xwk-skeleton-line\{height:14px;border-radius:4px\}/);
+  assert.match(styles, /\.xwk-skeleton-button-icon\{height:28px;width:28px\}/);
+  assert.match(styles, /\.xwk-skeleton-button-label\{height:14px;width:92px\}/);
+});
+
+test("WalletButton account avatar uses skeleton while identity resolves", () => {
+  const session = createSession();
+  const button = createButton({}, {
+    manager: {
+      on: () => () => undefined,
+      getSession: () => session,
+      getAccount: () => session.account
+    },
+    showWeb3Name: true,
+    identityResolver: async () => null
+  }) as unknown as {
+    identityResolvingKey: string;
+    renderPanelContent(session: WalletSession): string;
+    renderStyles(): string;
+  };
+
+  button.identityResolvingKey = "mainnet:rTestAddress1234567890";
+  const html = button.renderPanelContent(session);
+
+  assert.match(html, /xwk-account-avatar-skeleton/);
+  assert.match(html, /xwk-skeleton-circle/);
+  assert.match(html, /xwk-account-name-skeleton/);
+  assert.match(button.renderStyles(), /\.xwk-account-avatar-skeleton\{[^}]*background:/);
+});
+
 test("WalletButton submitted transaction status uses a subtle tokenized pulse", () => {
   const button = createButton({}) as unknown as { renderStyles(): string };
   const styles = button.renderStyles();
