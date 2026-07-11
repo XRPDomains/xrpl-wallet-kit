@@ -91,6 +91,7 @@ export default defineConfig({
         text: "Configuration",
         items: [
           { text: "Theming", link: "/docs/configuration/theming" },
+          { text: "App Metadata", link: "/docs/configuration/metadata" },
           { text: "Networks", link: "/docs/configuration/networks" },
           { text: "Localization (i18n)", link: "/docs/configuration/i18n" },
           { text: "Connect Button", link: "/docs/configuration/connect-button" },

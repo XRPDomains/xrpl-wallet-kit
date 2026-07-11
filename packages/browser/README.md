@@ -21,7 +21,12 @@ The package publishes:
 <script src="./xrpl-wallet-kit.iife.min.js"></script>
 <script>
   const kit = window.XRPLWalletKit.createWalletKit({
-    appName: "My XRPL App",
+    metadata: {
+      name: "My XRPL App",
+      description: "Wallet connection for My XRPL App",
+      url: window.location.origin,
+      icons: [window.location.origin + "/icon.png"]
+    },
     network: "mainnet",
     autoReconnect: true,
     walletConnectProjectId: "YOUR_WALLETCONNECT_PROJECT_ID",

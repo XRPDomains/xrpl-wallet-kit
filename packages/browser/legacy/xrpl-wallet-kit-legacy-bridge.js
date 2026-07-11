@@ -261,11 +261,18 @@
   }
   function createKitOptions(options, mount) {
     var ui = mergeUiConfig(createDefaultUi(options), options.ui);
+    var metadata = Object.assign({
+      name: options.appName || document.title || 'XRPL dApp',
+      description: options.appDescription || '',
+      url: options.appUrl || window.location.origin,
+      icons: options.appIcons || []
+    }, options.metadata || {});
     return Object.assign({
-      appName: options.appName || document.title || 'XRPL dApp',
-      appDescription: options.appDescription || '',
-      appUrl: options.appUrl || window.location.origin,
-      appIcons: options.appIcons || [],
+      metadata: metadata,
+      appName: metadata.name,
+      appDescription: metadata.description,
+      appUrl: metadata.url,
+      appIcons: metadata.icons,
       network: options.network || 'mainnet',
       storage: options.storage || 'localStorage',
       autoReconnect: options.autoReconnect !== false,

@@ -83,6 +83,13 @@ export interface WalletSession {
   metadata?: Record<string, unknown>;
 }
 
+export interface WalletAppMetadata {
+  name: string;
+  description?: string;
+  url?: string;
+  icons?: string[];
+}
+
 export type TransactionPayload = Record<string, unknown>;
 
 export interface SignMessageRequest {
@@ -264,7 +271,8 @@ export interface StoredWalletSessionEnvelope {
 }
 
 export interface WalletManagerConfig {
-  appName: string;
+  metadata?: WalletAppMetadata;
+  appName?: string;
   appDescription?: string;
   appUrl?: string;
   appIcons?: string[];

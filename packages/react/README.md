@@ -17,7 +17,12 @@ import { createWalletKit } from "@xrpl-wallet-kit/client";
 import { WalletKitProvider, WalletButton } from "@xrpl-wallet-kit/react";
 
 const kit = createWalletKit({
-  appName: "My XRPL App",
+  metadata: {
+    name: "My XRPL App",
+    description: "Wallet connection for My XRPL App",
+    url: window.location.origin,
+    icons: [`${window.location.origin}/icon.png`],
+  },
   network: "mainnet",
   autoReconnect: true,
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,

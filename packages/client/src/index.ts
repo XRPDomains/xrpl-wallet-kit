@@ -9,7 +9,7 @@ export * from "@xrpl-wallet-kit/adapter-xrpl-snap";
 export * from "@xrpl-wallet-kit/ui";
 
 import { WalletManager, createBrowserWalletStorage } from "@xrpl-wallet-kit/core";
-import type { WalletAdapter, WalletEventHandler, WalletEventName, WalletEvents, WalletManagerConfig } from "@xrpl-wallet-kit/core";
+import type { WalletAdapter, WalletAppMetadata, WalletEventHandler, WalletEventName, WalletEvents, WalletManagerConfig } from "@xrpl-wallet-kit/core";
 import { createCrossmarkAdapter } from "@xrpl-wallet-kit/adapter-crossmark";
 import { createDropFiAdapter } from "@xrpl-wallet-kit/adapter-dropfi";
 import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
@@ -56,6 +56,9 @@ export interface WalletKitIdentityConfig {
   web3Name?: boolean;
   fallbackToAddress?: boolean;
 }
+
+export type WalletKitMetadata = WalletAppMetadata;
+type ResolvedWalletKitMetadata = Required<WalletAppMetadata>;
 
 export interface CreateWalletClientOptions extends Omit<WalletManagerConfig, "adapters" | "storage"> {
   adapters?: WalletAdapter[];
@@ -244,16 +247,12 @@ function createDefaultAdapters(options: CreateWalletClientOptions, onQr: (event:
 
   if (options.walletConnectProjectId && shouldIncludeWalletConnect(ids)) {
     const walletConnectUiMode = getWalletConnectUiMode(options);
+    const appMetadata = resolveAppMetadata(options);
     adapters.push(...createWalletConnectAdapters({
       projectId: options.walletConnectProjectId,
       mode: walletConnectUiMode === "default" ? "default" : "details",
       wallets: resolveWalletConnectWallets(ids),
-      metadata: createWalletConnectMetadata({
-        name: options.appName,
-        description: options.appDescription ?? `${options.appName} XRPL wallet connection`,
-        url: options.appUrl ?? getCurrentOrigin(),
-        icons: options.appIcons ?? []
-      }),
+      metadata: createWalletConnectMetadata(appMetadata),
       onQr,
       signMessageDestination: options.walletConnectSignMessageDestination,
       useModal: walletConnectUiMode === "default" ? true : undefined,
@@ -380,6 +379,29 @@ function resolveWalletConnectWallets(ids: Set<string> | undefined): "all" | stri
 
 function getCurrentOrigin(): string {
   return typeof window !== "undefined" ? window.location.origin : "https://xrpl.org";
+}
+
+function resolveAppMetadata(options: Pick<CreateWalletClientOptions, "metadata" | "appName" | "appDescription" | "appUrl" | "appIcons">): ResolvedWalletKitMetadata {
+  const name = nonEmptyString(options.metadata?.name) ?? nonEmptyString(options.appName) ?? "XRPL dApp";
+  return {
+    name,
+    description: nonEmptyString(options.metadata?.description)
+      ?? nonEmptyString(options.appDescription)
+      ?? `${name} XRPL wallet connection`,
+    url: nonEmptyString(options.metadata?.url)
+      ?? nonEmptyString(options.appUrl)
+      ?? getCurrentOrigin(),
+    icons: normalizeIcons(options.metadata?.icons ?? options.appIcons)
+  };
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeIcons(icons: unknown): string[] {
+  if (!Array.isArray(icons)) return [];
+  return icons.filter((icon): icon is string => typeof icon === "string" && icon.trim().length > 0);
 }
 
 function withoutKitOnlyOptions(options: CreateWalletClientOptions): WalletManagerConfig {

@@ -16,6 +16,12 @@ npm install @xrpl-wallet-kit/client
 import { createWalletKit } from "@xrpl-wallet-kit/client";
 
 const { manager, modal, button, toast, openModal } = createWalletKit({
+  metadata: {
+    name: "My XRPL dApp",
+    description: "Wallet connection for My XRPL dApp",
+    url: window.location.origin,
+    icons: [`${window.location.origin}/icon.png`],
+  },
   wallets: "all",
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
   xamanClientId: import.meta.env.VITE_XAMAN_CLIENT_ID,
@@ -71,6 +77,20 @@ interface WalletKitConnectButtonConfig {
 
 ```ts
 interface CreateWalletClientOptions {
+  // dApp identity shown in WalletConnect/AppKit and future auth prompts
+  metadata?: {
+    name: string;
+    description?: string;
+    url?: string;
+    icons?: string[];
+  };
+
+  // Legacy aliases. Prefer metadata for new integrations.
+  appName?: string;
+  appDescription?: string;
+  appUrl?: string;
+  appIcons?: string[];
+
   // Adapters to register — defaults to all installed adapters when "all" is used
   wallets?: "all" | WalletKitAdapterId[];
 
@@ -96,6 +116,24 @@ interface CreateWalletClientOptions {
   ui?: WalletUiConfig;
 }
 ```
+
+## App Metadata
+
+Use `metadata` to identify your dApp to wallets. XRPL Wallet Kit forwards it to WalletConnect/AppKit and will reuse it for app-context UI such as connection loading and Sign-In with XRPL prompts.
+
+```ts
+createWalletKit({
+  metadata: {
+    name: "XRP Domains",
+    description: "XRPL domains and wallet tools",
+    url: "https://xrpdomains.xyz",
+    icons: ["https://xrpdomains.xyz/icon.png"],
+  },
+  walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
+});
+```
+
+`metadata` takes precedence over the older `appName`, `appDescription`, `appUrl`, and `appIcons` fields. Those aliases remain supported for existing integrations.
 
 ## Return Value
 

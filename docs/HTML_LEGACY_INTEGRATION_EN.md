@@ -72,10 +72,12 @@ window.XRPLWalletKitLegacyBridge
     legacyButton: '.btn-connect-wallet',
     hiddenAddress: '.currentAddress',
 
-    appName: 'My XRPL App',
-    appDescription: 'Wallet connection for My XRPL App',
-    appUrl: window.location.origin,
-    appIcons: [window.location.origin + '/favicon/favicon-96x96.png'],
+    metadata: {
+      name: 'My XRPL App',
+      description: 'Wallet connection for My XRPL App',
+      url: window.location.origin,
+      icons: [window.location.origin + '/favicon/favicon-96x96.png']
+    },
 
     network: 'mainnet',
     storage: 'localStorage',
@@ -107,9 +109,12 @@ window.walletKit = XRPLWalletKitLegacyBridge.mount({
   legacyButton: '.btn-connect-wallet',
   hiddenAddress: '.currentAddress',
 
-  appName: 'My XRPL App',
-  appDescription: 'My XRPL identity and payment app',
-  appUrl: window.location.origin,
+  metadata: {
+    name: 'My XRPL App',
+    description: 'My XRPL identity and payment app',
+    url: window.location.origin,
+    icons: [window.location.origin + '/favicon/favicon-96x96.png']
+  },
   network: 'mainnet',
   storage: 'localStorage',
   autoReconnect: true,
@@ -330,7 +335,10 @@ For a new app without legacy globals or old wallet facade code, use the SDK dire
 
 ```js
 const kit = XRPLWalletKit.create({
-  appName: 'My XRPL App',
+  metadata: {
+    name: 'My XRPL App',
+    url: window.location.origin
+  },
   xamanClientId: '...',
   walletConnectProjectId: '...',
   connectButton: '#wallet-kit-button'

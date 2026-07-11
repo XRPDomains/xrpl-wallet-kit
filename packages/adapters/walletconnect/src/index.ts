@@ -1224,7 +1224,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
 export function createWalletConnectMetadata(metadata: SignClientTypes.Metadata): SignClientTypes.Metadata {
   return {
     ...metadata,
-    icons: [WALLETCONNECT_ICON]
+    icons: metadata.icons?.length ? metadata.icons : [WALLETCONNECT_ICON]
   };
 }
 

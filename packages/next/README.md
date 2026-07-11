@@ -19,7 +19,12 @@ import { createWalletKit } from "@xrpl-wallet-kit/client";
 import { WalletKitProvider, WalletButton } from "@xrpl-wallet-kit/next";
 
 const kit = createWalletKit({
-  appName: "My XRPL App",
+  metadata: {
+    name: "My XRPL App",
+    description: "Wallet connection for My XRPL App",
+    url: typeof window !== "undefined" ? window.location.origin : "https://my-xrpl-app.example",
+    icons: ["https://my-xrpl-app.example/icon.png"],
+  },
   network: "mainnet",
   autoReconnect: true,
   walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,

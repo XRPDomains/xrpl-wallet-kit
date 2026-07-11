@@ -8,7 +8,12 @@ This document describes the current public UI configuration surface so the proje
 
 ```ts
 createWalletKit({
-  appName: "My XRPL dApp",
+  metadata: {
+    name: "My XRPL dApp",
+    description: "Wallet connection for My XRPL dApp",
+    url: "https://my-xrpl-dapp.example",
+    icons: ["https://my-xrpl-dapp.example/icon.png"]
+  },
   walletConnectProjectId: "...",
   xamanClientId: "...",
   autoReconnect: true,

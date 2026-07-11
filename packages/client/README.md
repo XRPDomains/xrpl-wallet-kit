@@ -22,7 +22,12 @@ npm install @xrpl-wallet-kit/client @xrpl-wallet-kit/react
 import { createWalletKit } from "@xrpl-wallet-kit/client";
 
 const kit = createWalletKit({
-  appName: "My XRPL App",
+  metadata: {
+    name: "My XRPL App",
+    description: "Wallet connection for My XRPL App",
+    url: window.location.origin,
+    icons: [`${window.location.origin}/icon.png`],
+  },
   network: "mainnet",
   autoReconnect: true,
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
@@ -40,6 +45,8 @@ const kit = createWalletKit({
   },
 });
 ```
+
+`metadata` is used by WalletConnect/AppKit and future auth prompts to identify the dApp. Legacy fields (`appName`, `appDescription`, `appUrl`, `appIcons`) are still accepted, but new integrations should prefer `metadata`.
 
 `walletConnect.mode: "default"` uses the official WalletConnect AppKit modal. Use `"list"` or `"group"` when you want XRPL Wallet Kit to render its custom wallet list and QR/deeplink panel.
 

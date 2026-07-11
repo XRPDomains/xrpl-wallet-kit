@@ -35,6 +35,29 @@ test("createWalletClient uses WalletConnect AppKit mode by default", () => {
   assert.equal(getAdapterOption(manager, "walletconnect", "modalMode"), "always");
 });
 
+test("createWalletClient forwards app metadata to WalletConnect and keeps legacy aliases as fallback", () => {
+  const manager = createWalletClient({
+    metadata: {
+      name: "Metadata dApp",
+      description: "Metadata description",
+      url: "https://metadata.example",
+      icons: ["https://metadata.example/icon.png"]
+    },
+    appName: "Legacy dApp",
+    appDescription: "Legacy description",
+    appUrl: "https://legacy.example",
+    appIcons: ["https://legacy.example/icon.png"],
+    walletConnectProjectId: "test-project"
+  });
+
+  assert.deepEqual(getAdapterOption(manager, "walletconnect", "metadata"), {
+    name: "Metadata dApp",
+    description: "Metadata description",
+    url: "https://metadata.example",
+    icons: ["https://metadata.example/icon.png"]
+  });
+});
+
 test("createWalletClient accepts xrpl-snap wallet id alias", () => {
   const manager = createWalletClient({
     appName: "Test dApp",
