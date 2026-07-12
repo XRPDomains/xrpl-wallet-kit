@@ -11,6 +11,8 @@ import type { AddWalletTransactionRequest, AuthenticateRequest, AuthenticateResu
 const SESSION_KEY = "session";
 export const WALLET_STORAGE_VERSION = 1;
 const RECOVER_SESSION_RETRY_DELAYS_MS = [0, 700, 1600, 3000];
+const DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS = 3000;
+const DEFAULT_PENDING_RETURN_RECOVERY_TIMEOUT_MS = 10000;
 const DEFAULT_ACCOUNT_STATUS_TIMEOUT_MS = 2500;
 const DEFAULT_AUTHENTICATE_EXPIRES_IN_SECONDS = 3600;
 const DEFAULT_TX_CONFIRMATION_ATTEMPTS = 6;
@@ -136,9 +138,14 @@ export class WalletManager extends WalletEventEmitter {
     }
     try {
       if (adapter.restoreSession) {
-        const restored = await adapter.restoreSession(session);
+        const restoredResult = await this.withTimeout(adapter.restoreSession(session), DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS);
+        if (restoredResult.timedOut) {
+          await this.clearStoredSessionAsStale(session, "restore_timeout");
+          return null;
+        }
+        const restored = restoredResult.value;
         if (!restored?.session) {
-          this.emit("session_stale", { adapterId: session.adapterId, account: session.account, session, reason: "restore_unavailable" });
+          await this.clearStoredSessionAsStale(session, "restore_unavailable");
           return null;
         }
         const enrichedSession = await this.enrichSession(this.withWalletMetadata(restored.session, adapter));
@@ -149,8 +156,20 @@ export class WalletManager extends WalletEventEmitter {
         return enrichedSession;
       }
 
-      if (adapter.isAvailable && !await adapter.isAvailable()) {
-        this.emit("session_stale", { adapterId: session.adapterId, account: session.account, session, reason: "adapter_unavailable" });
+      if (adapter.isAvailable) {
+        const availability = await this.withTimeout(Promise.resolve(adapter.isAvailable()), DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS);
+        if (availability.timedOut) {
+          await this.clearStoredSessionAsStale(session, "availability_timeout");
+          return null;
+        }
+        if (!availability.value) {
+          await this.clearStoredSessionAsStale(session, "adapter_unavailable");
+          return null;
+        }
+      }
+
+      if (session.expiresAt && session.expiresAt <= Date.now()) {
+        await this.clearStoredSessionAsStale(session, "session_expired");
         return null;
       }
 
@@ -185,15 +204,33 @@ export class WalletManager extends WalletEventEmitter {
     const announcedAdapters = new Set<string>();
 
     const recoveryRetryDelaysMs = this.config.recoveryRetryDelaysMs ?? RECOVER_SESSION_RETRY_DELAYS_MS;
+    const recoveryDeadline = Date.now() + DEFAULT_PENDING_RETURN_RECOVERY_TIMEOUT_MS;
+    let timedOut = false;
     for (const delayMs of recoveryRetryDelaysMs) {
-      if (delayMs > 0) await this.delay(delayMs);
+      const remainingBeforeDelay = recoveryDeadline - Date.now();
+      if (remainingBeforeDelay <= 0) {
+        timedOut = true;
+        break;
+      }
+      if (delayMs > 0) await this.delay(Math.min(delayMs, remainingBeforeDelay));
       for (const adapter of recoverableAdapters) {
+        const remaining = recoveryDeadline - Date.now();
+        if (remaining <= 0) {
+          timedOut = true;
+          break;
+        }
         try {
           if (!announcedAdapters.has(adapter.metadata.id)) {
             announcedAdapters.add(adapter.metadata.id);
             this.emit("connecting", { adapterId: adapter.metadata.id, recovering: true });
           }
-          const recovered = await adapter.recoverSession?.({ network, walletId: adapter.metadata.id });
+          const recovery = await this.withTimeout(adapter.recoverSession?.({ network, walletId: adapter.metadata.id }), remaining);
+          if (recovery.timedOut) {
+            timedOut = true;
+            this.logger.warn(`Session recovery timed out for ${adapter.metadata.id}`);
+            break;
+          }
+          const recovered = recovery.value;
           if (!recovered?.session) continue;
           const enrichedSession = await this.enrichSession(this.withWalletMetadata(recovered.session, adapter));
           this.setSession(enrichedSession);
@@ -206,13 +243,19 @@ export class WalletManager extends WalletEventEmitter {
           this.logger.warn(`Session recovery failed for ${adapter.metadata.id}`, error);
         }
       }
+      if (timedOut) break;
     }
 
     recoverableAdapters.forEach((adapter) => {
-      this.emit("session_stale", { adapterId: adapter.metadata.id, reason: "recover_unavailable", attempts: recoveryRetryDelaysMs.length });
+      this.emit("session_stale", { adapterId: adapter.metadata.id, reason: timedOut ? "recover_timeout" : "recover_unavailable", attempts: recoveryRetryDelaysMs.length });
       void adapter.cancelPendingConnection?.();
     });
     return null;
+  }
+
+  private async clearStoredSessionAsStale(session: WalletSession, reason: string): Promise<void> {
+    await this.storage.removeItem(SESSION_KEY);
+    this.emit("session_stale", { adapterId: session.adapterId, account: session.account, session, reason });
   }
 
   private delay(ms: number): Promise<void> {

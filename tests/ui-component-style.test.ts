@@ -294,15 +294,20 @@ test("WalletModal custom QR loading uses a tokenized skeleton placeholder", () =
   assert.match(html, /xwk-qr-loading-skeleton/);
   assert.match(html, /xwk-qr-skeleton/);
   assert.match(html, /xwk-skeleton-qr/);
-  assert.match(overrides, /\.xwk-qr-loading-skeleton\{display:grid;height:100%;place-items:center;width:100%\}/);
+  assert.doesNotMatch(html, /class="[^"]*(^|\s)xwk-skeleton(\s|")/);
+  assert.match(overrides, /\.xwk-qr-loading-skeleton\{display:grid;height:100%;place-items:stretch;width:100%\}/);
   assert.match(overrides, /\.xwk-skeleton\{[^}]*background:linear-gradient/);
-  assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*height:calc\(100% - 16px\)/);
-  assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*width:calc\(100% - 16px\)/);
+  assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*height:100%/);
+  assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*width:100%/);
   assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*overflow:hidden/);
-  assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*border-radius:12px/);
+  assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*border-radius:10px/);
   assert.match(overrides, /\.xwk-qr-skeleton:before\{[^}]*background-image:radial-gradient/);
+  assert.match(overrides, /\.xwk-qr-skeleton:before\{[^}]*inset:0/);
+  assert.match(overrides, /\.xwk-qr-skeleton:after\{[^}]*animation:xwk-qr-shimmer/);
+  assert.match(overrides, /\.xwk-qr-skeleton:after\{[^}]*transform:translateX\(-115%\)/);
   assert.match(overrides, /@keyframes xwk-qr-skeleton-pulse/);
-  assert.match(overrides, /prefers-reduced-motion:reduce[^`]*\.xwk-skeleton,\.xwk-qr-skeleton\{animation:none!important/);
+  assert.match(overrides, /@keyframes xwk-qr-shimmer\{0%\{transform:translateX\(-115%\)\}100%\{transform:translateX\(115%\)\}\}/);
+  assert.match(overrides, /prefers-reduced-motion:reduce[^`]*\.xwk-skeleton,\.xwk-qr-skeleton,\.xwk-qr-skeleton:after\{animation:none!important/);
 });
 
 test("WalletModal wallet badge uses skeleton while availability is resolving", () => {

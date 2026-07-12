@@ -212,6 +212,97 @@ test("WalletManager emits connected for stale auto reconnect without adapter res
   assert.deepEqual(connectedAddresses, ["rStoredOnly"]);
 });
 
+test("WalletManager clears stored sessions when passive restore is unavailable", async () => {
+  class UnavailableRestoreAdapter extends BaseWalletAdapter {
+    metadata = { id: "unavailable", name: "Unavailable", type: "extension" } as const;
+    capabilities = { connect: true };
+
+    async connect() {
+      return { account: { address: "rUnavailable", network } };
+    }
+
+    async restoreSession() {
+      return null;
+    }
+  }
+
+  const storage = new MemoryWalletStorage();
+  const session = {
+    adapterId: "unavailable",
+    account: { address: "rUnavailable", network },
+    connectedAt: 1
+  };
+  await storage.setItem("session", JSON.stringify({
+    version: WALLET_STORAGE_VERSION,
+    session,
+    updatedAt: Date.now()
+  }));
+
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new UnavailableRestoreAdapter()],
+    storage,
+    autoReconnect: true,
+    logger: { level: "silent" }
+  });
+  const staleReasons: string[] = [];
+
+  manager.on("session_stale", (event) => staleReasons.push(event.reason ?? ""));
+
+  const restored = await manager.autoReconnect();
+
+  assert.equal(restored, null);
+  assert.equal(await storage.getItem("session"), null);
+  assert.deepEqual(staleReasons, ["restore_unavailable"]);
+});
+
+test("WalletManager times out passive restore and clears the stored session", async () => {
+  class SlowRestoreAdapter extends BaseWalletAdapter {
+    metadata = { id: "slow-restore", name: "Slow Restore", type: "extension" } as const;
+    capabilities = { connect: true };
+
+    async connect() {
+      return { account: { address: "rSlowRestore", network } };
+    }
+
+    async restoreSession() {
+      await new Promise(() => undefined);
+      return null;
+    }
+  }
+
+  const storage = new MemoryWalletStorage();
+  const session = {
+    adapterId: "slow-restore",
+    account: { address: "rSlowRestore", network },
+    connectedAt: 1
+  };
+  await storage.setItem("session", JSON.stringify({
+    version: WALLET_STORAGE_VERSION,
+    session,
+    updatedAt: Date.now()
+  }));
+
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new SlowRestoreAdapter()],
+    storage,
+    autoReconnect: true,
+    logger: { level: "silent" }
+  });
+  const staleReasons: string[] = [];
+
+  manager.on("session_stale", (event) => staleReasons.push(event.reason ?? ""));
+
+  const startedAt = Date.now();
+  const restored = await manager.autoReconnect();
+
+  assert.equal(restored, null);
+  assert.equal(await storage.getItem("session"), null);
+  assert.deepEqual(staleReasons, ["restore_timeout"]);
+  assert.ok(Date.now() - startedAt < 5000);
+});
+
 test("WalletManager throws typed errors for missing adapters", async () => {
   const manager = new WalletManager({
     appName: "Test",
@@ -420,6 +511,54 @@ test("WalletManager recovers pending return sessions once and stores them", asyn
   assert.equal(stored.session?.account?.address, "rRecovered");
   assert.deepEqual(restoredAddresses, ["rRecovered"]);
   assert.deepEqual(connectedAddresses, ["rRecovered"]);
+});
+
+test("WalletManager times out pending return recovery and clears pending connection state", async () => {
+  class SlowRecoverAdapter extends BaseWalletAdapter {
+    metadata = { id: "slow-recover", name: "Slow Recover", type: "walletconnect" } as const;
+    capabilities = { connect: true };
+    cancelCalls = 0;
+
+    async connect() {
+      return { account: { address: "rSlowRecover", network } };
+    }
+
+    async canRecoverSession() {
+      return true;
+    }
+
+    async recoverSession() {
+      await new Promise(() => undefined);
+      return null;
+    }
+
+    cancelPendingConnection() {
+      this.cancelCalls += 1;
+    }
+  }
+
+  const adapter = new SlowRecoverAdapter();
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [adapter],
+    storage: new MemoryWalletStorage(),
+    autoReconnect: true,
+    logger: { level: "silent" }
+  });
+  const staleReasons: string[] = [];
+  const connectingEvents: Array<{ adapterId: string; recovering?: boolean }> = [];
+
+  manager.on("connecting", (event) => connectingEvents.push(event));
+  manager.on("session_stale", (event) => staleReasons.push(event.reason ?? ""));
+
+  const startedAt = Date.now();
+  const restored = await manager.autoReconnect();
+
+  assert.equal(restored, null);
+  assert.ok(Date.now() - startedAt < 12_000);
+  assert.deepEqual(connectingEvents, [{ adapterId: "slow-recover", recovering: true }]);
+  assert.deepEqual(staleReasons, ["recover_timeout"]);
+  assert.equal(adapter.cancelCalls, 1);
 });
 
 test("WalletConnect detail adapters can use marker-gated pending return recovery", () => {
