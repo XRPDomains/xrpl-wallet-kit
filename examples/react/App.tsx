@@ -4,7 +4,12 @@ import { createCrossmarkAdapter } from "@xrpl-wallet-kit/adapter-crossmark";
 import { WalletKitProvider, useWalletKit } from "@xrpl-wallet-kit/react";
 
 const manager = new WalletManager({
-  appName: "XRPL React dApp",
+  metadata: {
+    name: "XRPL React dApp",
+    description: "React wallet connection example",
+    url: typeof window !== "undefined" ? window.location.origin : undefined,
+    icons: []
+  },
   network: "mainnet",
   autoReconnect: true,
   storage: createBrowserWalletStorage(),

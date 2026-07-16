@@ -136,7 +136,7 @@
         walletConnectProjectId: ""
       };
     </script>
-    <script src="/xrpl-wallet-kit.iife.min.js?v=0.1.0-beta.1"></script>
+    <script src="/xrpl-wallet-kit.iife.min.js?v=0.1.10"></script>
     <script>
       (function () {
         var demoConfig = window.XRPL_WALLET_KIT_DEMO_CONFIG || {};
@@ -144,9 +144,12 @@
         var walletConnectProjectId = demoConfig.walletConnectProjectId || "";
 
         var kit = XRPLWalletKit.create({
-          appName: "XRPL Wallet Kit HTML Preview",
-          appDescription: "Legacy HTML integration preview",
-          appUrl: window.location.origin,
+          metadata: {
+            name: "XRPL Wallet Kit HTML Preview",
+            description: "Legacy HTML integration preview",
+            url: window.location.origin,
+            icons: []
+          },
           network: "mainnet",
           storage: "localStorage",
           autoReconnect: true,

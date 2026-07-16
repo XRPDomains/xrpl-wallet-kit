@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createWalletClient, createWalletKit } from "../packages/client/src/index";
+import { LEDGER_ICON } from "../packages/adapters/ledger/src/index";
 import type { WalletManager } from "../packages/core/src/manager";
 import type { WalletAdapter } from "../packages/core/src/types";
 
@@ -74,6 +75,28 @@ test("createWalletClient keeps canonical xrplsnap wallet id working", () => {
   });
 
   assert.deepEqual([...manager.adapters.keys()], ["xrplsnap"]);
+});
+
+test("createWalletClient includes Ledger in default adapters and selective wallet lists", () => {
+  const defaultManager = createWalletClient({
+    appName: "Test dApp",
+    walletConnectProjectId: "test-project"
+  });
+  assert.equal(defaultManager.adapters.has("ledger"), true);
+  assert.deepEqual([...defaultManager.adapters.keys()].slice(-2), ["walletconnect", "ledger"]);
+
+  const ledgerOnlyManager = createWalletClient({
+    appName: "Test dApp",
+    wallets: ["ledger"]
+  });
+  assert.deepEqual([...ledgerOnlyManager.adapters.keys()], ["ledger"]);
+});
+
+test("Ledger default icon uses a valid SVG namespace", () => {
+  const prefix = "data:image/svg+xml;base64,";
+  assert.equal(LEDGER_ICON.startsWith(prefix), true);
+  const svg = Buffer.from(LEDGER_ICON.slice(prefix.length), "base64").toString("utf8");
+  assert.match(svg, /xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
 });
 
 test("createWalletClient forwards WalletConnect sign message destination to detail adapters", () => {

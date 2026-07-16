@@ -92,7 +92,7 @@ window.XRPLWalletKitLegacyBridge
 Default bridge behavior:
 
 ```js
-wallets: ['xaman', 'gemwallet', 'crossmark', 'dropfi', 'xrplsnap', 'walletconnect']
+wallets: ['xaman', 'gemwallet', 'crossmark', 'dropfi', 'xrplsnap', 'ledger', 'walletconnect']
 showWeb3Name: true
 showBalance: true
 buttonSize: 'lg'

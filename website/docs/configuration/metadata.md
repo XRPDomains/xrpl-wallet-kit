@@ -28,7 +28,7 @@ const kit = createWalletKit({
 
 ## Legacy Aliases
 
-Existing integrations can still pass `appName`, `appDescription`, `appUrl`, and `appIcons`.
+Existing integrations can still pass `appName`, `appDescription`, `appUrl`, and `appIcons` while migrating. Do not use these aliases for new apps; keep new integrations on `metadata`.
 
 ```ts
 createWalletKit({
@@ -40,4 +40,3 @@ createWalletKit({
 ```
 
 For new integrations, prefer `metadata`. It keeps the app identity in one object and leaves room for future wallet/auth UX without adding more top-level options.
-

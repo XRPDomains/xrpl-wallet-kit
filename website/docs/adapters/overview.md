@@ -95,10 +95,10 @@ Adapters that return `signature`: GemWallet, Crossmark, DropFi, Otsu Wallet.
 
 ## Session Restore
 
-All adapters support session restore on page reload — the manager calls `autoReconnect()` and the adapter verifies whether the previously stored session is still valid:
+Restore behavior varies by wallet type. On page reload the manager calls `autoReconnect()` and each adapter decides whether a previously stored session can be verified safely:
 
 ```ts
-// On app startup, restore any previous session silently
+// On app startup, restore a previous session when the adapter can verify it safely.
 await manager.autoReconnect();
 ```
 
@@ -120,4 +120,3 @@ if (!await adapter.isAvailable()) {
 ```
 
 The manager uses this automatically to show **"Installed"** badges in the wallet list.
-

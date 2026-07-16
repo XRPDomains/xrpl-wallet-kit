@@ -27,7 +27,12 @@ The simple entrypoint is:
 
 ```js
 XRPLWalletKit.create({
-  appName: "My dApp",
+  metadata: {
+    name: "My XRPL App",
+    description: "Wallet connection for My XRPL App",
+    url: window.location.origin,
+    icons: [window.location.origin + "/icon.png"]
+  },
   walletConnectProjectId: "...",
   xamanClientId: "...",
   connectButton: "#connect-wallet"

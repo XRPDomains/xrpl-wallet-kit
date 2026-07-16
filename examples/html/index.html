@@ -10,7 +10,18 @@
       import { createCrossmarkAdapter } from "../../packages/adapters/crossmark/src/index.ts";
       import { createWalletModal } from "../../packages/ui/src/index.ts";
       const log = (value) => (document.querySelector("#log").textContent += `${value}\n`);
-      const manager = new WalletManager({ appName: "XRPL Wallet Kit HTML Example", network: "mainnet", autoReconnect: true, storage: createBrowserWalletStorage(), adapters: [createGemWalletAdapter(), createCrossmarkAdapter()] });
+      const manager = new WalletManager({
+        metadata: {
+          name: "XRPL Wallet Kit HTML Example",
+          description: "Plain HTML wallet connection example",
+          url: window.location.origin,
+          icons: []
+        },
+        network: "mainnet",
+        autoReconnect: true,
+        storage: createBrowserWalletStorage(),
+        adapters: [createGemWalletAdapter(), createCrossmarkAdapter()]
+      });
       manager.on("connected", ({ account }) => log(`connected: ${account.address}`));
       manager.on("error", ({ error }) => log(error?.message ?? String(error)));
       const modal = createWalletModal({ manager, theme: { accent: "#0078ae" } });

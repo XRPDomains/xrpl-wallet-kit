@@ -45,10 +45,7 @@ function createPreviewManager() {
   }
 
   manager = new WalletManager({
-    appName: PREVIEW_CONFIG.metadata.name,
-    appDescription: PREVIEW_CONFIG.metadata.description,
-    appUrl: PREVIEW_CONFIG.metadata.url,
-    appIcons: PREVIEW_CONFIG.metadata.icons,
+    metadata: PREVIEW_CONFIG.metadata,
     network: "mainnet",
     autoReconnect: true,
     storage: createBrowserWalletStorage("xwk.react.preview."),

@@ -13,6 +13,7 @@ import type { WalletAdapter, WalletAppMetadata, WalletEventHandler, WalletEventN
 import { createCrossmarkAdapter } from "@xrpl-wallet-kit/adapter-crossmark";
 import { createDropFiAdapter } from "@xrpl-wallet-kit/adapter-dropfi";
 import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
+import { createLedgerAdapter } from "@xrpl-wallet-kit/adapter-ledger";
 import { createWalletConnectAdapters, createWalletConnectMetadata } from "@xrpl-wallet-kit/adapter-walletconnect";
 import { createXamanAdapter } from "@xrpl-wallet-kit/adapter-xaman";
 import { createXrplSnapAdapter } from "@xrpl-wallet-kit/adapter-xrpl-snap";
@@ -33,6 +34,7 @@ export type WalletKitAdapterId =
   | "dropfi"
   | "xrplsnap"
   | "xrpl-snap"
+  | "ledger"
   | "staticbit"
   | "bitget"
   | "joey"
@@ -259,6 +261,8 @@ function createDefaultAdapters(options: CreateWalletClientOptions, onQr: (event:
       modalMode: walletConnectUiMode === "default" ? "always" : undefined
     }));
   }
+
+  if (shouldInclude(ids, "ledger")) adapters.push(createLedgerAdapter());
 
   return adapters;
 }

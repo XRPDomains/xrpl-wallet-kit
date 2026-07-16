@@ -62,7 +62,7 @@ const inline = new WalletInline({
   layout: "grid",
   size: "wide",
   textSize: "md",
-  wallets: ["xaman", "gemwallet", "walletconnect"],
+  wallets: ["xaman", "gemwallet", "ledger", "walletconnect"],
   walletConnectUiMode: "group",
   language: "en-US",
 });

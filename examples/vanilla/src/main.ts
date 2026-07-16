@@ -162,6 +162,7 @@ async function bootstrap(run = bootstrapRun) {
     { createCrossmarkAdapter },
     { createDropFiAdapter },
     { createGemWalletAdapter },
+    { createLedgerAdapter },
     { createWalletConnectAdapters, createWalletConnectMetadata },
     { createXamanAdapter },
     { createXrplSnapAdapter }
@@ -169,6 +170,7 @@ async function bootstrap(run = bootstrapRun) {
     import("../../../packages/adapters/crossmark/src"),
     import("../../../packages/adapters/dropfi/src"),
     import("../../../packages/adapters/gemwallet/src"),
+    import("../../../packages/adapters/ledger/src"),
     import("../../../packages/adapters/walletconnect/src"),
     import("../../../packages/adapters/xaman/src"),
     import("../../../packages/adapters/xrpl-snap/src")
@@ -196,10 +198,7 @@ async function bootstrap(run = bootstrapRun) {
   }));
 
   manager = new WalletManager({
-    appName: PREVIEW_CONFIG.metadata.name,
-    appDescription: PREVIEW_CONFIG.metadata.description,
-    appUrl: PREVIEW_CONFIG.metadata.url,
-    appIcons: PREVIEW_CONFIG.metadata.icons,
+    metadata: PREVIEW_CONFIG.metadata,
     network: getSelectedNetwork(),
     autoReconnect: true,
     persistTransactions: true,
@@ -220,6 +219,7 @@ async function bootstrap(run = bootstrapRun) {
   } else {
     log("config_warning", { message: "VITE_WALLETCONNECT_PROJECT_ID is not set; WalletConnect preview adapters are disabled." });
   }
+  manager.register(createLedgerAdapter());
 
   const { createWalletButton, createWalletModal, createWalletToast } = await import("../../../packages/ui/src");
   if (run !== bootstrapRun) return;

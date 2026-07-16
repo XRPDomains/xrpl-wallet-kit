@@ -32,7 +32,7 @@ Use lowercase stable IDs without spaces. Existing IDs:
 - `joey`
 - `girin`
 - `bifrost`
-- `ledger` (currently available as an adapter package but disabled in default UI examples)
+- `ledger`
 
 Third-party IDs should be short and unique, for example `mywallet`.
 

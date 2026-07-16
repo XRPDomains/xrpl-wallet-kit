@@ -241,12 +241,14 @@ kit.manager.addTransaction({
 
 ```ts
 createWalletKit({
-  wallets: ["xaman", "gemwallet", "walletconnect"],
+  wallets: ["xaman", "gemwallet", "ledger", "walletconnect"],
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
 });
 ```
 
 Available IDs: `"xaman"`, `"gemwallet"`, `"walletconnect"`, `"crossmark"`, `"ledger"`, `"dropfi"`, `"xrpl-snap"`, `"otsu"`.
+
+`ledger` is included in `wallets: "all"` by default. It uses WebHID/WebUSB and never silently restores after a reload; users must reconnect the device and open the XRP app.
 
 ## Custom Adapters
 

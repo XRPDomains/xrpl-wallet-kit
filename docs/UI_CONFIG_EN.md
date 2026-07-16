@@ -234,7 +234,7 @@ Example wallet order:
 
 ```ts
 walletList: {
-  wallets: ["xaman", "gemwallet", "crossmark", "dropfi", "xrplsnap", "walletconnect"]
+  wallets: ["xaman", "gemwallet", "crossmark", "dropfi", "xrplsnap", "ledger", "walletconnect"]
 }
 ```
 
@@ -540,7 +540,7 @@ Prefer `ui.accountPanel.mode` for the account panel presentation. `connectButton
 ]
 ```
 
-`ledger` has an adapter direction but is currently disabled in UI/test usage.
+`ledger` is included when using `wallets: "all"`. It is a hardware wallet, so it does not silently restore after page reload; the user must reconnect the device.
 
 ## Recommended Configurations
 
@@ -561,7 +561,7 @@ ui: {
 ui: {
   walletList: {
     layout: "list",
-    wallets: ["xaman", "gemwallet", "crossmark", "dropfi", "xrplsnap", "walletconnect"]
+    wallets: ["xaman", "gemwallet", "crossmark", "dropfi", "xrplsnap", "ledger", "walletconnect"]
   },
   walletConnect: { mode: "group" }
 }

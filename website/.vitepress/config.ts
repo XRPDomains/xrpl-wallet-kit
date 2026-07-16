@@ -50,8 +50,8 @@ export default defineConfig({
       { text: "Playground", link: "/docs/playground" },
       { text: "Theme Builder", link: "/docs/theme-builder" },
       { text: "API Reference", link: "/docs/api/wallet-manager" },
-      {
-        text: "v0.1.3",
+        {
+          text: "v0.1.10",
         items: [
           {
             text: "Changelog",
@@ -148,6 +148,16 @@ export default defineConfig({
         items: [
           { text: "Going Live", link: "/docs/guides/going-live" },
           { text: "Migration Guide", link: "/docs/guides/migration" },
+        ],
+      },
+      {
+        text: "Use Cases",
+        collapsed: true,
+        items: [
+          { text: "NFT Marketplace",     link: "/docs/use-cases/nft-marketplace" },
+          { text: "DEX & AMM",           link: "/docs/use-cases/dex-amm" },
+          { text: "Payments & Commerce", link: "/docs/use-cases/payments" },
+          { text: "Cross-chain Bridge",  link: "/docs/use-cases/bridge" },
         ],
       },
     ],

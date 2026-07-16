@@ -54,7 +54,7 @@ const kit = createWalletKit({
 
 ```ts
 const kit = createWalletKit({
-  wallets: ["xaman", "gemwallet", "dropfi", "walletconnect"],
+  wallets: ["xaman", "gemwallet", "dropfi", "ledger", "walletconnect"],
   walletConnectProjectId: "...",
   connectButton: "#connect-wallet",
 });
@@ -70,6 +70,8 @@ Available built-in ids:
 - `xrpl-snap` or `xrplsnap`
 - `ledger`
 - `otsu`
+
+`ledger` is included in `wallets: "all"` by default. Because it is a hardware wallet, it does not silently restore after reload; users must reconnect the device and open the XRP app.
 
 ## Signing
 
