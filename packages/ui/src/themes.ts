@@ -7,7 +7,7 @@ export const defaultFontFamily = "Inter, ui-sans-serif, system-ui, -apple-system
 export const lightTheme: ResolvedTheme = {
   accent: "#0078ae",
   accentText: "#ffffff",
-  background: "#ffffff",
+  background: "#fbfcff",
   foreground: "#111827",
   error: "#b45309",
   success: "#059669",
@@ -15,15 +15,15 @@ export const lightTheme: ResolvedTheme = {
   border: "rgba(17,24,39,.08)",
   overlay: "rgba(15,23,42,.46)",
   overlayBlur: 0,
-  surface: "#f8fafc",
-  surfaceHover: "rgba(17,24,39,.04)",
+  surface: "#f3f7fb",
+  surfaceHover: "#edf3f8",
   fallbackIconBackground: "rgba(15,23,42,.06)",
   fallbackIconColor: "#111827",
   shadow: "0 8px 40px rgba(15,23,42,.12), 0 0 0 1px rgba(15,23,42,.04)",
   radius: "14px",
   walletRadius: "10px",
   spinnerTrail: "rgba(0,0,0,.08)",
-  headerBackground: "#ffffff",
+  headerBackground: "#fbfcff",
   fontFamily: defaultFontFamily
 };
 
@@ -60,9 +60,9 @@ export const xrplTheme: ResolvedTheme = {
 
 export const minimalTheme: ResolvedTheme = {
   ...lightTheme,
-  background: "#ffffff",
-  headerBackground: "#ffffff",
-  surface: "#ffffff",
+  background: "#fbfcff",
+  headerBackground: "#fbfcff",
+  surface: "#fbfcff",
   border: "#d7dee8",
   radius: "8px",
   walletRadius: "8px",
@@ -92,6 +92,8 @@ export const midnightTheme: ResolvedTheme = {
   fontFamily: defaultFontFamily
 };
 
+// Decorative opt-in preset. Prefer the default/light/dark themes for host apps
+// that need predictable contrast over complex backgrounds.
 export const glassTheme: ResolvedTheme = {
   accent: "#6366f1",
   accentText: "#ffffff",

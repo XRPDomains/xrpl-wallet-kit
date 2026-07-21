@@ -161,8 +161,9 @@ test("WalletButton copied icon follows theme success token", () => {
   }) as unknown as { renderStyles(): string; copiedIcon(): string };
   const styles = button.renderStyles();
 
-  assert.match(styles, /\.xwk-copied-icon\{color:#11aa66/);
+  assert.match(styles, /\.xwk-copied-icon\{--xwk-success-icon-foreground:#111827;color:#11aa66/);
   assert.match(button.copiedIcon(), /fill="currentColor"/);
+  assert.match(button.copiedIcon(), /stroke="var\(--xwk-success-icon-foreground,currentColor\)"/);
   assert.doesNotMatch(button.copiedIcon(), /#1d9bf0/);
 });
 

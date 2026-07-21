@@ -4,6 +4,7 @@ import type { WalletMetadata } from "../packages/core/src";
 import { WalletButton, WalletButtonController, WalletInline, XrplWalletInline } from "../packages/ui/src/index";
 import { WalletModal } from "../packages/ui/src/modal";
 import { WalletToast } from "../packages/ui/src/toast";
+import { QR_LIGHT } from "../packages/ui/src/icons";
 import { darkTheme, glassTheme, lightTheme, resolveWalletTheme } from "../packages/ui/src/themes";
 
 const manager = {
@@ -157,11 +158,12 @@ test("WalletModal visual states use semantic theme tokens", () => {
   assert.match(styles, /\.xwk-spinner:before\{[^}]*border-top-color:#556677/);
   assert.match(styles, /\.xwk-spinner:before\{[^}]*border-right-color:#ccddee/);
   assert.match(styles, /\.xwk-qr-code\{[^}]*color:#556677/);
-  assert.match(styles, /\.xwk-copied-icon\{color:#11aa66/);
+  assert.match(styles, /\.xwk-copied-icon\{--xwk-success-icon-foreground:#fbfcff;color:#11aa66/);
   assert.match(styles, /\.xwk-footer\{[^}]*font-size:11px/);
   assert.match(mobileOverrides, /\.xwk-error-text,\.xwk-connect-status\.xwk-error-text,\.xwk-qr-loading\.xwk-error-text\{color:#cc3344!important\}/);
   assert.match(mobileOverrides, /\.xwk-close:focus-visible,\.xwk-back:focus-visible\{outline:2px solid #123abc!important/);
   assert.match(modal.checkIcon(), /fill="currentColor"/);
+  assert.match(modal.checkIcon(), /stroke="var\(--xwk-success-icon-foreground,currentColor\)"/);
   assert.doesNotMatch(styles, /#1d9bf0|#64748b|rgba\(148,163,184/);
 });
 
@@ -181,7 +183,8 @@ test("themeName presets resolve before token overrides", () => {
 
 test("theme presets use refined surface, border, and glass tokens", () => {
   assert.equal(lightTheme.border, "rgba(17,24,39,.08)");
-  assert.equal(lightTheme.surfaceHover, "rgba(17,24,39,.04)");
+  assert.equal(lightTheme.surface, "#f3f7fb");
+  assert.equal(lightTheme.surfaceHover, "#edf3f8");
   assert.equal(darkTheme.border, "rgba(248,250,252,.10)");
   assert.equal(darkTheme.surfaceHover, "#263244");
   assert.equal(glassTheme.overlayBlur, 24);
@@ -265,7 +268,7 @@ test("WalletModal custom QR supports light QR mode without changing modal frame"
   const styles = modal.renderStyles(lightTheme, "list", "default", "sm");
 
   assert.match(styles, /\.xwk-qr-code-wrap\{position:relative/);
-  assert.match(styles, /\.xwk-qr-code-light\{background:#fff;padding:8px\}/);
+  assert.match(styles, new RegExp(`\\.xwk-qr-code-light\\{background:${QR_LIGHT};padding:8px\\}`));
   assert.match(styles, /\.xwk-qr-theme-action\{[^}]*position:absolute/);
   assert.match(styles, /\.xwk-qr-theme-action\{[^}]*height:34px/);
   assert.match(styles, /\.xwk-qr-theme-action\{[^}]*opacity:0/);
@@ -301,9 +304,10 @@ test("WalletModal custom QR loading uses a tokenized skeleton placeholder", () =
   assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*width:100%/);
   assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*overflow:hidden/);
   assert.match(overrides, /\.xwk-qr-skeleton\{[^}]*border-radius:10px/);
-  assert.match(overrides, /\.xwk-qr-skeleton:before\{[^}]*background-image:radial-gradient/);
+  assert.match(overrides, /\.xwk-qr-skeleton:before\{[^}]*background:linear-gradient/);
   assert.match(overrides, /\.xwk-qr-skeleton:before\{[^}]*inset:0/);
   assert.match(overrides, /\.xwk-qr-skeleton:after\{[^}]*animation:xwk-qr-shimmer/);
+  assert.match(overrides, /\.xwk-qr-skeleton:after\{[^}]*background:linear-gradient/);
   assert.match(overrides, /\.xwk-qr-skeleton:after\{[^}]*transform:translateX\(-115%\)/);
   assert.match(overrides, /@keyframes xwk-qr-skeleton-pulse/);
   assert.match(overrides, /@keyframes xwk-qr-shimmer\{0%\{transform:translateX\(-115%\)\}100%\{transform:translateX\(115%\)\}\}/);
