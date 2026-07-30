@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/core",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "Headless XRPL wallet adapter core.",
   "license": "MIT",
   "type": "module",

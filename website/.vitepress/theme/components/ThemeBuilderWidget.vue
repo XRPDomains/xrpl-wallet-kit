@@ -390,7 +390,7 @@ const mountRef      = ref<HTMLElement | null>(null)
 let modalInstance:  any = null
 let buttonInstance: any = null
 let kitBundle:      any = null
-const KIT_BUNDLE_VERSION = '0.1.6'
+const KIT_BUNDLE_VERSION = '0.1.11'
 let inlineObserver: MutationObserver | null = null
 
 // ── Options ───────────────────────────────────────────────────

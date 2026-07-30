@@ -279,6 +279,7 @@ async function bootstrap(run = bootstrapRun) {
   renderTransactionState();
   renderSigningState();
   renderAuthState();
+  log("ethereum_provider_debug", describeEthereumProviders());
   log("ready", { walletConnectMode: mode, wallets: manager.getWallets().map((wallet) => wallet.id) });
 }
 
@@ -670,6 +671,30 @@ function createSignMessageRequestPreview(adapter: WalletAdapter, current: NonNul
 
 function log(name: string, payload: unknown) {
   events.textContent = `${new Date().toLocaleTimeString()} ${name} ${JSON.stringify(payload)}\n${events.textContent}`;
+}
+
+function describeEthereumProviders() {
+  const ethereum = (globalThis as typeof globalThis & { ethereum?: Record<string, unknown> }).ethereum;
+  const providers = Array.isArray(ethereum?.providers) ? ethereum.providers as Record<string, unknown>[] : [];
+  return {
+    hasEthereum: Boolean(ethereum),
+    root: describeEthereumProvider(ethereum, "root"),
+    providers: providers.map((provider, index) => describeEthereumProvider(provider, String(index)))
+  };
+}
+
+function describeEthereumProvider(provider: Record<string, unknown> | undefined, id: string) {
+  if (!provider) return { id, present: false };
+  return {
+    id,
+    present: true,
+    isMetaMask: Boolean(provider.isMetaMask),
+    isOkxWallet: Boolean(provider.isOkxWallet),
+    isOKExWallet: Boolean(provider.isOKExWallet),
+    hasMetaMaskApi: Boolean(provider._metamask),
+    hasRequest: typeof provider.request === "function",
+    keySample: Object.keys(provider).slice(0, 12)
+  };
 }
 
 function formatError(error: unknown) {

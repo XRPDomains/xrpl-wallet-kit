@@ -22,6 +22,7 @@ const adapter = createXrplSnapAdapter({
 
 - MetaMask **v11+** (Flask or production with Snaps enabled)
 - The XRPL Snap is installed automatically on first connect if not already present
+- The active EIP-1193 provider must support MetaMask Snaps methods such as `wallet_getSnaps` and `wallet_requestSnaps`
 
 ## Options
 
@@ -109,6 +110,10 @@ There is no mobile return / deeplink recovery — XRPL Snap is a desktop MetaMas
 ## Troubleshooting
 
 **MetaMask not detected?** Ensure MetaMask is installed and that `window.ethereum` is present. MetaMask Flask is required for Snap support in older MetaMask versions.
+
+**`wallet_requestSnaps` does not exist/is not available?** The active provider is not a MetaMask Snaps-capable provider. This can happen in unsupported MetaMask environments, in-app browsers, or when another extension takes over `window.ethereum`. The adapter checks `wallet_getSnaps` and treats this case as unavailable instead of trying to install the Snap.
+
+When multiple browser wallets are installed, the adapter prefers MetaMask from `window.ethereum.providers` or cached EIP-6963 provider announcements before falling back to `window.ethereum`. This avoids using non-Snaps providers when wallets such as OKX take over `window.ethereum`. If another wallet still takes over the provider, pass the MetaMask EIP-1193 provider explicitly through `createXrplSnapAdapter({ ethereum })`.
 
 **Snap installation failed?** The user denied the installation prompt. MetaMask requires explicit permission to install each Snap. Try the connection flow again.
 

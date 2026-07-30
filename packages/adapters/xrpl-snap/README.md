@@ -34,10 +34,14 @@ When using `@xrpl-wallet-kit/client` defaults, the XRPL Snap adapter is already 
 ## Runtime Notes
 
 - Requires MetaMask with Snaps support.
+- `isAvailable()` verifies Snaps support with `wallet_getSnaps`; providers that expose `window.ethereum` but do not support Snaps are treated as unavailable.
+- When multiple browser wallets are installed, the adapter prefers a MetaMask provider from `window.ethereum.providers` or EIP-6963 before falling back to `window.ethereum`. EIP-6963 announcements are cached so MetaMask can still be selected when wallets such as OKX own `window.ethereum`.
 - Default snap id is `npm:xrpl-snap`.
 - `connect()` calls `wallet_requestSnaps` and then invokes the snap to fetch the XRPL account.
 - `signMessage()` uses a transaction-style proof flow because Snap message-signing support can vary.
 - `signAndSubmit()` invokes the snap and normalizes the result with `normalizeTxResult()`.
+
+If you see `the method wallet_requestSnaps does not exist/is not available`, the active provider is not a MetaMask Snaps-capable provider. Use MetaMask desktop with Snaps enabled, and check that another injected wallet such as OKX is not taking over `window.ethereum`.
 
 ## Testing
 

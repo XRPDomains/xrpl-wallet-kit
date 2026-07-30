@@ -54,6 +54,20 @@ export default defineConfig(({ mode }) => {
         }
       }
     },
+    resolve: {
+      alias: {
+        "@xrpl-wallet-kit/client": resolve(__dirname, "../client/src/index.ts"),
+        "@xrpl-wallet-kit/core": resolve(__dirname, "../core/src/index.ts"),
+        "@xrpl-wallet-kit/ui": resolve(__dirname, "../ui/src/index.ts"),
+        "@xrpl-wallet-kit/adapter-crossmark": resolve(__dirname, "../adapters/crossmark/src/index.ts"),
+        "@xrpl-wallet-kit/adapter-dropfi": resolve(__dirname, "../adapters/dropfi/src/index.ts"),
+        "@xrpl-wallet-kit/adapter-gemwallet": resolve(__dirname, "../adapters/gemwallet/src/index.ts"),
+        "@xrpl-wallet-kit/adapter-ledger": resolve(__dirname, "../adapters/ledger/src/index.ts"),
+        "@xrpl-wallet-kit/adapter-walletconnect": resolve(__dirname, "../adapters/walletconnect/src/index.ts"),
+        "@xrpl-wallet-kit/adapter-xaman": resolve(__dirname, "../adapters/xaman/src/index.ts"),
+        "@xrpl-wallet-kit/adapter-xrpl-snap": resolve(__dirname, "../adapters/xrpl-snap/src/index.ts")
+      }
+    },
     define: {
       "process.env": {}
     }

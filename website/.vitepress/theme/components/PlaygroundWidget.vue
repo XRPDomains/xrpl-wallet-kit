@@ -107,7 +107,7 @@ const kitLoaded  = ref(false)
 let modalInstance: any = null
 let buttonInstance: any = null
 let kitBundle: any = null
-const KIT_BUNDLE_VERSION = '0.1.3'
+const KIT_BUNDLE_VERSION = '0.1.11'
 
 // ── Preview mode CSS class ────────────────────────────────────
 const previewModeClass = computed(() =>

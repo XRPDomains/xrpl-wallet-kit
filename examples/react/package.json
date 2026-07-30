@@ -1,7 +1,7 @@
 {
   "name": "@xrpl-wallet-kit/example-react",
   "private": true,
-  "version": "0.1.10",
+  "version": "0.1.12",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5174 --strictPort"
@@ -10,6 +10,5 @@
     "@vitejs/plugin-react": "^4.3.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
-  },
-  "devDependencies": {}
+  }
 }
