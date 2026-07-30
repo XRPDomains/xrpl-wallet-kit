@@ -4,7 +4,26 @@ Framework-agnostic wallet adapter toolkit for XRPL applications.
 
 XRPL Wallet Kit provides a headless core, wallet adapters, a prebuilt wallet UI, React helpers, and a browser bundle for legacy HTML sites. It is designed for dApps that need wallet connection, account state, signing, payment, NFT, identity, and WalletConnect flows without coupling wallet logic to a specific business app.
 
-## Packages
+For detailed guides, framework examples, configuration options, and adapter notes, see the documentation site: https://xrpdomains.xyz/xrpl-wallet-kit/
+
+Useful links:
+
+- Documentation: https://xrpdomains.xyz/xrpl-wallet-kit/
+- Playground: https://xrpdomains.xyz/xrpl-wallet-kit/playground
+- Theme Builder: https://xrpdomains.xyz/xrpl-wallet-kit/docs/theme-builder
+
+## Features
+
+- Framework agnostic: use the headless manager from Vanilla JS, React, Next.js, Vue, Nuxt, or legacy HTML apps.
+- Multi-wallet by default: Xaman, GemWallet, Crossmark, DropFi, WalletConnect detail wallets, XRPL Snap, Ledger, and community adapters.
+- Adapter-based architecture: install only the packages you need, or use the all-in-one client/browser bundle.
+- Prebuilt wallet UI: connect modal, account panel, QR/deeplink flows, transaction toast, recent transactions, balance, identity, and theme presets.
+- Event-driven core: subscribe to connection, account, network, session, and transaction lifecycle events.
+- Persistent sessions: best-effort auto reconnect with guarded recovery for browser extensions, Xaman, and WalletConnect.
+- Auth-ready signing: normalized `signMessage()` and `@xrpl-wallet-kit/auth` helpers for server verification.
+- Type safe: TypeScript-first packages with explicit adapter capabilities and typed wallet results.
+
+## What's Included
 
 Core and UI:
 
@@ -25,6 +44,39 @@ Adapters:
 - `@xrpl-wallet-kit/adapter-xrpl-snap`
 - `@xrpl-wallet-kit/adapter-ledger`
 
+## Architecture
+
+XRPL Wallet Kit is split into small packages so apps can choose between a batteries-included setup and direct low-level control.
+
+```text
+Your dApp
+  |
+  |-- @xrpl-wallet-kit/client
+  |     |-- WalletManager from @xrpl-wallet-kit/core
+  |     |-- WalletModal / WalletButton from @xrpl-wallet-kit/ui
+  |     `-- first-party wallet adapters
+  |
+  |-- @xrpl-wallet-kit/react / @xrpl-wallet-kit/next
+  |
+  `-- @xrpl-wallet-kit/browser for CDN and legacy HTML apps
+
+WalletManager
+  |-- session storage
+  |-- event emitter
+  |-- transaction store
+  |-- identity and balance helpers
+  `-- adapters
+        |-- Xaman
+        |-- GemWallet
+        |-- Crossmark
+        |-- DropFi
+        |-- WalletConnect
+        |-- XRPL Snap
+        `-- Ledger
+```
+
+Most applications should start with `@xrpl-wallet-kit/client`. Advanced integrations can compose `@xrpl-wallet-kit/core`, `@xrpl-wallet-kit/ui`, and individual adapters directly.
+
 ## Install
 
 ```bash
@@ -44,6 +96,8 @@ npm install @xrpl-wallet-kit/browser
 ```
 
 ## Quick Start
+
+See the full quick start and examples in the docs: https://xrpdomains.xyz/xrpl-wallet-kit/docs/quick-start
 
 ```ts
 import { createWalletKit } from "@xrpl-wallet-kit/client";
@@ -172,6 +226,18 @@ npm.cmd run typecheck
 npm.cmd test
 npm.cmd run build:browser
 ```
+
+## Acknowledgments
+
+XRPL Wallet Kit learns from and is inspired by excellent wallet connection projects across the Web3 ecosystem:
+
+- [XRPL Connect](https://github.com/XRPL-Commons/xrpl-connect) by XRPL Commons for XRPL wallet connection patterns and community-first documentation.
+- [RainbowKit](https://www.rainbowkit.com/) for wallet onboarding, authentication documentation, and account UX ideas.
+- [ConnectKit](https://github.com/family/connectkit) for polished wallet connection UI patterns.
+- [WalletConnect](https://walletconnect.com/) and Reown AppKit for cross-wallet session and QR/deeplink flows.
+- [Solana Wallet Adapter](https://github.com/anza-xyz/wallet-adapter) for adapter-based wallet architecture.
+
+Thanks to the XRPL wallet teams and community projects that make wallet interoperability possible.
 
 ## Status
 
