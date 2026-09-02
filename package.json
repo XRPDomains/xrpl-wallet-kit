@@ -17,6 +17,7 @@
     "typecheck": "tsc -b --pretty false",
     "test": "npm run build && node --import tsx --test tests/*.test.ts",
     "smoke:browser": "node tests/browser-bundle-smoke.mjs",
+    "smoke:release": "node scripts/check-release-smoke.mjs",
     "check:integrity": "node scripts/check-file-integrity.mjs",
     "check:unused": "knip --no-progress --reporter compact",
     "check:unused:report": "knip --no-progress --reporter compact --no-exit-code",
