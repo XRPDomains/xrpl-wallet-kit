@@ -275,6 +275,35 @@ test("XRPL Snap availability does not block MetaMask candidate when wallet_getSn
   assert.deepEqual(calls, ["wallet_getSnaps", "wallet_getSnaps", "wallet_requestSnaps", "wallet_invokeSnap"]);
 });
 
+test("XRPL Snap retries transient keyring hydration after first install", async () => {
+  const calls: string[] = [];
+  let invokeAttempts = 0;
+  const provider: Eip1193Provider = {
+    isMetaMask: true,
+    _metamask: {},
+    request: async (args) => {
+      const method = (args as { method?: string }).method;
+      calls.push(method ?? "unknown");
+      if (method === "wallet_getSnaps") return {};
+      if (method === "wallet_requestSnaps") return {};
+      if (method === "wallet_invokeSnap") {
+        invokeAttempts += 1;
+        if (invokeAttempts === 1) {
+          throw { code: -32602, message: "KeyringController - Keyring not found." };
+        }
+        return { account: "rSnapAddress" };
+      }
+      throw new Error(`Unexpected method: ${method}`);
+    }
+  };
+
+  const result = await new XrplSnapAdapter({ ethereum: provider, snapRequestRetryDelaysMs: [0] }).connect({});
+
+  assert.equal(result.account.address, "rSnapAddress");
+  assert.equal(invokeAttempts, 2);
+  assert.deepEqual(calls, ["wallet_getSnaps", "wallet_requestSnaps", "wallet_invokeSnap", "wallet_invokeSnap"]);
+});
+
 test("XRPL Snap can reuse a previously announced EIP-6963 MetaMask provider", async () => {
   const previous = {
     ethereum: (globalThis as unknown as { ethereum?: Eip1193Provider }).ethereum,

@@ -37,6 +37,7 @@ export interface XrplSnapAdapterOptions {
   signMessageDestination?: string;
   signMessageMethods?: string[];
   providerDiscoveryTimeoutMs?: number;
+  snapRequestRetryDelaysMs?: number[];
 }
 
 export class XrplSnapAdapter extends BaseWalletAdapter {
@@ -78,7 +79,7 @@ export class XrplSnapAdapter extends BaseWalletAdapter {
     this.activeAddress = undefined;
     this.activeProvider = ethereum;
     await this.selectSnapNetwork(options);
-    const snap = await this.withAbort(ethereum.request({ method: "wallet_invokeSnap", params: { snapId: this.snapId, request: { method: "xrpl_getAccount" } } }), options.signal);
+    const snap = await this.withAbort(this.invokeSnap("xrpl_getAccount", undefined), options.signal);
     const address = (snap as { account?: string }).account;
     const publicKey = (snap as { publicKey?: string }).publicKey;
     if (!address) throw new Error("XRPL Snap did not return an XRPL address");
@@ -180,10 +181,28 @@ export class XrplSnapAdapter extends BaseWalletAdapter {
 
   private async invokeSnap(method: string, params: unknown) {
     const ethereum = await this.ethereum();
-    return ethereum.request({
+    const request = () => ethereum.request({
       method: "wallet_invokeSnap",
       params: { snapId: this.snapId, request: { method, params } }
     });
+    const retryDelays = this.options.snapRequestRetryDelaysMs ?? [120, 350, 800];
+
+    try {
+      return await request();
+    } catch (error) {
+      if (!this.isSnapKeyringHydratingError(error)) throw error;
+      let lastError = error;
+      for (const delayMs of retryDelays) {
+        await this.delay(delayMs);
+        try {
+          return await request();
+        } catch (retryError) {
+          lastError = retryError;
+          if (!this.isSnapKeyringHydratingError(retryError)) throw retryError;
+        }
+      }
+      throw lastError;
+    }
   }
 
   private createSignMessagePaymentTx(request: SignMessageRequest) {
@@ -281,9 +300,9 @@ export class XrplSnapAdapter extends BaseWalletAdapter {
     const injected = (globalThis as unknown as { ethereum?: Eip1193Provider }).ethereum;
     this.startEip6963Discovery();
     const configured = this.options.ethereum;
+    if (this.activeProvider) return this.activeProvider;
     if (configured) return await this.pickSnapProvider(configured, true) ?? this.pickStrongMetaMaskProvider(configured);
-    const ethereum = this.activeProvider
-      ?? await this.pickSnapProvider(injected, false)
+    const ethereum = await this.pickSnapProvider(injected, false)
       ?? await this.discoverMetaMaskProvider()
       ?? [...discoveredMetaMaskProviders][0]
       ?? this.pickStrongMetaMaskProvider(injected);
@@ -413,6 +432,16 @@ export class XrplSnapAdapter extends BaseWalletAdapter {
   private isSnapsUnsupportedError(error: unknown): boolean {
     const message = this.getErrorMessage(error);
     return /-32601|wallet_requestSnaps|wallet_getSnaps|does not exist|not available|unsupported|method not found|unknown method/i.test(message);
+  }
+
+  private isSnapKeyringHydratingError(error: unknown): boolean {
+    const message = this.getErrorMessage(error);
+    return /KeyringController\s*-\s*Keyring not found|Keyring not found/i.test(message);
+  }
+
+  private delay(ms: number): Promise<void> {
+    if (ms <= 0) return Promise.resolve();
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
