@@ -51,7 +51,7 @@ export default defineConfig({
       { text: "Theme Builder", link: "/docs/theme-builder" },
       { text: "API Reference", link: "/docs/api/wallet-manager" },
         {
-          text: "v0.1.11",
+          text: "v0.1.12",
         items: [
           {
             text: "Changelog",
@@ -154,6 +154,7 @@ export default defineConfig({
         text: "Use Cases",
         collapsed: true,
         items: [
+          { text: "Overview",            link: "/docs/use-cases/overview" },
           { text: "NFT Marketplace",     link: "/docs/use-cases/nft-marketplace" },
           { text: "DEX & AMM",           link: "/docs/use-cases/dex-amm" },
           { text: "Payments & Commerce", link: "/docs/use-cases/payments" },
