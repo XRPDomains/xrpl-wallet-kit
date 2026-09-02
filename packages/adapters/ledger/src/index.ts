@@ -149,6 +149,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
 
   async signAndSubmit(request: SignAndSubmitRequest): Promise<TxResult> {
     if (!this.session) throw createWalletError.notConnected();
+    this.assertSingleSignTransaction(request.txJson);
     try {
       const result = await this.session.signTransaction(request.txJson, request.submit ?? true);
       return {
@@ -167,6 +168,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
 
   async signTransaction(request: SignTransactionRequest): Promise<SignTransactionResult> {
     if (!this.session) throw createWalletError.notConnected();
+    this.assertSingleSignTransaction(request.txJson);
     try {
       const result = await this.session.signTransaction(request.txJson, false);
       return {
@@ -237,6 +239,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
   private async signWithDefaultLedger(tx: unknown, submit = true): Promise<LedgerSignResult> {
     if (!this.xrp || !this.session) throw createWalletError.notConnected();
     if (!this.network) throw createWalletError.connectionFailed(this.metadata.name, new Error("XRPL network is required for Ledger signing"));
+    this.assertSingleSignTransaction(tx);
 
     const { Client, encode } = await import("xrpl");
     const client = new Client(this.network.rpcUrl);
@@ -362,6 +365,13 @@ export class LedgerAdapter extends BaseWalletAdapter {
       ]);
     } finally {
       if (timer) clearTimeout(timer);
+    }
+  }
+
+  private assertSingleSignTransaction(tx: unknown): void {
+    const txJson = asRecord(tx);
+    if (txJson.SigningPubKey === "" || Array.isArray(txJson.Signers)) {
+      throw createWalletError.unsupportedMethod("XRPL multisigning", this.metadata.name);
     }
   }
 }

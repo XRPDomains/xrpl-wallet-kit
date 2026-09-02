@@ -10,20 +10,50 @@ export enum WalletKitErrorCode {
   UNSUPPORTED_METHOD = "UNSUPPORTED_METHOD",
   INVALID_ADAPTER = "INVALID_ADAPTER",
   NETWORK_MISMATCH = "NETWORK_MISMATCH",
+  NETWORK_NOT_SUPPORTED = "NETWORK_NOT_SUPPORTED",
   NOT_CONNECTED = "NOT_CONNECTED",
   ALREADY_CONNECTED = "ALREADY_CONNECTED",
   UNKNOWN_ERROR = "UNKNOWN_ERROR"
 }
 
+export enum WalletKitErrorCategory {
+  WALLET_UNAVAILABLE = "WALLET_UNAVAILABLE",
+  USER_ACTION = "USER_ACTION",
+  NETWORK = "NETWORK",
+  INVALID_INPUT = "INVALID_INPUT",
+  TIMEOUT = "TIMEOUT",
+  INTERNAL = "INTERNAL"
+}
+
+export const WALLET_KIT_ERROR_CATEGORY_BY_CODE: Record<WalletKitErrorCode, WalletKitErrorCategory> = {
+  [WalletKitErrorCode.WALLET_NOT_FOUND]: WalletKitErrorCategory.WALLET_UNAVAILABLE,
+  [WalletKitErrorCode.WALLET_NOT_INSTALLED]: WalletKitErrorCategory.WALLET_UNAVAILABLE,
+  [WalletKitErrorCode.WALLET_NOT_AVAILABLE]: WalletKitErrorCategory.WALLET_UNAVAILABLE,
+  [WalletKitErrorCode.CONNECTION_FAILED]: WalletKitErrorCategory.INTERNAL,
+  [WalletKitErrorCode.CONNECTION_REJECTED]: WalletKitErrorCategory.USER_ACTION,
+  [WalletKitErrorCode.SIGN_FAILED]: WalletKitErrorCategory.INTERNAL,
+  [WalletKitErrorCode.SIGN_REJECTED]: WalletKitErrorCategory.USER_ACTION,
+  [WalletKitErrorCode.REQUEST_TIMEOUT]: WalletKitErrorCategory.TIMEOUT,
+  [WalletKitErrorCode.UNSUPPORTED_METHOD]: WalletKitErrorCategory.INVALID_INPUT,
+  [WalletKitErrorCode.INVALID_ADAPTER]: WalletKitErrorCategory.INVALID_INPUT,
+  [WalletKitErrorCode.NETWORK_MISMATCH]: WalletKitErrorCategory.NETWORK,
+  [WalletKitErrorCode.NETWORK_NOT_SUPPORTED]: WalletKitErrorCategory.NETWORK,
+  [WalletKitErrorCode.NOT_CONNECTED]: WalletKitErrorCategory.USER_ACTION,
+  [WalletKitErrorCode.ALREADY_CONNECTED]: WalletKitErrorCategory.USER_ACTION,
+  [WalletKitErrorCode.UNKNOWN_ERROR]: WalletKitErrorCategory.INTERNAL
+};
+
 export class WalletKitError extends Error {
   readonly code: WalletKitErrorCode;
+  readonly category: WalletKitErrorCategory;
   readonly cause?: unknown;
   readonly details?: Record<string, unknown>;
 
-  constructor(code: WalletKitErrorCode, message: string, options: { cause?: unknown; details?: Record<string, unknown> } = {}) {
+  constructor(code: WalletKitErrorCode, message: string, options: { cause?: unknown; details?: Record<string, unknown>; category?: WalletKitErrorCategory } = {}) {
     super(message);
     this.name = "WalletKitError";
     this.code = code;
+    this.category = options.category ?? WALLET_KIT_ERROR_CATEGORY_BY_CODE[code] ?? WalletKitErrorCategory.INTERNAL;
     this.cause = options.cause;
     this.details = options.details;
   }
@@ -93,6 +123,16 @@ export const createWalletError = {
     WalletKitErrorCode.INVALID_ADAPTER,
     `Wallet adapter is invalid: ${adapterId}`,
     { details: { adapterId, issues } }
+  ),
+  networkMismatch: (walletName: string, expected?: string, actual?: string, cause?: unknown) => new WalletKitError(
+    WalletKitErrorCode.NETWORK_MISMATCH,
+    `${walletName} is connected to ${actual ?? "an unknown network"} but the app requested ${expected ?? "a different network"}`,
+    { cause, details: { walletName, expected, actual } }
+  ),
+  networkNotSupported: (walletName: string, network?: string, cause?: unknown) => new WalletKitError(
+    WalletKitErrorCode.NETWORK_NOT_SUPPORTED,
+    `${walletName} does not support ${network ?? "the requested network"}`,
+    { cause, details: { walletName, network } }
   ),
   notConnected: () => new WalletKitError(
     WalletKitErrorCode.NOT_CONNECTED,

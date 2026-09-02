@@ -1,6 +1,6 @@
 import QRCodeStyling from "qr-code-styling";
 import QRCode from "qrcode";
-import { WalletKitErrorCode, getErrorMessage, isWalletKitError } from "@xrpl-wallet-kit/core";
+import { WalletKitErrorCode, getErrorMessage, isWalletKitError, sanitizeWalletUrl } from "@xrpl-wallet-kit/core";
 import type { WalletAdapter, WalletMetadata, WalletNetwork, WalletSession } from "@xrpl-wallet-kit/core";
 import { resolveWalletUiOptions } from "./config";
 import { resolveWalletUiMessages } from "./locales";
@@ -788,7 +788,7 @@ class WalletPickerView {
         const textSize = this.options.textSize ?? "sm";
         const hasReadyUri = state.status === "ready" && Boolean(state.uri);
         const uri = state.status === "ready" ? state.uri : undefined;
-        const deeplink = state.status === "ready" ? state.deeplink : undefined;
+        const deeplink = state.status === "ready" ? sanitizeWalletUrl(state.deeplink) : undefined;
         const qrCodeAttributes = hasReadyUri ? ` aria-hidden="true"` : "";
         const openAction = hasReadyUri && deeplink
             ? `<a class="xwk-action xwk-action-primary" data-xwk-open href="${this.escapeHtml(deeplink)}">${this.escapeHtml(messages.openWallet)}</a>`
@@ -931,8 +931,9 @@ class WalletPickerView {
         const previewLimit = group.maxPreviewIcons ?? 5;
         const previewWallets = wallets.slice(0, previewLimit);
         const overflow = wallets.length - previewWallets.length;
-        const icon = group.icon
-            ? `<img src="${this.escapeHtml(group.icon)}" alt="">`
+        const iconUrl = sanitizeWalletUrl(group.icon, { allowDataImage: true });
+        const icon = iconUrl
+            ? `<img src="${this.escapeHtml(iconUrl)}" alt="">`
             : `<span class="xwk-icon-fallback">${this.escapeHtml(group.name.slice(0, 1).toUpperCase())}</span>`;
         const secondary = layout === "list"
             ? `<span class="xwk-group">${this.escapeHtml(messages.walletCount(wallets.length))}</span>`
@@ -997,14 +998,16 @@ class WalletPickerView {
         }
     }
     private renderWalletIcon(wallet?: WalletMetadata) {
-        if (wallet?.icon)
-            return `<img src="${this.escapeHtml(wallet.icon)}" alt="">`;
+        const icon = sanitizeWalletUrl(wallet?.icon, { allowDataImage: true });
+        if (icon)
+            return `<img src="${this.escapeHtml(icon)}" alt="">`;
         const letter = wallet?.name.slice(0, 1).toUpperCase() ?? "W";
         return `<span class="xwk-icon-fallback">${this.escapeHtml(letter)}</span>`;
     }
     private renderMiniWalletIcon(wallet: WalletMetadata) {
-        if (wallet.icon)
-            return `<img class="xwk-mini-icon" src="${this.escapeHtml(wallet.icon)}" alt="">`;
+        const icon = sanitizeWalletUrl(wallet.icon, { allowDataImage: true });
+        if (icon)
+            return `<img class="xwk-mini-icon" src="${this.escapeHtml(icon)}" alt="">`;
         return `<span class="xwk-mini-icon xwk-mini-fallback">${this.escapeHtml(wallet.name.slice(0, 1).toUpperCase())}</span>`;
     }
     private backIcon() {

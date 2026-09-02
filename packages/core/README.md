@@ -15,7 +15,7 @@ Most apps should install `@xrpl-wallet-kit/client` instead. It wires the manager
 ## Manager
 
 ```ts
-import { WalletManager, MAINNET } from "@xrpl-wallet-kit/core";
+import { WalletManager, MAINNET, isWalletKitError } from "@xrpl-wallet-kit/core";
 import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
 
 const manager = new WalletManager({
@@ -83,6 +83,22 @@ const transactions = manager.getTransactions();
 
 The transaction confirmer is best-effort. If confirmation is inconclusive, keep an explorer link available instead of marking the transaction failed too early.
 
+## Errors
+
+All typed errors expose both a specific `code` and a broader `category` so apps can render stable recovery UI without parsing wallet-specific messages.
+
+```ts
+try {
+  await manager.connect("xaman");
+} catch (error) {
+  if (isWalletKitError(error) && error.category === "NETWORK") {
+    // Ask the user to switch networks or reconnect on the requested ledger.
+  }
+}
+```
+
+Network mismatches are rejected before a session is persisted. If a wallet reports a different network id or network type than the app requested, the manager throws `NETWORK_MISMATCH`.
+
 ## Adapter Contract
 
 Adapters implement the `WalletAdapter` interface and declare capabilities for the methods they truly support.
@@ -99,6 +115,7 @@ Capability rules:
 - `signTransaction: true` requires signing without submitting.
 - `signAndSubmit: true` requires submitting or delegating submission to the wallet.
 - Adapters should throw typed `WalletKitError`s for rejected, unsupported, unavailable, or failed flows.
+- Adapter availability checks are bounded by the manager so one slow extension cannot block the full wallet list.
 
 ## Storage and Auto Reconnect
 

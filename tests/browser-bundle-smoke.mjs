@@ -7,6 +7,11 @@ import vm from "node:vm";
 const bundlePath = resolve("packages/browser/dist/xrpl-wallet-kit.iife.js");
 const code = await readFile(bundlePath, "utf8");
 
+for (const expectedText of ["Connect Wallet", "Copy address", "Disconnect", "Recent transactions"]) {
+  assert.ok(code.includes(expectedText), `browser bundle should include UI text: ${expectedText}`);
+}
+assert.doesNotMatch(code, /broken\s*—\s*truncated|truncated mid-string/i);
+
 class SmokeWebSocket {
   static CONNECTING = 0;
   static OPEN = 1;

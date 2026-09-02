@@ -13,6 +13,7 @@ export const WALLET_STORAGE_VERSION = 1;
 const RECOVER_SESSION_RETRY_DELAYS_MS = [0, 700, 1600, 3000];
 const DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS = 3000;
 const DEFAULT_PENDING_RETURN_RECOVERY_TIMEOUT_MS = 10000;
+const DEFAULT_AVAILABILITY_CHECK_TIMEOUT_MS = 1000;
 const DEFAULT_ACCOUNT_STATUS_TIMEOUT_MS = 2500;
 const DEFAULT_AUTHENTICATE_EXPIRES_IN_SECONDS = 3600;
 const DEFAULT_TX_CONFIRMATION_ATTEMPTS = 6;
@@ -64,7 +65,12 @@ export class WalletManager extends WalletEventEmitter {
     const entries = await Promise.all([...this.adapters.values()].map(async (adapter) => {
       if (!adapter.isAvailable) return [adapter.metadata.id, false] as const;
       try {
-        return [adapter.metadata.id, Boolean(await adapter.isAvailable())] as const;
+        const availability = await this.withTimeout(Promise.resolve(adapter.isAvailable()), DEFAULT_AVAILABILITY_CHECK_TIMEOUT_MS);
+        if (availability.timedOut) {
+          this.logger.warn(`Availability check timed out for ${adapter.metadata.id}`);
+          return [adapter.metadata.id, false] as const;
+        }
+        return [adapter.metadata.id, Boolean(availability.value)] as const;
       } catch (error) {
         this.logger.warn(`Availability check failed for ${adapter.metadata.id}`, error);
         return [adapter.metadata.id, false] as const;
@@ -78,7 +84,12 @@ export class WalletManager extends WalletEventEmitter {
     const results = await Promise.all([...this.adapters.values()].map(async (adapter) => {
       if (!adapter.isAvailable) return null;
       try {
-        return await adapter.isAvailable() ? adapter : null;
+        const availability = await this.withTimeout(Promise.resolve(adapter.isAvailable()), DEFAULT_AVAILABILITY_CHECK_TIMEOUT_MS);
+        if (availability.timedOut) {
+          this.logger.warn(`Availability check timed out for ${adapter.metadata.id}`);
+          return null;
+        }
+        return availability.value ? adapter : null;
       } catch (error) {
         this.logger.warn(`Availability check failed for ${adapter.metadata.id}`, error);
         return null;
@@ -148,6 +159,7 @@ export class WalletManager extends WalletEventEmitter {
           await this.clearStoredSessionAsStale(session, "restore_unavailable");
           return null;
         }
+        this.assertSessionNetwork(adapter, restored.session, this.getNetwork(), "restoreSession");
         const enrichedSession = await this.enrichSession(this.withWalletMetadata(restored.session, adapter));
         this.setSession(enrichedSession);
         await this.loadPersistedTransactions(enrichedSession);
@@ -174,6 +186,7 @@ export class WalletManager extends WalletEventEmitter {
       }
 
       const enrichedSession = await this.enrichSession(this.withWalletMetadata(session, adapter));
+      this.assertSessionNetwork(adapter, enrichedSession, this.getNetwork(), "autoReconnect");
       this.setSession(enrichedSession);
       await this.loadPersistedTransactions(enrichedSession);
       this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession, stale: true });
@@ -232,6 +245,7 @@ export class WalletManager extends WalletEventEmitter {
           }
           const recovered = recovery.value;
           if (!recovered?.session) continue;
+          this.assertSessionNetwork(adapter, recovered.session, network, "recoverSession");
           const enrichedSession = await this.enrichSession(this.withWalletMetadata(recovered.session, adapter));
           this.setSession(enrichedSession);
           await this.saveSession(enrichedSession);
@@ -273,7 +287,7 @@ export class WalletManager extends WalletEventEmitter {
       this.pendingAdapterId = adapterId;
       this.pendingAbortController = new AbortController();
       this.emit("connecting", { adapterId });
-      if (adapter.isAvailable && !await adapter.isAvailable()) {
+      if (adapter.isAvailable && !await this.isAdapterAvailable(adapter)) {
         throw createWalletError.walletNotAvailable(adapter.metadata.name);
       }
       const signal = options.signal ?? this.pendingAbortController.signal;
@@ -281,6 +295,7 @@ export class WalletManager extends WalletEventEmitter {
       if (signal.aborted || this.pendingAdapterId !== adapterId) {
         throw new Error("Wallet connection was cancelled");
       }
+      this.assertAccountNetwork(adapter, result.account, network, "connect");
       const session = await this.enrichSession(this.withWalletMetadata(result.session ?? { adapterId, account: { ...result.account, network }, connectedAt: Date.now() }, adapter));
       this.setSession(session);
       await this.saveSession(session);
@@ -800,6 +815,35 @@ export class WalletManager extends WalletEventEmitter {
       ]);
     } finally {
       if (timer) clearTimeout(timer);
+    }
+  }
+
+  private async isAdapterAvailable(adapter: WalletAdapter): Promise<boolean> {
+    if (!adapter.isAvailable) return true;
+    const availability = await this.withTimeout(Promise.resolve(adapter.isAvailable()), DEFAULT_AVAILABILITY_CHECK_TIMEOUT_MS);
+    if (availability.timedOut) {
+      this.logger.warn(`Availability check timed out for ${adapter.metadata.id}`);
+      return false;
+    }
+    return Boolean(availability.value);
+  }
+
+  private assertSessionNetwork(adapter: WalletAdapter, session: WalletSession, expected: WalletNetwork, source: string): void {
+    this.assertAccountNetwork(adapter, session.account, expected, source);
+  }
+
+  private assertAccountNetwork(adapter: WalletAdapter, account: WalletAccount, expected: WalletNetwork, source: string): void {
+    const actualNetwork = account.network;
+    const actualId = actualNetwork?.id;
+    const actualType = actualNetwork?.networkType ?? account.networkType;
+    const expectedId = expected.id;
+    const expectedType = expected.networkType;
+
+    if (actualId && actualId !== expectedId) {
+      throw createWalletError.networkMismatch(adapter.metadata.name, String(expectedId), String(actualId), new Error(`${source} returned a different network id`));
+    }
+    if (actualType && actualType !== expectedType) {
+      throw createWalletError.networkMismatch(adapter.metadata.name, expectedType, actualType, new Error(`${source} returned a different network type`));
     }
   }
 

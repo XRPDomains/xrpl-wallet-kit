@@ -3,17 +3,20 @@ import test from "node:test";
 import {
   BaseWalletAdapter,
   MemoryWalletStorage,
+  WalletKitErrorCategory,
   WalletKitErrorCode,
   WalletManager,
   WALLET_STORAGE_VERSION,
   assertWalletAdapter,
   createNetworkRegistry,
+  createWalletError,
   getExplorerAccountUrl,
   getExplorerTxUrl,
   getHttpRpcUrl,
   getNativeAsset,
   isMainnetNetwork,
   isWalletKitError,
+  sanitizeWalletUrl,
   normalizeTxResult,
   validateWalletAdapter
 } from "../packages/core/src/index";
@@ -110,6 +113,33 @@ test("WalletManager returns available wallet adapters", async () => {
   const wallets = await manager.getAvailableWallets();
 
   assert.deepEqual(wallets.map((wallet) => wallet.metadata.id), ["available"]);
+});
+
+test("WalletManager availability checks fail closed when an adapter hangs", async () => {
+  class HangingAvailabilityAdapter extends BaseWalletAdapter {
+    metadata = { id: "hanging", name: "Hanging Wallet", type: "extension" } as const;
+    capabilities = { connect: true };
+
+    async isAvailable() {
+      await new Promise(() => undefined);
+      return true;
+    }
+
+    async connect() {
+      return { account: { address: "rHanging" } };
+    }
+  }
+
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new HangingAvailabilityAdapter()],
+    logger: { level: "silent" }
+  });
+  const startedAt = Date.now();
+
+  assert.deepEqual(await manager.getWalletAvailability(), { hanging: false });
+  assert.deepEqual(await manager.getAvailableWallets(), []);
+  assert.ok(Date.now() - startedAt < 2500);
 });
 
 test("WalletManager stores sessions in a versioned envelope", async () => {
@@ -314,6 +344,48 @@ test("WalletManager throws typed errors for missing adapters", async () => {
     () => manager.connect("missing"),
     (error) => isWalletKitError(error) && error.code === WalletKitErrorCode.WALLET_NOT_FOUND
   );
+});
+
+test("WalletKitError exposes a stable category for app-level handling", () => {
+  const error = createWalletError.networkMismatch("Mock Wallet", "MAINNET", "TESTNET");
+
+  assert.equal(error.code, WalletKitErrorCode.NETWORK_MISMATCH);
+  assert.equal(error.category, WalletKitErrorCategory.NETWORK);
+  assert.deepEqual(error.details, {
+    walletName: "Mock Wallet",
+    expected: "MAINNET",
+    actual: "TESTNET"
+  });
+});
+
+test("WalletManager rejects connected sessions that report a different network", async () => {
+  class WrongNetworkAdapter extends BaseWalletAdapter {
+    metadata = { id: "wrong-network", name: "Wrong Network", type: "extension" } as const;
+    capabilities = { connect: true };
+
+    async connect() {
+      return {
+        account: {
+          address: "rWrongNetwork",
+          networkType: "TESTNET"
+        }
+      };
+    }
+  }
+
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new WrongNetworkAdapter()],
+    logger: { level: "silent" }
+  });
+
+  await assert.rejects(
+    () => manager.connect("wrong-network", { network }),
+    (error) => isWalletKitError(error)
+      && error.code === WalletKitErrorCode.NETWORK_MISMATCH
+      && error.category === WalletKitErrorCategory.NETWORK
+  );
+  assert.equal(manager.getSession(), null);
 });
 
 test("WalletManager switches wallets by disconnecting the active adapter first", async () => {
@@ -1009,6 +1081,14 @@ test("NetworkRegistry resolves native asset, HTTP RPC, explorer, and mainnet ide
   assert.equal(getExplorerTxUrl(xahau, "ABC/123"), "https://explorer.xahau.network/tx/ABC%2F123");
   assert.equal(isMainnetNetwork(network), true);
   assert.equal(isMainnetNetwork(xahau), false);
+});
+
+test("sanitizeWalletUrl blocks executable URLs but keeps wallet-safe image and deeplink URLs", () => {
+  assert.equal(sanitizeWalletUrl("javascript:alert(1)"), undefined);
+  assert.equal(sanitizeWalletUrl("data:text/html;base64,PHNjcmlwdA==", { allowDataImage: true }), undefined);
+  assert.equal(sanitizeWalletUrl("data:image/png;base64,AAAA", { allowDataImage: true }), "data:image/png;base64,AAAA");
+  assert.equal(sanitizeWalletUrl("xumm://xumm.app/sign/abc"), "xumm://xumm.app/sign/abc");
+  assert.equal(sanitizeWalletUrl("/wallet-icon.svg"), "/wallet-icon.svg");
 });
 test("BaseWalletAdapter runs cleanup handlers once in reverse order", async () => {
   class CleanupAdapter extends BaseWalletAdapter {

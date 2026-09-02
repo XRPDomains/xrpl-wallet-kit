@@ -1,5 +1,5 @@
 import QRCodeStyling from "qr-code-styling";
-import { getExplorerAccountUrl, getExplorerTxUrl, getNativeAsset, isMainnetNetwork } from "@xrpl-wallet-kit/core";
+import { getExplorerAccountUrl, getExplorerTxUrl, getNativeAsset, isMainnetNetwork, sanitizeWalletUrl } from "@xrpl-wallet-kit/core";
 import type { WalletSession, WalletTransaction } from "@xrpl-wallet-kit/core";
 import { createXrpBalanceResolver } from "./balance";
 import { ensureWalletStyle, lockPageScroll, unlockPageScroll } from "./dom";
@@ -827,7 +827,8 @@ export class WalletButtonController {
       return `<div class="xwk-account-art xwk-account-avatar-skeleton" role="status" aria-label="${this.escapeHtml(this.messages().connecting)}"><span class="xwk-skeleton xwk-skeleton-circle"></span></div>`;
     }
     if (this.identityAvatar) {
-      return `<img class="xwk-account-avatar" src="${this.escapeHtml(this.identityAvatar)}" alt="">`;
+      const avatar = sanitizeWalletUrl(this.identityAvatar, { allowDataImage: true });
+      if (avatar) return `<img class="xwk-account-avatar" src="${this.escapeHtml(avatar)}" alt="">`;
     }
     const [from, to, spot] = this.getAddressGradient(this.getSessionAddress(session));
     return `<div class="xwk-account-art" style="--xwk-avatar-from:${from};--xwk-avatar-to:${to};--xwk-avatar-spot:${spot}"><span></span></div>`;
@@ -868,7 +869,7 @@ export class WalletButtonController {
   }
 
   private renderWalletIcon(wallet?: WalletMetadata, fallbackIcon?: string): string {
-    const icon = wallet?.icon ?? fallbackIcon;
+    const icon = sanitizeWalletUrl(wallet?.icon ?? fallbackIcon, { allowDataImage: true });
     if (icon) return `<img class="xwk-button-icon" src="${this.escapeHtml(icon)}" alt="">`;
     if (!wallet) return `<span class="xwk-button-icon xwk-button-icon-fallback xwk-button-icon-svg-fallback" aria-hidden="true">${this.walletIcon()}</span>`;
     const label = wallet.name.slice(0, 1).toUpperCase();
@@ -879,8 +880,10 @@ export class WalletButtonController {
     const icon = this.options.icon;
     if (!icon || icon.type === "default") return this.renderWalletIcon(undefined);
     if (icon.type === "image") {
+      const src = sanitizeWalletUrl(icon.src, { allowDataImage: true });
+      if (!src) return this.renderWalletIcon(undefined);
       const aria = icon.alt ? ` role="img" aria-label="${this.escapeHtml(icon.alt)}"` : ` aria-hidden="true"`;
-      return `<span class="xwk-button-icon xwk-button-icon-custom xwk-button-icon-custom-image"${aria}><img src="${this.escapeHtml(icon.src)}" alt="" decoding="async"></span>`;
+      return `<span class="xwk-button-icon xwk-button-icon-custom xwk-button-icon-custom-image"${aria}><img src="${this.escapeHtml(src)}" alt="" decoding="async"></span>`;
     }
     return this.renderCustomHtmlIcon(icon);
   }
