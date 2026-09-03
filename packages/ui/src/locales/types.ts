@@ -41,6 +41,7 @@ export interface WalletUiMessages {
   qrUriCopied: string;
   installed: string;
   recommended: string;
+  recent: string;
   mobileWallet: string;
   extensionWallet: string;
   walletConnectWallet: string;

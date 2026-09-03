@@ -31,6 +31,7 @@ export const viVNMessages: WalletUiMessages = {
   qrUriCopied: "Đã sao chép QR URI.",
   installed: "Đã cài",
   recommended: "Đề xuất",
+  recent: "Gần đây",
   mobileWallet: "Ví di động",
   extensionWallet: "Extension",
   walletConnectWallet: "WalletConnect",
