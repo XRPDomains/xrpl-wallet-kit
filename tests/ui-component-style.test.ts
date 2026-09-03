@@ -210,7 +210,7 @@ test("WalletModal hides wallet group subtitles by default and keeps recommended 
   const html = modal.renderWallet(wallet, "list");
 
   assert.match(styles, /\.xwk-wallet-badges\{[^}]*margin-left:auto/);
-  assert.match(styles, /\.xwk-wallet-badge\.xwk-recommended\{[^}]*color:#0078ae/);
+  assert.match(styles, /\.xwk-wallet-badge\.xwk-recommended,\.xwk-wallet-badge\.xwk-recent\{[^}]*color:#0078ae/);
   assert.match(html, /class="xwk-wallet-badge xwk-recommended">Recommended<\/span>/);
   assert.doesNotMatch(html, /<span class="xwk-group">Mobile wallet<\/span>/);
   assert.doesNotMatch(html, /<span class="xwk-group">Recommended<\/span>/);
@@ -256,6 +256,51 @@ test("WalletModal keeps recommended badge text when partial messages omit new la
   const html = modal.renderWallet(wallet, "list");
 
   assert.match(html, /class="xwk-wallet-badge xwk-recommended">Recommended<\/span>/);
+});
+
+test("WalletModal sorts the most recently connected wallet first", () => {
+  const wallets: WalletMetadata[] = [
+    { id: "xaman", name: "Xaman", type: "mobile", recommended: true },
+    { id: "gemwallet", name: "GemWallet", type: "extension", group: "Extensions" },
+    { id: "joey", name: "Joey", type: "walletconnect", group: "WalletConnect" }
+  ];
+  const modal = new WalletModal({
+    manager: { ...manager, getWallets: () => wallets } as never,
+    themeMode: "light"
+  }) as unknown as {
+    recentWalletId?: string;
+    getWallets(): WalletMetadata[];
+    renderWalletBadges(wallet: WalletMetadata, layout: "list"): string;
+  };
+
+  modal.recentWalletId = "joey";
+
+  assert.deepEqual(modal.getWallets().map((wallet) => wallet.id), ["joey", "xaman", "gemwallet"]);
+  assert.match(modal.renderWalletBadges(wallets[2], "list"), /class="xwk-wallet-badge xwk-recent">Recent<\/span>/);
+});
+
+test("WalletModal does not duplicate recent with stronger wallet badges", () => {
+  const modal = new WalletModal({
+    manager: manager as never,
+    themeMode: "light"
+  }) as unknown as {
+    availability: Record<string, boolean>;
+    availabilityLoading: boolean;
+    recentWalletId?: string;
+    renderWalletBadges(wallet: WalletMetadata, layout: "list"): string;
+  };
+
+  modal.recentWalletId = "xaman";
+  const recommended = modal.renderWalletBadges({ id: "xaman", name: "Xaman", type: "mobile", recommended: true }, "list");
+  assert.match(recommended, /Recommended/);
+  assert.doesNotMatch(recommended, /Recent/);
+
+  modal.recentWalletId = "gemwallet";
+  modal.availabilityLoading = false;
+  modal.availability = { gemwallet: true };
+  const installed = modal.renderWalletBadges({ id: "gemwallet", name: "GemWallet", type: "extension", group: "Extensions" }, "list");
+  assert.match(installed, /Installed/);
+  assert.doesNotMatch(installed, /Recent/);
 });
 
 test("WalletModal custom QR supports light QR mode without changing modal frame", () => {

@@ -29,6 +29,7 @@ export const enUSMessages: WalletUiMessages = {
   qrUriCopied: "QR URI copied.",
   installed: "Installed",
   recommended: "Recommended",
+  recent: "Recent",
   mobileWallet: "Mobile wallet",
   extensionWallet: "Extension",
   walletConnectWallet: "WalletConnect",
