@@ -125,6 +125,7 @@ export type WalletBalanceResolver = (context: {
 
 export interface WalletModalController {
   open(): void;
+  openAndWait(): Promise<WalletSession>;
   close(notify?: boolean, restoreFocus?: boolean): void;
   isOpen(): boolean;
   on(event: "open" | "close", handler: () => void): () => void;
