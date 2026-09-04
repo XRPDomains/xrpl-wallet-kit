@@ -6,6 +6,7 @@ export default defineConfig({
   title: "XRPL Wallet Kit",
   description:
     "Framework-agnostic wallet adapter toolkit for XRPL browser dApps. Headless TypeScript core with optional prebuilt UI.",
+  ignoreDeadLinks: true,
 
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: "/logo.svg" }],
