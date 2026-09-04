@@ -1,6 +1,6 @@
 import QRCodeStyling from "qr-code-styling";
 import QRCode from "qrcode";
-import { WalletKitErrorCode, getErrorMessage, isWalletKitError, sanitizeWalletUrl } from "@xrpl-wallet-kit/core";
+import { WalletKitError, WalletKitErrorCode, getErrorMessage, isWalletKitError, sanitizeWalletUrl } from "@xrpl-wallet-kit/core";
 import type { WalletAdapter, WalletMetadata, WalletNetwork, WalletSession } from "@xrpl-wallet-kit/core";
 import { resolveWalletUiOptions } from "./config";
 import { resolveWalletUiMessages } from "./locales";
@@ -30,6 +30,12 @@ type WalletPickerPresentation = "modal" | "inline";
 let walletPickerInstanceId = 0;
 const RECENT_WALLET_STORAGE_KEY = "xrpl-wallet-kit:recent-wallet";
 
+interface OpenAndWaitRequest {
+    promise: Promise<WalletSession>;
+    resolve: (session: WalletSession) => void;
+    reject: (error: Error) => void;
+}
+
 class WalletPickerView {
     protected options: WalletUiOptions;
     protected root?: HTMLDivElement;
@@ -55,6 +61,7 @@ class WalletPickerView {
     private cachedStyle = "";
     private closeTimer?: number;
     private recentWalletId?: string;
+    private openWaitRequest?: OpenAndWaitRequest;
 
     constructor(options: WalletUiOptions, presentation: WalletPickerPresentation) {
         this.qrUri = "";
@@ -92,7 +99,26 @@ class WalletPickerView {
             this.showQr(adapterId, uri, deeplink);
         }
     }
+    openAndWait(): Promise<WalletSession> {
+        const session = this.options.manager.getSession();
+        if (session)
+            return Promise.resolve(session);
+        if (this.openWaitRequest) {
+            this.open();
+            return this.openWaitRequest.promise;
+        }
+        const request = {} as OpenAndWaitRequest;
+        request.promise = new Promise<WalletSession>((resolve, reject) => {
+            request.resolve = resolve;
+            request.reject = reject;
+        });
+        this.openWaitRequest = request;
+        this.open();
+        return request.promise;
+    }
     close(notify = true, restoreFocus = notify, animate = true) {
+        if (notify)
+            this.rejectOpenWait("Wallet picker was closed before a wallet connected.");
         document.removeEventListener("keydown", this.onDocumentKeyDown);
         if (this.qrCopyResetTimer)
             window.clearTimeout(this.qrCopyResetTimer);
@@ -136,6 +162,7 @@ class WalletPickerView {
     }
     destroy() {
         void this.options.manager.cancelPendingConnection();
+        this.rejectOpenWait("Wallet picker was destroyed before a wallet connected.");
         this.close(false, false, false);
         if (this.qrCopyResetTimer)
             window.clearTimeout(this.qrCopyResetTimer);
@@ -145,6 +172,20 @@ class WalletPickerView {
         this.openHandlers.clear();
         this.closeHandlers.clear();
         this.connectHandlers.clear();
+    }
+    private resolveOpenWait(session: WalletSession) {
+        const request = this.openWaitRequest;
+        if (!request)
+            return;
+        this.openWaitRequest = undefined;
+        request.resolve(session);
+    }
+    private rejectOpenWait(message: string) {
+        const request = this.openWaitRequest;
+        if (!request)
+            return;
+        this.openWaitRequest = undefined;
+        request.reject(new WalletKitError(WalletKitErrorCode.CONNECTION_REJECTED, message));
     }
     isOpen(): boolean {
         return Boolean(this.root?.isConnected);
@@ -685,8 +726,10 @@ class WalletPickerView {
             return;
         this.activeRequestAdapterId = undefined;
         this.writeRecentWalletId(adapterId);
-        if (session)
+        if (session) {
+            this.resolveOpenWait(session);
             this.connectHandlers.forEach((handler) => handler(session));
+        }
         if (this.presentation === "inline") {
             this.showList();
             const status = this.root?.querySelector(".xwk-status");
