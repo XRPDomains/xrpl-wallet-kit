@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { WalletMetadata } from "../packages/core/src";
+import { WalletKitErrorCode, type WalletMetadata, type WalletSession } from "../packages/core/src";
 import { WalletButton, WalletButtonController, WalletInline, XrplWalletInline } from "../packages/ui/src/index";
 import { WalletModal } from "../packages/ui/src/modal";
 import { WalletToast } from "../packages/ui/src/toast";
@@ -11,6 +11,7 @@ const manager = {
   on: () => () => undefined,
   cancelPendingConnection: async () => undefined,
   getNetwork: () => ({ id: "mainnet", name: "XRPL Mainnet", networkType: "MAINNET" }),
+  getSession: () => null,
   getWallets: () => [],
   getAdapter: () => undefined
 };
@@ -106,6 +107,89 @@ test("WalletModal preserves custom mount through constructor and option updates"
   const nextMount = {} as HTMLElement;
   modal.updateOptions({ mount: nextMount });
   assert.equal(modal.options.mount, nextMount);
+});
+
+test("WalletModal openAndWait resolves when a wallet connects", async () => {
+  const modal = new WalletModal({
+    manager: manager as never,
+    themeMode: "light"
+  }) as unknown as WalletModal & {
+    activeRequestAdapterId?: string;
+    handleConnected(adapterId: string, session: WalletSession): void;
+    open(): void;
+    close(): void;
+  };
+  const session: WalletSession = {
+    adapterId: "xaman",
+    account: { address: "rTEST" },
+    connectedAt: Date.now()
+  };
+
+  modal.open = () => undefined;
+  modal.close = () => undefined;
+  modal.activeRequestAdapterId = "xaman";
+
+  const pending = modal.openAndWait();
+  modal.handleConnected("xaman", session);
+
+  assert.equal(await pending, session);
+});
+
+test("WalletModal openAndWait resolves immediately when a session already exists", async () => {
+  const session: WalletSession = {
+    adapterId: "xaman",
+    account: { address: "rCONNECTED" },
+    connectedAt: Date.now()
+  };
+  const sessionManager = Object.create(manager) as typeof manager;
+  sessionManager.getSession = () => session;
+  const modal = new WalletModal({
+    manager: sessionManager as never,
+    themeMode: "light"
+  });
+  let opened = false;
+  modal.open = () => { opened = true; };
+
+  assert.equal(await modal.openAndWait(), session);
+  assert.equal(opened, false);
+});
+
+test("WalletModal openAndWait rejects when the modal closes before connection", async () => {
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  (globalThis as typeof globalThis & { document: unknown }).document = {
+    removeEventListener: () => undefined
+  };
+  (globalThis as typeof globalThis & { window: unknown }).window = {
+    clearTimeout: () => undefined,
+    matchMedia: () => ({ matches: true })
+  };
+  try {
+    const modal = new WalletModal({
+      manager: manager as never,
+      themeMode: "light"
+    });
+    modal.open = () => undefined;
+
+    const pending = modal.openAndWait();
+    modal.close();
+
+    await assert.rejects(pending, {
+      name: "WalletKitError",
+      code: WalletKitErrorCode.CONNECTION_REJECTED,
+      message: "Wallet picker was closed before a wallet connected."
+    });
+  }
+  finally {
+    if (previousDocument === undefined)
+      Reflect.deleteProperty(globalThis, "document");
+    else
+      globalThis.document = previousDocument;
+    if (previousWindow === undefined)
+      Reflect.deleteProperty(globalThis, "window");
+    else
+      globalThis.window = previousWindow;
+  }
 });
 
 test("WalletModal clamps long adapter errors before display", () => {
