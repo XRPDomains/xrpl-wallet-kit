@@ -53,6 +53,30 @@ const modal = new WalletModal({
 
 Modals, account panels, and toasts may portal to `document.body`, so they do not inherit CSS scoped to your app root, such as `.app[data-theme="dark"]`. Pass theme values through kit configuration instead of relying on host selectors.
 
+## Strict CSP
+
+If your app uses a strict Content Security Policy with style nonces, pass the per-response nonce through `ui.nonce`. XRPL Wallet Kit applies it to generated style nodes for the modal, inline wallet list, connect button, account panel, and transaction toasts.
+
+```ts
+createWalletKit({
+  // adapters, network, etc.
+  ui: {
+    nonce: window.__CSP_NONCE__,
+    mode: "dark",
+  },
+});
+```
+
+When constructing UI pieces directly, pass the same `nonce` option to each component:
+
+```ts
+const modal = new WalletModal({ manager, nonce });
+const button = new WalletButton({ manager, modal, target: "#connect", nonce });
+const toast = new WalletToast({ manager, nonce });
+```
+
+Use a fresh nonce for each server-rendered response and keep the value consistent across all kit UI surfaces rendered on that page.
+
 ## Theme Tokens
 
 | Property | Default light | Default dark | Description |

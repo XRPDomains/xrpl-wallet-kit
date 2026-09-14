@@ -225,6 +225,7 @@ function resolveToastOptions(options: CreateWalletKitOptions, modalUi: Partial<O
   const toast = raw === true ? {} : raw;
   return {
     language: modalUi.language,
+    nonce: modalUi.nonce,
     messages: modalUi.messages,
     themeMode: modalUi.themeMode,
     themeName: modalUi.themeName,

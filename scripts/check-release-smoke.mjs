@@ -6,6 +6,7 @@ import { dirname, join, relative, resolve } from "node:path";
 const root = process.cwd();
 const rootPackage = await readJson("package.json");
 const workspaceVersion = rootPackage.version;
+const expectedXrplPeerRange = "^4.0.0 || ^5.0.0";
 
 assert.match(workspaceVersion, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/, "root package version must be semver");
 
@@ -41,6 +42,14 @@ for (const [packageName, { pkg, packagePath }] of workspacePackages) {
       }
     }
   }
+
+  if (pkg.peerDependencies?.xrpl) {
+    assert.equal(
+      pkg.peerDependencies.xrpl,
+      expectedXrplPeerRange,
+      `${packageName} peerDependencies.xrpl must support xrpl v4 and v5`
+    );
+  }
 }
 
 const browserPackage = await readJson("packages/browser/package.json");
@@ -59,6 +68,20 @@ for (const bundleName of ["xrpl-wallet-kit.iife.js", "xrpl-wallet-kit.iife.min.j
 
 const websitePackage = await readJson("website/package.json");
 assert.equal(websitePackage.version, workspaceVersion, "website package version must match root");
+
+for (const examplePath of [
+  "examples/react/package.json",
+  "examples/html-legacy-bundle/package.json"
+]) {
+  const examplePackage = await readJson(examplePath);
+  assert.equal(examplePackage.version, workspaceVersion, `${examplePath} version must match root`);
+}
+
+const legacyHtml = await readFile(resolve(root, "examples/html-legacy-bundle/index.html"), "utf8");
+assert.ok(
+  legacyHtml.includes(`xrpl-wallet-kit.iife.min.js?v=${workspaceVersion}`),
+  "HTML legacy example must load the browser bundle with the current cache version"
+);
 
 const vitepressConfig = await readFile(resolve(root, "website/.vitepress/config.ts"), "utf8");
 assert.ok(vitepressConfig.includes(`text: "v${workspaceVersion}"`), "website nav version must match root");

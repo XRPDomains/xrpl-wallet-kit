@@ -41,7 +41,7 @@ export function unlockPageScroll(): void {
   savedScrollY = 0;
 }
 
-export function ensureWalletStyle(id: string, styles: string): void {
+export function ensureWalletStyle(id: string, styles: string, nonce?: string): void {
   if (typeof document === "undefined") return;
   const selector = `style[data-xwk-style="${id}"]`;
   let element = document.head.querySelector<HTMLStyleElement>(selector);
@@ -52,5 +52,7 @@ export function ensureWalletStyle(id: string, styles: string): void {
   } else if (element.nextSibling) {
     document.head.appendChild(element);
   }
+  if (nonce) element.setAttribute("nonce", nonce);
+  else element.removeAttribute("nonce");
   if (element.textContent !== styles) element.textContent = styles;
 }

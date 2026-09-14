@@ -36,6 +36,7 @@ The toast listens for `tx_submitted`, `tx_confirmed`, and `tx_failed` events on 
 interface WalletToastOptions {
   manager: WalletManager;
   mount?: HTMLElement;
+  nonce?: string; // CSP nonce applied to generated style tags
 
   position?: "bottom-right" | "bottom-left" | "bottom-center";
   autoDismissMs?: number; // default: 5000, set to 0 to disable

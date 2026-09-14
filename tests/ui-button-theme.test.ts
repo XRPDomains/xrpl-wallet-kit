@@ -206,6 +206,19 @@ test("WalletButton connecting state uses stable skeleton primitives", () => {
   assert.match(styles, /\.xwk-skeleton-button-label\{height:14px;width:92px\}/);
 });
 
+test("WalletButton fallback account avatar avoids inline styles for strict CSP", () => {
+  const button = createButton({}) as unknown as {
+    renderAccountAvatar(session: WalletSession): string;
+    renderStyles(): string;
+  };
+  const avatar = button.renderAccountAvatar(createSession());
+  const styles = button.renderStyles();
+
+  assert.doesNotMatch(avatar, /style="/);
+  assert.match(avatar, /xwk-account-art-tone-\d/);
+  assert.match(styles, /\.xwk-account-art-tone-0/);
+});
+
 test("WalletButton account avatar uses skeleton while identity resolves", () => {
   const session = createSession();
   const button = createButton({}, {

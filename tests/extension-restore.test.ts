@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { encode } from "xrpl";
 import { CrossmarkAdapter, type CrossmarkProvider } from "../packages/adapters/crossmark/src/index";
 import { DropFiAdapter, type DropFiProvider } from "../packages/adapters/dropfi/src/index";
 import { GemWalletAdapter, type GemWalletProvider } from "../packages/adapters/gemwallet/src/index";
 import { XamanAdapter, type XamanSdkLike } from "../packages/adapters/xaman/src/index";
-import { MemoryWalletStorage, WalletManager, WALLET_STORAGE_VERSION } from "../packages/core/src/index";
+import { MemoryWalletStorage, WalletKitErrorCode, WalletManager, WALLET_STORAGE_VERSION } from "../packages/core/src/index";
 import type { WalletAdapter, WalletSession } from "../packages/core/src/index";
 
 const network = {
@@ -54,6 +55,17 @@ test("Xaman restoreSession returns null when SDK state is not signed in", async 
   assert.equal(restored, null);
 });
 
+test("Xaman restoreSession returns null when SDK state is explicitly signed out", async () => {
+  const sdk = createXamanSdk({ account: "rRestoreAddress", signedIn: false });
+
+  const restored = await new XamanAdapter({ sdk }).restoreSession({
+    ...session,
+    adapterId: "xaman"
+  });
+
+  assert.equal(restored, null);
+});
+
 test("Xaman restoreSession requires the active SDK account to match the stored session", async () => {
   const sdk = createXamanSdk({ account: "rOtherAddress", signedIn: true });
 
@@ -74,7 +86,21 @@ test("Xaman restoreSession restores only when SDK state proves the stored accoun
   });
 
   assert.equal(restored?.account.address, "rRestoreAddress");
+  assert.equal(restored?.account.network, network);
+});
+
+test("Xaman restoreSession preserves stored network metadata during account refresh", async () => {
+  const sdk = createXamanSdk({ account: "rRestoreAddress", signedIn: true, networkType: "TESTNET" });
+
+  const restored = await new XamanAdapter({ sdk }).restoreSession({
+    ...session,
+    adapterId: "xaman",
+    account: { ...session.account, networkType: "MAINNET" }
+  });
+
+  assert.equal(restored?.account.address, "rRestoreAddress");
   assert.equal(restored?.account.networkType, "MAINNET");
+  assert.equal(restored?.account.network, network);
 });
 
 test("Xaman restoreSession waits for OAuth state to hydrate after reload", async () => {
@@ -101,10 +127,81 @@ test("Xaman restoreSession waits for OAuth state to hydrate after reload", async
     });
 
     assert.equal(restored?.account.address, "rRestoreAddress");
-    assert.equal(restored?.account.networkType, "MAINNET");
+    assert.equal(restored?.account.network, network);
+    assert.equal(restored?.account.networkType, undefined);
   } finally {
     clearTimeout(timer);
   }
+});
+
+test("Xaman sign-only transactions reject excessive LastLedgerSequence extension", async () => {
+  const signedHex = encode({
+    TransactionType: "Payment",
+    Account: "rrrrrrrrrrrrrrrrrrrrBZbvji",
+    Destination: "rrrrrrrrrrrrrrrrrrrrBZbvji",
+    Amount: "1",
+    Fee: "12",
+    Sequence: 1,
+    LastLedgerSequence: 200
+  });
+  const sdk = createXamanSdk({ account: "rRestoreAddress", signedIn: true });
+  sdk.payload.get = async () => ({
+    meta: { signed: true },
+    response: { hex: signedHex }
+  });
+
+  const adapter = new XamanAdapter({ sdk, maxLastLedgerSequenceExtension: 10 });
+
+  await assert.rejects(
+    adapter.signAndSubmit({
+      txJson: {
+        TransactionType: "Payment",
+        Account: "rrrrrrrrrrrrrrrrrrrrBZbvji",
+        Destination: "rrrrrrrrrrrrrrrrrrrrBZbvji",
+        Amount: "1",
+        Fee: "12",
+        Sequence: 1,
+        LastLedgerSequence: 100
+      },
+      submit: false
+    }),
+    {
+      name: "WalletKitError",
+      code: WalletKitErrorCode.SIGN_FAILED
+    }
+  );
+});
+
+test("Xaman sign-only transactions allow bounded LastLedgerSequence extension", async () => {
+  const signedHex = encode({
+    TransactionType: "Payment",
+    Account: "rrrrrrrrrrrrrrrrrrrrBZbvji",
+    Destination: "rrrrrrrrrrrrrrrrrrrrBZbvji",
+    Amount: "1",
+    Fee: "12",
+    Sequence: 1,
+    LastLedgerSequence: 108
+  });
+  const sdk = createXamanSdk({ account: "rRestoreAddress", signedIn: true });
+  sdk.payload.get = async () => ({
+    meta: { signed: true },
+    response: { hex: signedHex }
+  });
+
+  const result = await new XamanAdapter({ sdk, maxLastLedgerSequenceExtension: 10 }).signAndSubmit({
+    txJson: {
+      TransactionType: "Payment",
+      Account: "rrrrrrrrrrrrrrrrrrrrBZbvji",
+      Destination: "rrrrrrrrrrrrrrrrrrrrBZbvji",
+      Amount: "1",
+      Fee: "12",
+      Sequence: 1,
+      LastLedgerSequence: 100
+    },
+    submit: false
+  });
+
+  assert.equal(result.signed, true);
 });
 
 test("DropFi restoreSession accepts passive address state even when isConnected is false after reload", async () => {

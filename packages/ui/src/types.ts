@@ -59,6 +59,7 @@ export interface WalletUiGroup {
 export interface WalletUiOptions {
   manager: WalletManager;
   mount?: HTMLElement;
+  nonce?: string;
   layout?: WalletUiLayout;
   size?: WalletUiSize;
   textSize?: WalletUiTextSize;
@@ -78,6 +79,7 @@ export interface WalletUiOptions {
 }
 
 export interface WalletToastConfig {
+  nonce?: string;
   autoDismissMs?: number;
   maxVisible?: number;
   position?: WalletToastPosition;
@@ -149,6 +151,7 @@ export interface WalletButtonOptions {
   manager: WalletManager;
   modal: WalletModalController;
   target?: WalletButtonTarget;
+  nonce?: string;
   label?: string;
   icon?: WalletButtonIconConfig;
   showAdapterIcon?: boolean;
@@ -251,6 +254,7 @@ export interface WalletIdentityUiConfig {
 }
 
 export interface WalletUiConfig {
+  nonce?: string;
   mode?: WalletUiThemeMode;
   themeMode?: WalletUiThemeMode;
   themeName?: WalletUiThemeName;

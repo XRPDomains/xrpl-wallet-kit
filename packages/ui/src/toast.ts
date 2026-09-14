@@ -151,7 +151,7 @@ export class WalletToast {
 
   private ensureStyles(): void {
     const styles = this.renderStyles();
-    ensureWalletStyle("xwk-toast", styles);
+    ensureWalletStyle("xwk-toast", styles, this.options.nonce);
   }
 
   private getExplorerUrl(hash: string, network?: WalletNetwork): string | undefined {

@@ -44,7 +44,9 @@ When using `@xrpl-wallet-kit/client` defaults, Xaman is already included when co
 - Connection and signing may produce QR/deeplink flows. The adapter reports those through the manager/UI event path.
 - Pending mobile-return recovery markers use `WalletStorage` through the adapter's `recoveryStorage` option.
 - `restoreSession()` waits briefly for the Xaman OAuth/PKCE SDK to rehydrate remembered JWT state after page reload, then restores only when the active Xaman account matches the stored session.
+- `restoreSession()` verifies account ownership only. It preserves the stored manager network context instead of treating Xaman refresh metadata as proof that the mobile app switched networks.
 - `restoreSession()` and `recoverSession()` are best-effort and return `null` for normal stale or unavailable sessions.
+- Sign-only transaction requests (`submit: false`) allow Xaman to extend `LastLedgerSequence` by at most `maxLastLedgerSequenceExtension` ledgers. The default is `50`; set `0` to require exact preservation.
 
 ## Testing
 

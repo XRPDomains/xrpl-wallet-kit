@@ -180,6 +180,16 @@ For app-wide UI settings, prefer the top-level `ui` option. It is shared by the 
 
 ```ts
 createWalletKit({
+  // adapters, network, etc.
+  ui: {
+    nonce: window.__CSP_NONCE__, // optional CSP style nonce
+    mode: "dark",
+  },
+});
+```
+
+```ts
+createWalletKit({
   wallets: "all",
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
   connectButton: "#connect-btn",

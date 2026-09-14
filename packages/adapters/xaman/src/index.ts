@@ -6,6 +6,7 @@ export const XAMAN_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAAC
 
 const XAMAN_PENDING_RECOVERY_TTL_MS = 180000;
 const XAMAN_RESTORE_READY_TIMEOUT_MS = 2500;
+const DEFAULT_MAX_LAST_LEDGER_SEQUENCE_EXTENSION = 50;
 
 export interface XamanPkceAuth {
   authorize(): Promise<XamanAuthResult | undefined | Error>;
@@ -68,6 +69,7 @@ export interface XamanAdapterOptions {
   deeplink?: (uri: string) => string;
   onQr?: (event: { adapterId: string; uri: string; deeplink?: string; qrPng?: string }) => void;
   recoveryStorage?: WalletStorage;
+  maxLastLedgerSequenceExtension?: number;
 }
 
 export class XamanAdapter extends BaseWalletAdapter {
@@ -185,10 +187,15 @@ export class XamanAdapter extends BaseWalletAdapter {
   }
 
   async signAndSubmit(request: SignAndSubmitRequest) {
+    this.validateSignOnlyExpiryInput(request);
     const result = await this.createAndResolvePayload({
       txjson: request.txJson,
       options: { submit: request.submit ?? true }
     });
+
+    if (request.submit === false) {
+      await this.validateSignOnlyExpiryResult(request, result);
+    }
 
     return normalizeTxResult({
       hash: result?.response?.txid ?? undefined,
@@ -201,6 +208,7 @@ export class XamanAdapter extends BaseWalletAdapter {
   async checkXamanState(options: ConnectOptions = {}) {
     if (!this.sdk) return null;
     await this.waitForSdkReady(this.sdk);
+    if (this.sdk.state?.signedIn === false) return null;
     const openid = await this.resolveSdkValue(this.sdk.environment?.openid);
     const accountAddress = await this.resolveSdkValue(this.sdk.user?.account)
       ?? this.sdk.state?.account
@@ -210,8 +218,7 @@ export class XamanAdapter extends BaseWalletAdapter {
     return {
       account: {
         address: accountAddress,
-        network: options.network,
-        networkType: await this.resolveSdkValue(this.sdk.user?.networkType) ?? openid?.networkType
+        network: options.network
       },
       raw: {
         state: this.sdk.state,
@@ -279,6 +286,48 @@ export class XamanAdapter extends BaseWalletAdapter {
       throw new Error("Xaman request was rejected or expired");
     }
     return result;
+  }
+
+  private validateSignOnlyExpiryInput(request: SignAndSubmitRequest): void {
+    if (request.submit !== false) return;
+    const supplied = this.getLastLedgerSequence(request.txJson);
+    if (supplied === undefined) return;
+    if (!Number.isSafeInteger(supplied) || supplied <= 0) {
+      throw createWalletError.signFailed(new Error("Xaman sign-only LastLedgerSequence must be a positive integer."));
+    }
+  }
+
+  private async validateSignOnlyExpiryResult(request: SignAndSubmitRequest, result: XamanPayloadResult | null): Promise<void> {
+    const supplied = this.getLastLedgerSequence(request.txJson);
+    const signedHex = result?.response?.hex ?? undefined;
+    if (supplied === undefined || !signedHex) return;
+
+    const signed = await this.decodeSignedTransaction(signedHex);
+    const returned = this.getLastLedgerSequence(signed);
+    if (returned === undefined) return;
+
+    const maxExtension = this.options.maxLastLedgerSequenceExtension ?? DEFAULT_MAX_LAST_LEDGER_SEQUENCE_EXTENSION;
+    if (returned > supplied + maxExtension) {
+      throw createWalletError.signFailed(new Error(
+        `Xaman extended LastLedgerSequence from ${supplied} to ${returned}, above the allowed ${maxExtension} ledger extension.`
+      ));
+    }
+  }
+
+  private getLastLedgerSequence(txJson: unknown): number | undefined {
+    if (!txJson || typeof txJson !== "object") return undefined;
+    const value = (txJson as { LastLedgerSequence?: unknown }).LastLedgerSequence;
+    if (value === undefined || value === null) return undefined;
+    return typeof value === "number" ? value : Number(value);
+  }
+
+  private async decodeSignedTransaction(txBlob: string): Promise<Record<string, unknown>> {
+    try {
+      const { decode } = await import("xrpl");
+      return decode(txBlob) as Record<string, unknown>;
+    } catch (error) {
+      throw createWalletError.signFailed(error);
+    }
   }
 
   private resolvePayloadEvent(event: unknown): XamanPayloadEvent {
