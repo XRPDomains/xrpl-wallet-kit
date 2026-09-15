@@ -26,6 +26,9 @@ interface WalletUiOptions {
   /** DOM element to render the overlay into (default: document.body) */
   mount?: HTMLElement;
 
+  /** CSP nonce applied to generated style tags */
+  nonce?: string;
+
   /** Light/dark/auto theme mode (default: "light") */
   themeMode?: "light" | "dark" | "auto";
 
@@ -104,6 +107,21 @@ Open the modal (shows the wallet list).
 modal.open();
 ```
 
+### openAndWait()
+
+Open the modal and resolve after a wallet connects.
+
+```ts
+try {
+  const session = await modal.openAndWait();
+  console.log("Connected", session.account.address);
+} catch (error) {
+  console.error("Wallet connection did not complete", error);
+}
+```
+
+If a session already exists, `openAndWait()` resolves immediately. If the user closes the picker before connecting, it rejects with a typed connection error.
+
 ### close()
 
 Close the modal without disconnecting.
@@ -148,6 +166,8 @@ modal.updateOptions({
 
 ```ts
 interface WalletUiConfig {
+  /** CSP nonce applied to generated style tags */
+  nonce?: string;
   /** Light/dark/auto mode */
   mode?: "light" | "dark" | "auto";
   /** Built-in theme preset name */

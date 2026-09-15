@@ -3,9 +3,13 @@ import test from "node:test";
 import { ensureWalletStyle } from "../packages/ui/src/dom";
 
 type FakeStyleElement = {
+  attributes: Record<string, string>;
   dataset: Record<string, string>;
   textContent: string;
   nextSibling: FakeStyleElement | null;
+  getAttribute(name: string): string | null;
+  removeAttribute(name: string): void;
+  setAttribute(name: string, value: string): void;
 };
 
 function installFakeDocument() {
@@ -29,7 +33,22 @@ function installFakeDocument() {
   const document = {
     head,
     createElement() {
-      return { dataset: {}, textContent: "", nextSibling: null } satisfies FakeStyleElement;
+      const element: FakeStyleElement = {
+        attributes: {},
+        dataset: {},
+        textContent: "",
+        nextSibling: null,
+        getAttribute(name: string) {
+          return this.attributes[name] ?? null;
+        },
+        removeAttribute(name: string) {
+          delete this.attributes[name];
+        },
+        setAttribute(name: string, value: string) {
+          this.attributes[name] = value;
+        }
+      };
+      return element;
     }
   };
   const previousDocument = globalThis.document;
@@ -59,6 +78,26 @@ test("ensureWalletStyle reuses stable style nodes and updates their content", ()
     ]);
     assert.equal(dom.children.length, 2);
     assert.equal(dom.children[1]?.textContent, ".xwk-account-button{color:white}");
+  } finally {
+    dom.restore();
+  }
+});
+
+test("ensureWalletStyle applies and clears CSP nonce on reused style nodes", () => {
+  const dom = installFakeDocument();
+  try {
+    ensureWalletStyle("xwk-modal", ".xwk-modal{color:black}", "nonce-123");
+
+    assert.equal(dom.children[0]?.getAttribute("nonce"), "nonce-123");
+
+    ensureWalletStyle("xwk-modal", ".xwk-modal{color:white}", "nonce-456");
+
+    assert.equal(dom.children[0]?.getAttribute("nonce"), "nonce-456");
+    assert.equal(dom.children[0]?.textContent, ".xwk-modal{color:white}");
+
+    ensureWalletStyle("xwk-modal", ".xwk-modal{color:white}");
+
+    assert.equal(dom.children[0]?.getAttribute("nonce"), null);
   } finally {
     dom.restore();
   }

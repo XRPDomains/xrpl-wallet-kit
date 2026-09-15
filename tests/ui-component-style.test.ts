@@ -74,6 +74,26 @@ test("WalletModal buttons defend against host button CSS", () => {
   assert.match(styles, /\.xwk-action\{[^}]*width:100%/);
 });
 
+test("WalletModal network badge avoids inline styles for strict CSP", () => {
+  const modal = new WalletModal({
+    manager: {
+      ...manager,
+      getNetwork: () => ({ id: "testnet", name: "XRPL Testnet", networkType: "TESTNET" })
+    } as never,
+    themeMode: "light"
+  }) as unknown as {
+    renderNetworkBadge(): string;
+    renderStyles(theme: typeof lightTheme, layout: "list", size: "default", textSize: "sm"): string;
+  };
+
+  const badge = modal.renderNetworkBadge();
+  const styles = modal.renderStyles(lightTheme, "list", "default", "sm");
+
+  assert.doesNotMatch(badge, /style="/);
+  assert.match(badge, /xwk-network-badge-testnet/);
+  assert.match(styles, /\.xwk-network-badge-testnet/);
+});
+
 test("WalletModal uses subtle motion without animating modal dimensions", () => {
   const modal = new WalletModal({
     manager: manager as never,

@@ -31,6 +31,7 @@ const adapter = createXamanAdapter({
 | `deeplink` | `(uri: string) => string` | Generate a wallet deep link URL from the Xaman payload URI |
 | `onQr` | `(event) => void` | Callback with `{ adapterId, uri, deeplink?, qrPng? }` each time a payload is created — use to render QR in your own UI |
 | `recoveryStorage` | `WalletStorage` | Custom storage for the pending-recovery marker (default: localStorage) |
+| `maxLastLedgerSequenceExtension` | `number` | Maximum ledgers Xaman may extend a supplied `LastLedgerSequence` in sign-only requests. Default: `50`; use `0` for exact preservation |
 
 ## Connection Flow
 
@@ -88,13 +89,13 @@ const result = await manager.signAndSubmit({
 
 NFT offers, TrustSet, and other transaction types follow the same pattern — pass any valid XRPL `txJson`. Xaman handles submission after user approval.
 
-::: tip No signTransaction
-Xaman does not support sign-only (without submit). `signAndSubmit` is the only signing method. Use the `options: { submit: false }` flag in the payload options if you need the adapter to request sign-only internally — but note the result will not include a txBlob.
+::: tip Sign-only requests
+Xaman does not expose a separate `signTransaction` method, but `manager.signTransaction()` can route through `signAndSubmit({ submit: false })`. When your `txJson` includes `LastLedgerSequence`, the adapter rejects signed responses that widen that value beyond `maxLastLedgerSequenceExtension`.
 :::
 
 ## Session Restore / Mobile Return Recovery
 
-**Session restore** (`restoreSession`): on page reload, the adapter checks `sdk.state.signedIn` and retrieves the current account address. If the Xaman SDK still reports a valid session, no re-approval is needed.
+**Session restore** (`restoreSession`): on page reload, the adapter checks `sdk.state.signedIn` and retrieves the current account address. If the Xaman SDK still reports a valid session, no re-approval is needed. Restore verifies account ownership only; it preserves the manager's stored network context and does not treat Xaman refresh metadata as proof that the mobile app changed networks.
 
 **Mobile return recovery** (`recoverSession`): when a user taps the deep link and returns to the dApp, the adapter checks for a pending-recovery marker in storage. If found (within 3 minutes), it re-runs the OAuth authorize flow to complete the connection without a fresh QR.
 

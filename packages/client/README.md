@@ -33,6 +33,7 @@ const kit = createWalletKit({
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
   connectButton: "#connect-wallet",
   ui: {
+    nonce: window.__CSP_NONCE__, // optional, for strict Content Security Policy
     themeMode: "light",
     walletConnect: { mode: "default" },
     accountPanel: {

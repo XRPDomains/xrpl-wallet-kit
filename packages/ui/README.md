@@ -111,3 +111,13 @@ const modal = new WalletModal({
 Built-in presets: `default`, `light`, `dark`, `xrpl`, `minimal`, `midnight`, `glass`, `rounded`, `crisp`, and `soft`.
 
 Important tokens include `accent`, `accentText`, `success`, `error`, `surface`, `surfaceHover`, `border`, `overlay`, `overlayBlur`, `spinnerTrail`, `headerBackground`, `radius`, `walletRadius`, and `fontFamily`.
+
+## Strict CSP
+
+Pass a per-response `nonce` when your app uses a strict `style-src` policy. The UI applies it to generated style tags for modal, inline, button, account panel, and toast surfaces.
+
+```ts
+const modal = new WalletModal({ manager, nonce });
+const button = new WalletButton({ manager, modal, target: "#connect-wallet", nonce });
+const toast = new WalletToast({ manager, nonce });
+```

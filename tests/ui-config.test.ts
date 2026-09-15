@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveWalletButtonOptions } from "../packages/ui/src/config";
+import { resolveWalletButtonOptions, resolveWalletUiOptions } from "../packages/ui/src/config";
 
 test("resolveWalletButtonOptions defaults account panel mode to modal", () => {
   const options = resolveWalletButtonOptions();
@@ -111,4 +111,16 @@ test("resolveWalletButtonOptions lets direct button theme override shared theme"
 
   assert.equal(options.themeMode, "light");
   assert.equal(options.theme?.accent, "#abcdef");
+});
+
+test("wallet UI config forwards CSP nonce to modal and button surfaces", () => {
+  const modalOptions = resolveWalletUiOptions({
+    nonce: "nonce-123"
+  });
+  const buttonOptions = resolveWalletButtonOptions({
+    nonce: "nonce-123"
+  });
+
+  assert.equal(modalOptions.nonce, "nonce-123");
+  assert.equal(buttonOptions.nonce, "nonce-123");
 });

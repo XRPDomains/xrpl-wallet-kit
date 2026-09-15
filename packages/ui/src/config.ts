@@ -21,6 +21,7 @@ export function resolveWalletUiOptions(overrides: (WalletUiConfig & Partial<Omit
   const wallets = walletList?.wallets === "all" ? undefined : walletList?.wallets;
 
   return {
+    nonce: overrides.nonce,
     layout: walletList?.layout ?? overrides.layout ?? "list",
     walletConnectUiMode,
     themeMode: mode ?? overrides.themeMode ?? "light",
@@ -61,6 +62,7 @@ export function resolveWalletButtonOptions(ui: WalletUiConfig = {}, overrides: W
 
   return createDefaultWalletButtonConfig(compactWalletButtonConfig({
     language: ui.language,
+    nonce: ui.nonce,
     messages: resolveWalletUiMessages(ui.language, ui.messages),
     label: connectButton.label,
     icon: connectButton.icon,
