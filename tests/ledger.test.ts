@@ -11,7 +11,42 @@ const network = {
   walletConnectChainId: "xrpl:0"
 } as const;
 
-test("Ledger rejects multisign transaction shapes before delegating signing", async () => {
+test("Ledger returns a signer contribution for multisign sign-only requests", async () => {
+  let multisignCalls = 0;
+  const adapter = new LedgerAdapter({
+    connectLedger: async () => ({
+      address: "rLedgerAddress",
+      publicKey: "ED".padEnd(66, "0"),
+      signTransaction: async () => {
+        return { txBlob: "SIGNED" };
+      },
+      signMultisignTransaction: async () => {
+        multisignCalls += 1;
+        return {
+          txBlob: "MULTISIGNED",
+          signed: true,
+          raw: { signer: { Signer: { Account: "rLedgerAddress", SigningPubKey: "ED00", TxnSignature: "AA" } } }
+        };
+      }
+    })
+  });
+
+  await adapter.connect({ network });
+
+  const result = await adapter.signTransaction({
+    txJson: {
+      TransactionType: "Payment",
+      Account: "rSourceAccount",
+      SigningPubKey: ""
+    }
+  });
+
+  assert.equal(result.txBlob, "MULTISIGNED");
+  assert.equal(result.signed, true);
+  assert.equal(multisignCalls, 1);
+});
+
+test("Ledger rejects multisign submission before delegating signing", async () => {
   let signCalls = 0;
   const adapter = new LedgerAdapter({
     connectLedger: async () => ({
@@ -23,18 +58,10 @@ test("Ledger rejects multisign transaction shapes before delegating signing", as
       }
     })
   });
-
   await adapter.connect({ network });
 
   await assert.rejects(
-    () => adapter.signTransaction({
-      txJson: {
-        TransactionType: "Payment",
-        Account: "rLedgerAddress",
-        SigningPubKey: "",
-        Signers: []
-      }
-    }),
+    () => adapter.signAndSubmit({ txJson: { TransactionType: "Payment", SigningPubKey: "" } }),
     (error) => {
       assert.equal((error as { code?: string }).code, WalletKitErrorCode.UNSUPPORTED_METHOD);
       return true;

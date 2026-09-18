@@ -422,7 +422,7 @@ export const PRESET_THEMES: Record<string, ResolvedTheme> = {
 export type WalletUiThemeName =
   | "default" | "dark"
   | "midnight" | "glass" | "rounded" | "crisp" | "soft"
-  | (string & {});
+  | (string & Record<never, never>);
 ```
 
 ```typescript
@@ -492,7 +492,7 @@ Render trong phần `.xwk-footer` của modal list view — chỉ hiển thị k
 
 ### 3.3 API tách `theme` và `customTheme`
 
-ConnectKit dùng `theme="midnight"` cho preset và `customTheme={{...}}` riêng cho overrides. Cách này rõ hơn — người dùng biết mình đang override preset chứ không phải tạo theme từ đầu.
+ConnectKit dùng `theme="midnight"` cho preset và `customTheme={...}` riêng cho overrides. Cách này rõ hơn — người dùng biết mình đang override preset chứ không phải tạo theme từ đầu.
 
 Hiện tại kit dùng `theme?: WalletUiTheme` cho cả hai việc. Không cần breaking change — chỉ thêm alias:
 

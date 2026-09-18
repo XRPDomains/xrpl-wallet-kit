@@ -272,9 +272,20 @@
         <!-- Preview column -->
         <div class="tb-preview-col">
           <div class="tb-preview-bar">
-            <div class="tb-view-toggle">
-              <button class="tb-view-btn" :class="{ active: previewDevice === 'desktop' }" @click="previewDevice = 'desktop'">🖥 Desktop</button>
-              <button class="tb-view-btn" :class="{ active: previewDevice === 'mobile' }" @click="previewDevice = 'mobile'">📱 Mobile</button>
+            <div class="tb-state-toggle" aria-label="Preview wallet state">
+              <button
+                v-for="state in previewStates"
+                :key="state.value"
+                class="tb-view-btn tb-state-btn"
+                :class="{ active: previewState === state.value }"
+                @click="previewState = state.value"
+              >
+                {{ state.label }}
+              </button>
+            </div>
+            <div class="tb-view-toggle" aria-label="Preview device">
+              <button class="tb-view-btn" :class="{ active: previewDevice === 'desktop' }" @click="previewDevice = 'desktop'">Desktop</button>
+              <button class="tb-view-btn" :class="{ active: previewDevice === 'mobile' }" @click="previewDevice = 'mobile'">Mobile</button>
             </div>
           </div>
           <div class="tb-preview-outer" :class="previewDevice === 'mobile' ? 'tb-mobile' : 'tb-desktop'">
@@ -315,6 +326,29 @@
                 <div ref="mountRef" class="tb-mount"></div>
               </div>
             </template>
+          </div>
+          <div class="tb-state-samples" :style="previewThemeVars" aria-label="Theme state samples">
+            <div class="tb-state-sample">
+              <span class="tb-state-dot tb-state-dot-accent"></span>
+              <div>
+                <strong>Signing</strong>
+                <span>Waiting for wallet approval</span>
+              </div>
+            </div>
+            <div class="tb-state-sample">
+              <span class="tb-state-dot tb-state-dot-success"></span>
+              <div>
+                <strong>Confirmed</strong>
+                <span>Transaction accepted</span>
+              </div>
+            </div>
+            <div class="tb-state-sample tb-state-sample-error">
+              <span class="tb-state-dot tb-state-dot-error"></span>
+              <div>
+                <strong>Error</strong>
+                <span>Wallet request failed</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -382,6 +416,8 @@ function goBack() {
 }
 
 const previewDevice = ref<'desktop' | 'mobile'>('desktop')
+type PreviewState = 'wallets' | 'connecting' | 'error'
+const previewState = ref<PreviewState>('wallets')
 const activePreset  = ref<string>('default')
 const copied        = ref(false)
 const kitLoaded     = ref(false)
@@ -392,6 +428,7 @@ let buttonInstance: any = null
 let kitBundle:      any = null
 const KIT_BUNDLE_VERSION = '0.1.14'
 let inlineObserver: MutationObserver | null = null
+let previewSession: any = null
 
 // ── Options ───────────────────────────────────────────────────
 const layouts = [
@@ -420,6 +457,11 @@ const btnSizes = [
   { value: 'sm', label: 'SM' },
   { value: 'md', label: 'MD' },
   { value: 'lg', label: 'LG' },
+]
+const previewStates: Array<{ value: PreviewState; label: string }> = [
+  { value: 'wallets',     label: 'Wallets' },
+  { value: 'connecting',  label: 'Connecting' },
+  { value: 'error',       label: 'Error' },
 ]
 const swatches = [
   { value: '#0078ae', label: 'XRPL Blue' },
@@ -490,6 +532,173 @@ const presets = [
   { id: 'crisp',    label: 'Crisp',    config: { layout: 'list', mode: 'light', themeName: 'crisp',   size: 'default', btnVariant: 'outline', btnSize: 'md', accent: '#111827', radius: '4px',  walletRadius: '4px',  ...BLANK } },
   { id: 'soft',     label: 'Soft',     config: { layout: 'grid', mode: 'light', themeName: 'soft',    size: 'default', btnVariant: 'default', btnSize: 'md', accent: '#7c3aed', radius: '16px', walletRadius: '12px', ...BLANK } },
 ]
+
+const PRESET_THEME_TOKENS: Record<string, Record<string, string | number>> = {
+  default: {
+    accent: '#0078ae',
+    accentText: '#ffffff',
+    background: '#fbfcff',
+    foreground: '#111827',
+    muted: '#64748b',
+    border: 'rgba(17,24,39,.08)',
+    surface: '#f3f7fb',
+    surfaceHover: '#edf3f8',
+    success: '#059669',
+    error: '#b45309',
+  },
+  light: {
+    accent: '#0078ae',
+    accentText: '#ffffff',
+    background: '#fbfcff',
+    foreground: '#111827',
+    muted: '#64748b',
+    border: 'rgba(17,24,39,.08)',
+    surface: '#f3f7fb',
+    surfaceHover: '#edf3f8',
+    success: '#059669',
+    error: '#b45309',
+  },
+  dark: {
+    accent: '#4aa3ff',
+    accentText: '#ffffff',
+    background: '#111827',
+    foreground: '#f8fafc',
+    muted: '#94a3b8',
+    border: 'rgba(248,250,252,.10)',
+    surface: '#1f2937',
+    surfaceHover: '#263244',
+    success: '#34d399',
+    error: '#fbbf24',
+  },
+  xrpl: {
+    accent: '#0078ae',
+    accentText: '#ffffff',
+    background: '#fbfcff',
+    foreground: '#111827',
+    muted: '#64748b',
+    border: 'rgba(17,24,39,.08)',
+    surface: '#f3f7fb',
+    surfaceHover: '#edf3f8',
+    success: '#059669',
+    error: '#b45309',
+  },
+  minimal: {
+    accent: '#0078ae',
+    accentText: '#ffffff',
+    background: '#fbfcff',
+    foreground: '#111827',
+    muted: '#64748b',
+    border: '#d7dee8',
+    surface: '#fbfcff',
+    surfaceHover: '#edf3f8',
+    success: '#059669',
+    error: '#b45309',
+  },
+  midnight: {
+    accent: '#3b82f6',
+    accentText: '#ffffff',
+    background: '#0f1629',
+    foreground: '#e2e8f0',
+    muted: '#64748b',
+    border: '#1e2d4a',
+    surface: '#1a2540',
+    surfaceHover: '#1e2d4a',
+    success: '#34d399',
+    error: '#f87171',
+  },
+  glass: {
+    accent: '#6366f1',
+    accentText: '#ffffff',
+    background: 'rgba(255,255,255,.72)',
+    foreground: '#1e293b',
+    muted: '#64748b',
+    border: 'rgba(255,255,255,.50)',
+    surface: 'rgba(255,255,255,.52)',
+    surfaceHover: 'rgba(255,255,255,.66)',
+    success: '#10b981',
+    error: '#ef4444',
+  },
+  rounded: {
+    accent: '#7c3aed',
+    accentText: '#ffffff',
+    background: '#fbfcff',
+    foreground: '#111827',
+    muted: '#64748b',
+    border: '#f3e8ff',
+    surface: '#faf5ff',
+    surfaceHover: '#f5f0ff',
+    success: '#059669',
+    error: '#b45309',
+  },
+  crisp: {
+    accent: '#111827',
+    accentText: '#ffffff',
+    background: '#fbfcff',
+    foreground: '#111827',
+    muted: '#64748b',
+    border: '#111827',
+    surface: '#f9fafb',
+    surfaceHover: '#f3f4f6',
+    success: '#16a34a',
+    error: '#b45309',
+  },
+  soft: {
+    accent: '#7c3aed',
+    accentText: '#ffffff',
+    background: '#faf5ff',
+    foreground: '#111827',
+    muted: '#64748b',
+    border: '#e9d5ff',
+    surface: '#f3e8ff',
+    surfaceHover: '#ede9fe',
+    success: '#059669',
+    error: '#b45309',
+  },
+}
+
+function resolvePreviewMode() {
+  if (config.mode !== 'auto') return config.mode
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+const resolvedPreviewTheme = computed(() => {
+  const mode = resolvePreviewMode()
+  const preset = PRESET_THEME_TOKENS[config.themeName] ?? PRESET_THEME_TOKENS[mode] ?? PRESET_THEME_TOKENS.default
+  return {
+    ...preset,
+    accent:       config.accent || preset.accent,
+    accentText:   config.accentText || preset.accentText,
+    background:   config.background || preset.background,
+    foreground:   config.foreground || preset.foreground,
+    muted:        config.muted || preset.muted,
+    border:       config.border || preset.border,
+    surface:      config.surface || preset.surface,
+    surfaceHover: config.surfaceHover || preset.surfaceHover,
+    success:      config.success || preset.success,
+    error:        config.error || preset.error,
+    radius:       config.radius,
+    walletRadius: config.walletRadius,
+    fontFamily:   config.fontFamily || 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  }
+})
+
+const previewThemeVars = computed(() => {
+  const theme = resolvedPreviewTheme.value
+  return {
+    '--tb-kit-accent': theme.accent,
+    '--tb-kit-accent-text': theme.accentText,
+    '--tb-kit-bg': theme.background,
+    '--tb-kit-text': theme.foreground,
+    '--tb-kit-muted': theme.muted,
+    '--tb-kit-border': theme.border,
+    '--tb-kit-surface': theme.surface,
+    '--tb-kit-surface-hover': theme.surfaceHover,
+    '--tb-kit-success': theme.success,
+    '--tb-kit-error': theme.error,
+    '--tb-kit-radius': theme.walletRadius,
+    '--tb-kit-font': theme.fontFamily,
+  } as Record<string, string | number>
+})
 
 function applyPreset(p: (typeof presets)[0]) {
   activePreset.value = p.id
@@ -629,6 +838,8 @@ function renderPreview() {
   const { WalletModal, WalletButtonController } = kitBundle
   const manager = buildMockManager()
   if (!manager) return
+  hydratePreviewSession(manager)
+  trackPreviewSession(manager)
   const sdkThemeName = getSdkThemeName()
 
   const btnWrap = document.createElement('div')
@@ -679,12 +890,66 @@ function renderPreview() {
   })
   buttonInstance.mount(btnWrap)
 
-  // Auto-open modal (theme builder always shows full modal UI)
+  // Auto-open the modal for unconnected previews; preserve connected sessions
+  // across theme/layout changes so controls can be tuned in the real account state.
   requestAnimationFrame(() => {
-    try { modalInstance?.open() } catch {}
+    try {
+      if (manager.getSession?.()) return
+      modalInstance?.open()
+      requestAnimationFrame(() => replayModalState(manager))
+    } catch {}
   })
 }
 
+function hydratePreviewSession(manager: any) {
+  if (!previewSession || !manager) return
+  try {
+    const adapterId = previewSession.adapterId
+    const adapter = manager.getAdapter?.(adapterId)
+    const network = manager.getNetwork?.(previewSession.account?.network)
+    const session = {
+      ...previewSession,
+      wallet: adapter?.metadata ?? previewSession.wallet,
+      account: {
+        ...previewSession.account,
+        network: network ?? previewSession.account?.network,
+      },
+    }
+    manager.activeSession = session
+    manager.activeAdapterId = adapterId
+  } catch {}
+}
+
+function trackPreviewSession(manager: any) {
+  try {
+    manager.on?.('connected', ({ session }: { session?: any }) => {
+      if (session) previewSession = session
+    })
+    manager.on?.('session_restored', ({ session }: { session?: any }) => {
+      if (session) previewSession = session
+    })
+    manager.on?.('disconnected', () => { previewSession = null })
+    manager.on?.('session_expired', () => { previewSession = null })
+  } catch {}
+}
+
+function replayModalState(manager: any) {
+  if (!modalInstance || !manager) return
+  const adapterId = 'gemwallet'
+  try {
+    if (previewState.value === 'connecting') {
+      manager.emit?.('connecting', { adapterId, recovering: false })
+    } else if (previewState.value === 'error') {
+      manager.emit?.('connecting', { adapterId, recovering: false })
+      requestAnimationFrame(() => {
+        manager.emit?.('error', {
+          adapterId,
+          error: { message: 'Wallet request failed. Please check the wallet and try again.' },
+        })
+      })
+    }
+  } catch {}
+}
 
 // ── Inline containment (persistent: catches every internal SDK mount() call) ──
 
@@ -873,7 +1138,7 @@ function setupInlineObserver(container: HTMLElement, isMobile: boolean): Mutatio
 }
 
 watch(config, () => { if (kitLoaded.value) renderPreview() }, { deep: true })
-watch(() => config.mode, () => { if (kitLoaded.value) renderPreview() })
+watch(previewState, () => { if (kitLoaded.value) renderPreview() })
 watch(previewDevice, async () => {
   if (kitLoaded.value) {
     await nextTick()   // wait for phone/plain frame DOM swap
@@ -1176,11 +1441,23 @@ onUnmounted(() => {
 /* ── Preview column ──────────────────────────────────────────── */
 .tb-preview-col { display: flex; flex-direction: column; gap: 16px; }
 
-.tb-preview-bar { display: flex; justify-content: flex-end; }
+.tb-preview-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
 
-.tb-view-toggle { display: flex; gap: 6px; }
+.tb-view-toggle,
+.tb-state-toggle {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 
 .tb-view-btn {
+  min-height: 32px;
   padding: 5px 14px;
   border-radius: 8px;
   border: 1px solid var(--vp-c-border);
@@ -1195,6 +1472,10 @@ onUnmounted(() => {
   border-color: var(--vp-c-brand-1);
   color: var(--vp-c-brand-1);
   background: var(--vp-c-brand-soft);
+}
+
+.tb-state-btn {
+  min-width: 78px;
 }
 
 .tb-preview-outer { display: flex; justify-content: center; }
@@ -1215,6 +1496,113 @@ onUnmounted(() => {
 .tb-light-bg { background: #f8fafc; }
 
 .tb-mount { position: relative; min-height: 540px; }
+
+.tb-state-samples {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  font-family: var(--tb-kit-font);
+}
+
+.tb-state-sample {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid var(--tb-kit-border);
+  border-radius: var(--tb-kit-radius);
+  background: var(--tb-kit-surface);
+  color: var(--tb-kit-text);
+  transition: background-color .16s ease, border-color .16s ease;
+}
+
+.tb-state-sample:hover {
+  background: var(--tb-kit-surface-hover);
+}
+
+.tb-state-sample strong,
+.tb-state-sample span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tb-state-sample strong {
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.tb-state-sample span {
+  color: var(--tb-kit-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.tb-state-sample-error {
+  border-color: color-mix(in srgb, var(--tb-kit-error) 28%, var(--tb-kit-border));
+}
+
+.tb-state-dot {
+  align-items: center;
+  border-radius: 999px;
+  box-sizing: border-box;
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  position: relative;
+  width: 28px;
+}
+
+.tb-state-dot::before {
+  border-radius: inherit;
+  content: "";
+  height: 10px;
+  width: 10px;
+}
+
+.tb-state-dot-accent {
+  background: color-mix(in srgb, var(--tb-kit-accent) 14%, var(--tb-kit-bg));
+}
+
+.tb-state-dot-accent::before {
+  background: var(--tb-kit-accent);
+}
+
+.tb-state-dot-accent::after {
+  animation: tb-state-pulse 1.4s ease-out infinite;
+  border: 1px solid var(--tb-kit-accent);
+  border-radius: inherit;
+  content: "";
+  inset: 6px;
+  opacity: .42;
+  position: absolute;
+}
+
+.tb-state-dot-success {
+  background: color-mix(in srgb, var(--tb-kit-success) 14%, var(--tb-kit-bg));
+}
+
+.tb-state-dot-success::before {
+  background: var(--tb-kit-success);
+}
+
+.tb-state-dot-error {
+  background: color-mix(in srgb, var(--tb-kit-error) 14%, var(--tb-kit-bg));
+}
+
+.tb-state-dot-error::before {
+  background: var(--tb-kit-error);
+}
+
+@keyframes tb-state-pulse {
+  0% { opacity: .42; transform: scale(.8); }
+  80%, 100% { opacity: 0; transform: scale(1.75); }
+}
 
 /* ── Code panel ──────────────────────────────────────────────── */
 .tb-code-panel {

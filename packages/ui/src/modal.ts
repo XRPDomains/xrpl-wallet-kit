@@ -236,10 +236,9 @@ class WalletPickerView {
             const adapter = this.options.manager.getAdapter(id);
             try {
                 if (this.shouldDelegateToWalletConnectModal(wallet, adapter)) {
+                    this.activeRequestAdapterId = id;
                     if (this.presentation === "modal")
                         this.close(false, false, false);
-                    else
-                        this.activeRequestAdapterId = id;
                     await this.waitForPaint();
                     await this.options.manager.connect(id);
                     return;

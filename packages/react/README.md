@@ -44,6 +44,22 @@ export function App() {
 }
 ```
 
+`WalletButton` forwards normal host attributes to its `<span>` mount and exposes both the host and controller through a ref:
+
+```tsx
+import { useRef } from "react";
+import { WalletButton, type WalletButtonHandle } from "@xrpl-wallet-kit/react";
+
+const walletButton = useRef<WalletButtonHandle>(null);
+
+<WalletButton ref={walletButton} className="wallet-slot" aria-label="Wallet account" />;
+
+walletButton.current?.controller?.updateOptions({ showBalance: false });
+walletButton.current?.element?.focus();
+```
+
+Managed wallet options remain owned by the controller; standard host fields, event handlers, `aria-*`, and `data-*` are applied to the host element.
+
 ## Hooks
 
 ```tsx

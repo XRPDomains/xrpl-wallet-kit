@@ -12,6 +12,7 @@ export {
 } from "@xrpl-wallet-kit/react";
 export type {
   ReactWalletButtonProps,
+  WalletButtonHandle,
   WalletKitContextValue,
   WalletKitProviderProps,
   WalletKitStatus,

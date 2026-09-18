@@ -45,6 +45,7 @@ export interface LedgerSession {
   publicKey?: string;
   derivationPath?: string;
   signTransaction(tx: unknown, submit?: boolean): Promise<LedgerSignResult>;
+  signMultisignTransaction?(tx: unknown): Promise<LedgerSignResult>;
 }
 
 interface LedgerAccount {
@@ -149,7 +150,9 @@ export class LedgerAdapter extends BaseWalletAdapter {
 
   async signAndSubmit(request: SignAndSubmitRequest): Promise<TxResult> {
     if (!this.session) throw createWalletError.notConnected();
-    this.assertSingleSignTransaction(request.txJson);
+    if (this.isMultisignTransaction(request.txJson)) {
+      throw createWalletError.unsupportedMethod("multisign submission", this.metadata.name);
+    }
     try {
       const result = await this.session.signTransaction(request.txJson, request.submit ?? true);
       return {
@@ -168,9 +171,11 @@ export class LedgerAdapter extends BaseWalletAdapter {
 
   async signTransaction(request: SignTransactionRequest): Promise<SignTransactionResult> {
     if (!this.session) throw createWalletError.notConnected();
-    this.assertSingleSignTransaction(request.txJson);
     try {
-      const result = await this.session.signTransaction(request.txJson, false);
+      const multisign = this.isMultisignTransaction(request.txJson);
+      const result = multisign
+        ? await this.signMultisignTransaction(request.txJson)
+        : await this.session.signTransaction(request.txJson, false);
       return {
         txBlob: result.txBlob,
         signed: result.signed ?? Boolean(result.txBlob),
@@ -232,14 +237,17 @@ export class LedgerAdapter extends BaseWalletAdapter {
       address: account.address,
       publicKey: account.publicKey,
       derivationPath: this.derivationPath,
-      signTransaction: (tx, submit) => this.signWithDefaultLedger(tx, submit)
+      signTransaction: (tx, submit) => this.signWithDefaultLedger(tx, submit),
+      signMultisignTransaction: (tx) => this.signMultisignWithDefaultLedger(tx)
     };
   }
 
   private async signWithDefaultLedger(tx: unknown, submit = true): Promise<LedgerSignResult> {
     if (!this.xrp || !this.session) throw createWalletError.notConnected();
     if (!this.network) throw createWalletError.connectionFailed(this.metadata.name, new Error("XRPL network is required for Ledger signing"));
-    this.assertSingleSignTransaction(tx);
+    if (this.isMultisignTransaction(tx)) {
+      throw createWalletError.unsupportedMethod("XRPL multisigning through the single-sign path", this.metadata.name);
+    }
 
     const { Client, encode } = await import("xrpl");
     const client = new Client(this.network.rpcUrl);
@@ -293,6 +301,50 @@ export class LedgerAdapter extends BaseWalletAdapter {
         signed: true,
         raw: response
       };
+    } finally {
+      await client.disconnect();
+    }
+  }
+
+  private async signMultisignTransaction(tx: unknown): Promise<LedgerSignResult> {
+    if (!this.session) throw createWalletError.notConnected();
+    if (this.session.signMultisignTransaction) return this.session.signMultisignTransaction(tx);
+    throw createWalletError.unsupportedMethod("XRPL multisigning for injected Ledger sessions", this.metadata.name);
+  }
+
+  private async signMultisignWithDefaultLedger(tx: unknown): Promise<LedgerSignResult> {
+    if (!this.xrp || !this.session) throw createWalletError.notConnected();
+    if (!this.network) throw createWalletError.connectionFailed(this.metadata.name, new Error("XRPL network is required for Ledger signing"));
+
+    const { Client, encode, encodeForMultiSigning } = await import("xrpl");
+    const client = new Client(this.network.rpcUrl);
+    await client.connect();
+    try {
+      const input = asRecord(tx);
+      if (Array.isArray(input.Signers) && input.Signers.length > 0) {
+        throw createWalletError.unsupportedMethod("adding a signer to a populated Signers array", this.metadata.name);
+      }
+      const prepared = await client.autofill({
+        ...input,
+        Account: typeof input.Account === "string" ? input.Account : this.session.address,
+        SigningPubKey: ""
+      } as any) as unknown as Record<string, unknown>;
+      delete prepared.TxnSignature;
+      delete prepared.Signers;
+      prepared.SigningPubKey = "";
+
+      const publicKey = (this.session.publicKey ?? (await this.xrp.getAddress(this.derivationPath, false, false)).publicKey).toUpperCase();
+      const signingBlob = encodeForMultiSigning(prepared as never, this.session.address).toUpperCase();
+      const signature = await this.withTimeout(
+        this.xrp.signTransaction(this.derivationPath, signingBlob),
+        "Ledger multisigning timeout. Please confirm the transaction on your Ledger device."
+      );
+      if (!signature) throw new Error("Ledger did not return a transaction signature");
+
+      const signer = { Signer: { Account: this.session.address, SigningPubKey: publicKey, TxnSignature: signature.toUpperCase() } };
+      const signedTx = { ...prepared, Signers: [signer] };
+      const txBlob = encode(signedTx as never);
+      return { txBlob, signed: true, raw: { txBlob, signedTx, signer } };
     } finally {
       await client.disconnect();
     }
@@ -368,11 +420,9 @@ export class LedgerAdapter extends BaseWalletAdapter {
     }
   }
 
-  private assertSingleSignTransaction(tx: unknown): void {
+  private isMultisignTransaction(tx: unknown): boolean {
     const txJson = asRecord(tx);
-    if (txJson.SigningPubKey === "" || Array.isArray(txJson.Signers)) {
-      throw createWalletError.unsupportedMethod("XRPL multisigning", this.metadata.name);
-    }
+    return txJson.SigningPubKey === "" || Array.isArray(txJson.Signers);
   }
 }
 
