@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { WalletAccount, WalletCapabilities, WalletManager, WalletMetadata, WalletSession } from "@xrpl-wallet-kit/core";
 import { createWalletButton, createWalletModal } from "@xrpl-wallet-kit/ui";
 import type { WalletButtonController, WalletButtonOptions, WalletModal, WalletUiConfig } from "@xrpl-wallet-kit/ui";
@@ -24,7 +24,13 @@ export interface WalletKitProviderProps {
   ui?: WalletUiConfig;
 }
 
-export type ReactWalletButtonProps = Partial<Omit<WalletButtonOptions, "manager" | "modal" | "target">>;
+type ManagedWalletButtonProps = Partial<Omit<WalletButtonOptions, "manager" | "modal" | "target">>;
+export type ReactWalletButtonProps = ManagedWalletButtonProps & Omit<React.HTMLAttributes<HTMLSpanElement>, keyof ManagedWalletButtonProps | "children">;
+
+export interface WalletButtonHandle {
+  element: HTMLSpanElement | null;
+  controller: WalletButtonController | null;
+}
 
 const WalletKitContext = createContext<WalletKitContextValue | null>(null);
 const useClientLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -137,10 +143,30 @@ export function useWalletCapabilities(): WalletCapabilities | undefined {
   return session ? manager.getCapabilities(session.adapterId) : undefined;
 }
 
-export function WalletButton(props: ReactWalletButtonProps) {
+const HOST_PROP_NAMES = new Set([
+  "id", "className", "style", "role", "title", "tabIndex", "hidden", "dir", "lang",
+  "accessKey", "contentEditable", "draggable", "spellCheck", "translate"
+]);
+
+export const WalletButton = forwardRef<WalletButtonHandle, ReactWalletButtonProps>(function WalletButton(props, ref) {
   const { manager, modal } = useWalletKit();
   const targetRef = useRef<HTMLSpanElement | null>(null);
   const buttonRef = useRef<WalletButtonController | null>(null);
+  const hostProps: React.HTMLAttributes<HTMLSpanElement> = {};
+  const controllerProps: ManagedWalletButtonProps = {};
+
+  for (const [key, value] of Object.entries(props)) {
+    if (HOST_PROP_NAMES.has(key) || /^on[A-Z]/.test(key) || key.startsWith("aria-") || key.startsWith("data-")) {
+      (hostProps as Record<string, unknown>)[key] = value;
+    } else {
+      (controllerProps as Record<string, unknown>)[key] = value;
+    }
+  }
+
+  useImperativeHandle(ref, () => ({
+    get element() { return targetRef.current; },
+    get controller() { return buttonRef.current; }
+  }), []);
 
   useEffect(() => {
     if (!targetRef.current) return;
@@ -148,7 +174,7 @@ export function WalletButton(props: ReactWalletButtonProps) {
       manager,
       modal,
       target: targetRef.current,
-      ...props
+      ...controllerProps
     });
     return () => {
       buttonRef.current?.destroy();
@@ -157,11 +183,11 @@ export function WalletButton(props: ReactWalletButtonProps) {
   }, [manager, modal]);
 
   useEffect(() => {
-    buttonRef.current?.updateOptions(props);
+    buttonRef.current?.updateOptions(controllerProps);
   }, [props]);
 
-  return <span ref={targetRef} />;
-}
+  return <span {...hostProps} ref={targetRef} />;
+});
 
 export type XrplWalletContextValue = WalletKitContextValue;
 export type XrplWalletProviderProps = WalletKitProviderProps;

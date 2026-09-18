@@ -37,5 +37,5 @@ test("useWalletKit still guards usage outside WalletKitProvider", () => {
 });
 
 test("React package exports WalletButton component", () => {
-  assert.equal(typeof WalletButton, "function");
+  assert.ok(typeof WalletButton === "function" || typeof WalletButton === "object");
 });

@@ -1,0 +1,43 @@
+name: Coordinated release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish packages and create a GitHub release
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci
+      - run: npm run build:browser
+      - run: npm run smoke:release
+      - run: npm --prefix website ci
+      - run: npm --prefix website run build
+      - name: Publish all public workspaces
+        if: ${{ inputs.publish }}
+        run: npm publish --workspaces --if-present --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Create GitHub release
+        if: ${{ inputs.publish }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          git tag "v${VERSION}"
+          git push origin "v${VERSION}"
+          gh release create "v${VERSION}" --generate-notes --verify-tag

@@ -36,7 +36,9 @@ const kit = createWalletKit({
 - Default derivation path is `44'/144'/0'/0/0`.
 - `signTransaction()` signs without submit.
 - `signAndSubmit()` signs and submits when requested by the caller.
-- XRPL multisigning is intentionally not advertised. Payloads that contain multisign shape such as `SigningPubKey: ""` or `Signers` fail with `UNSUPPORTED_METHOD` before the adapter delegates signing.
+- `signTransaction()` supports XRPL multisigning when `SigningPubKey` is empty. It returns a signed blob plus the signer contribution under `raw.signer`/`raw.signedTx` for the dApp to combine with other signers.
+- `signAndSubmit()` rejects multisign payloads with `UNSUPPORTED_METHOD`; the dApp must combine a quorum of signer contributions before submission.
+- A custom `connectLedger` session must implement `signMultisignTransaction()` to opt into multisigning.
 
 ## Options
 
@@ -62,7 +64,8 @@ Hardware transport should be mocked in unit tests. Manual smoke testing should c
 - connect success;
 - disconnect cleanup;
 - `submit:false` signed transaction result;
-- multisign payloads fail closed;
+- multisign sign-only contribution and malformed pre-populated `Signers` input;
+- multisign submission fails closed;
 - user rejection on device.
 
 ## Links

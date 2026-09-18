@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const packagesRoot = join(root, "packages");
-const jsFiles = [];
+const moduleFiles = [];
 
 function walk(directory) {
   for (const entry of readdirSync(directory)) {
@@ -14,8 +14,8 @@ function walk(directory) {
       walk(path);
       continue;
     }
-    if (stats.isFile() && path.endsWith(".js")) {
-      jsFiles.push(path);
+    if (stats.isFile() && (path.endsWith(".js") || path.endsWith(".d.ts"))) {
+      moduleFiles.push(path);
     }
   }
 }
@@ -33,7 +33,7 @@ function addJsExtension(specifier) {
 
 walk(packagesRoot);
 
-for (const file of jsFiles) {
+for (const file of moduleFiles) {
   if (!file.includes(`${join("dist")}`) && !file.includes(`${join("dist", "")}`)) {
     continue;
   }

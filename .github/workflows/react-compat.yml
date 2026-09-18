@@ -1,0 +1,38 @@
+name: React compatibility
+
+on:
+  pull_request:
+    paths:
+      - "packages/react/**"
+      - "packages/next/**"
+      - "packages/ui/**"
+      - "packages/core/**"
+      - "package-lock.json"
+      - ".github/workflows/react-compat.yml"
+  workflow_dispatch:
+
+jobs:
+  packed-consumer:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        react: ["18", "19"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Pack workspace packages
+        run: |
+          mkdir -p .packs
+          npm pack --workspace @xrpl-wallet-kit/core --pack-destination .packs
+          npm pack --workspace @xrpl-wallet-kit/ui --pack-destination .packs
+          npm pack --workspace @xrpl-wallet-kit/react --pack-destination .packs
+          npm pack --workspace @xrpl-wallet-kit/next --pack-destination .packs
+      - name: Verify packed React consumer
+        env:
+          REACT_VERSION: ${{ matrix.react }}
+        run: node scripts/check-react-consumer.mjs

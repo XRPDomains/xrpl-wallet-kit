@@ -46,6 +46,8 @@ export function WalletConnectButton() {
 }
 ```
 
+The exported `WalletButton` also supports host attributes and a `WalletButtonHandle` ref. This is useful when a Client Component needs the underlying mount element or imperative UI controller.
+
 ## App Router Notes
 
 - Use this package from Client Components only.

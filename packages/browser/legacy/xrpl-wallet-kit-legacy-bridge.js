@@ -169,8 +169,8 @@
     document.head.appendChild(style);
   }
 
-  function renderFallbackButton(label) {
-    return '<span class="xwk-legacy-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4.5 7.5A2.5 2.5 0 0 1 7 5h11.5A1.5 1.5 0 0 1 20 6.5V9H7A2.5 2.5 0 0 1 4.5 6.5v1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 9h15.5A2.5 2.5 0 0 1 22 11.5v5A2.5 2.5 0 0 1 19.5 19h-13A2.5 2.5 0 0 1 4 16.5V9Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M17 13.5h5V17h-5a1.75 1.75 0 1 1 0-3.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="xwk-legacy-label">' + label + '</span><span class="xwk-legacy-chevron" aria-hidden="true">v</span>';
+  function renderFallbackButton() {
+    return '<span class="xwk-legacy-icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4.5 7.5A2.5 2.5 0 0 1 7 5h11.5A1.5 1.5 0 0 1 20 6.5V9H7A2.5 2.5 0 0 1 4.5 6.5v1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 9h15.5A2.5 2.5 0 0 1 22 11.5v5A2.5 2.5 0 0 1 19.5 19h-13A2.5 2.5 0 0 1 4 16.5V9Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M17 13.5h5V17h-5a1.75 1.75 0 1 1 0-3.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="xwk-legacy-label"></span><span class="xwk-legacy-chevron" aria-hidden="true">v</span>';
   }
 
   function ensureFallbackButton(mount, kit, label) {
@@ -181,7 +181,8 @@
       button = document.createElement('button');
       button.type = 'button';
       button.className = 'xwk-legacy-fallback';
-      button.innerHTML = renderFallbackButton(label || 'Connect Wallet');
+      button.innerHTML = renderFallbackButton();
+      button.querySelector('.xwk-legacy-label').textContent = label || 'Connect Wallet';
       mount.appendChild(button);
     }
     button.onclick = function () {
