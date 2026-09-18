@@ -24,12 +24,29 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:browser
+      - name: Sync browser bundle to website
+        run: cp packages/browser/dist/xrpl-wallet-kit.iife.min.js website/public/xrpl-wallet-kit.iife.min.js
       - run: npm run smoke:release
       - run: npm --prefix website ci
       - run: npm --prefix website run build
       - name: Publish all public workspaces
         if: ${{ inputs.publish }}
-        run: npm publish --workspaces --if-present --access public
+        run: |
+          npm publish --workspace @xrpl-wallet-kit/core --access public
+          npm publish --workspace @xrpl-wallet-kit/adapter-crossmark --access public
+          npm publish --workspace @xrpl-wallet-kit/adapter-dropfi --access public
+          npm publish --workspace @xrpl-wallet-kit/adapter-gemwallet --access public
+          npm publish --workspace @xrpl-wallet-kit/adapter-ledger --access public
+          npm publish --workspace @xrpl-wallet-kit/adapter-otsu --access public
+          npm publish --workspace @xrpl-wallet-kit/adapter-walletconnect --access public
+          npm publish --workspace @xrpl-wallet-kit/adapter-xaman --access public
+          npm publish --workspace @xrpl-wallet-kit/adapter-xrpl-snap --access public
+          npm publish --workspace @xrpl-wallet-kit/auth --access public
+          npm publish --workspace @xrpl-wallet-kit/ui --access public
+          npm publish --workspace @xrpl-wallet-kit/react --access public
+          npm publish --workspace @xrpl-wallet-kit/next --access public
+          npm publish --workspace @xrpl-wallet-kit/client --access public
+          npm publish --workspace @xrpl-wallet-kit/browser --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Create GitHub release

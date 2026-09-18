@@ -52,7 +52,7 @@ export default defineConfig({
       { text: "Theme Builder", link: "/docs/theme-builder" },
       { text: "API Reference", link: "/docs/api/wallet-manager" },
         {
-          text: "v0.1.14",
+          text: "v0.1.15",
         items: [
           {
             text: "Changelog",

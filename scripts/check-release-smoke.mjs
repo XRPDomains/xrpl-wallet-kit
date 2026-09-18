@@ -66,6 +66,10 @@ for (const bundleName of ["xrpl-wallet-kit.iife.js", "xrpl-wallet-kit.iife.min.j
   assert.doesNotMatch(bundle, /broken\s*—\s*truncated|truncated mid-string/i, `${bundlePath} must not contain truncation markers`);
 }
 
+const browserBundle = await readFile(resolve(root, "packages/browser/dist/xrpl-wallet-kit.iife.min.js"), "utf8");
+const websiteBundle = await readFile(resolve(root, "website/public/xrpl-wallet-kit.iife.min.js"), "utf8");
+assert.equal(websiteBundle, browserBundle, "website public browser bundle must match the package build");
+
 const websitePackage = await readJson("website/package.json");
 assert.equal(websitePackage.version, workspaceVersion, "website package version must match root");
 
