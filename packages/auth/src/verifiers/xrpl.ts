@@ -100,7 +100,20 @@ async function resolveLedgerPublicKey(address: string, options: XrplSignatureVer
 async function loadPeer<T>(name: string, options: XrplSignatureVerifierOptions): Promise<T> {
   try {
     if (options.dependencies?.loadPeer) return await options.dependencies.loadPeer<T>(name);
-    const mod = await import(name);
+    let mod: unknown;
+    switch (name) {
+      case "ripple-keypairs":
+        mod = await import("ripple-keypairs");
+        break;
+      case "verify-xrpl-signature":
+        mod = await import("verify-xrpl-signature");
+        break;
+      case "xrpl":
+        mod = await import("xrpl");
+        break;
+      default:
+        throw new Error(`Unsupported XRPL verifier peer: ${name}`);
+    }
     const maybeDefault = mod as { default?: unknown };
     return (maybeDefault.default && typeof maybeDefault.default === "object" ? maybeDefault.default : mod) as T;
   } catch (error) {

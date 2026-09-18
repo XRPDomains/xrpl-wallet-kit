@@ -1002,6 +1002,26 @@ test("WalletManager falls back to signAndSubmit with submit false for signTransa
   assert.equal(result.signed, true);
 });
 
+test("WalletManager recovers a signed blob from a nested adapter response", async () => {
+  class NestedBlobAdapter extends MockAdapter {
+    async signAndSubmit() {
+      return { signed: true, raw: { response: { hex: "NESTED_BLOB" } } };
+    }
+  }
+
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new NestedBlobAdapter()],
+    logger: { level: "silent" }
+  });
+
+  await manager.connect("mock", { network });
+  const result = await manager.signTransaction({ txJson: { TransactionType: "Payment" } });
+
+  assert.equal(result.txBlob, "NESTED_BLOB");
+  assert.equal(result.signed, true);
+});
+
 test("WalletManager populates activationStatus from account_info", async () => {
   const statusNetwork = {
     ...network,

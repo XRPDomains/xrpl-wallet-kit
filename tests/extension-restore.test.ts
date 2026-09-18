@@ -202,6 +202,7 @@ test("Xaman sign-only transactions allow bounded LastLedgerSequence extension", 
   });
 
   assert.equal(result.signed, true);
+  assert.equal(result.txBlob, signedHex);
 });
 
 test("DropFi restoreSession accepts passive address state even when isConnected is false after reload", async () => {

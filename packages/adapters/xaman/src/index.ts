@@ -197,12 +197,15 @@ export class XamanAdapter extends BaseWalletAdapter {
       await this.validateSignOnlyExpiryResult(request, result);
     }
 
-    return normalizeTxResult({
+    const normalized = normalizeTxResult({
       hash: result?.response?.txid ?? undefined,
       signed: result?.meta?.signed,
       rejected: result?.meta?.cancelled,
       raw: result
     });
+    return request.submit === false
+      ? { ...normalized, txBlob: result?.response?.hex ?? undefined }
+      : normalized;
   }
 
   async checkXamanState(options: ConnectOptions = {}) {

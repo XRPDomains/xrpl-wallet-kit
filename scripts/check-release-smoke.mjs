@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { access, readFile, readdir } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const root = process.cwd();
 const rootPackage = await readJson("package.json");
@@ -50,6 +51,14 @@ for (const [packageName, { pkg, packagePath }] of workspacePackages) {
       `${packageName} peerDependencies.xrpl must support xrpl v4 and v5`
     );
   }
+}
+
+for (const entryPath of [
+  "packages/ui/dist/index.js",
+  "packages/react/dist/index.js",
+  "packages/next/dist/index.js"
+]) {
+  await import(pathToFileURL(resolve(root, entryPath)).href);
 }
 
 const browserPackage = await readJson("packages/browser/package.json");

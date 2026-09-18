@@ -867,6 +867,8 @@ function normalizeSignTransactionResult(raw: unknown): SignTransactionResult {
     "response.tx_blob",
     "raw.txBlob",
     "raw.tx_blob",
+    "response.hex",
+    "raw.response.hex",
     "tx_json",
     "result.tx_json"
   ]);
