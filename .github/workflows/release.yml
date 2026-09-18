@@ -24,8 +24,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:browser
-      - name: Sync browser bundle to website
-        run: cp packages/browser/dist/xrpl-wallet-kit.iife.min.js website/public/xrpl-wallet-kit.iife.min.js
       - run: npm run smoke:release
       - run: npm --prefix website ci
       - run: npm --prefix website run build

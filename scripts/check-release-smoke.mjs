@@ -75,10 +75,6 @@ for (const bundleName of ["xrpl-wallet-kit.iife.js", "xrpl-wallet-kit.iife.min.j
   assert.doesNotMatch(bundle, /broken\s*—\s*truncated|truncated mid-string/i, `${bundlePath} must not contain truncation markers`);
 }
 
-const browserBundle = await readFile(resolve(root, "packages/browser/dist/xrpl-wallet-kit.iife.min.js"), "utf8");
-const websiteBundle = await readFile(resolve(root, "website/public/xrpl-wallet-kit.iife.min.js"), "utf8");
-assert.equal(websiteBundle, browserBundle, "website public browser bundle must match the package build");
-
 const websitePackage = await readJson("website/package.json");
 assert.equal(websitePackage.version, workspaceVersion, "website package version must match root");
 
@@ -105,13 +101,8 @@ for (const widgetPath of [
 ]) {
   const widget = await readFile(resolve(root, widgetPath), "utf8");
   assert.ok(
-    widget.includes(`const KIT_BUNDLE_VERSION = '${workspaceVersion}'`),
-    `${widgetPath} KIT_BUNDLE_VERSION must match root`
-  );
-  assert.match(
-    widget,
-    /xrpl-wallet-kit\.iife\.min\.js\?v=\$\{KIT_BUNDLE_VERSION\}/,
-    `${widgetPath} must load the website bundle through KIT_BUNDLE_VERSION`
+    widget.includes("https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js"),
+    `${widgetPath} must load the latest browser bundle from jsDelivr`
   );
 }
 
