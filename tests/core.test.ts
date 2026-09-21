@@ -955,6 +955,73 @@ test("WalletManager keeps the active session in sync with account and network ch
   assert.equal(manager.getSession()?.account.network?.id, "testnet");
 });
 
+test("WalletManager switches network through the active adapter and persists the session", async () => {
+  const storage = new MemoryWalletStorage();
+  const testnet = { ...network, id: "testnet", name: "XRPL Testnet", networkType: "TESTNET" } as const;
+  class NetworkAdapter extends MockAdapter {
+    capabilities = {
+      connect: true,
+      signMessage: true,
+      signAndSubmit: true,
+      switchNetwork: true,
+      details: { supportedNetworks: ["mainnet", "testnet"] }
+    } as const;
+    switchedTo?: string;
+
+    async switchNetwork(nextNetwork: typeof network | typeof testnet) {
+      this.switchedTo = nextNetwork.id;
+      return { network: nextNetwork };
+    }
+  }
+  const adapter = new NetworkAdapter();
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [adapter],
+    networks: [testnet],
+    storage,
+    logger: { level: "silent" }
+  });
+  const changes: string[] = [];
+  manager.on("networkChanged", ({ network: changed }) => changes.push(String(changed?.id)));
+
+  await manager.connect("mock", { network });
+  const selected = await manager.switchNetwork("testnet");
+
+  assert.equal(selected.id, "testnet");
+  assert.equal(adapter.switchedTo, "testnet");
+  assert.equal(manager.getSession()?.account.network?.id, "testnet");
+  assert.deepEqual(changes, ["testnet"]);
+  const stored = JSON.parse(await storage.getItem("session") ?? "null");
+  assert.equal(stored.session.account.network.id, "testnet");
+});
+
+test("WalletManager rejects network switches outside adapter capability metadata", async () => {
+  class MainnetOnlyAdapter extends MockAdapter {
+    capabilities = {
+      connect: true,
+      signMessage: true,
+      signAndSubmit: true,
+      switchNetwork: true,
+      details: { supportedNetworks: ["mainnet"] }
+    } as const;
+
+    async switchNetwork(nextNetwork: typeof network) {
+      return { network: nextNetwork };
+    }
+  }
+  const testnet = { ...network, id: "testnet", name: "XRPL Testnet", networkType: "TESTNET" } as const;
+  const manager = new WalletManager({
+    appName: "Test",
+    adapters: [new MainnetOnlyAdapter()],
+    networks: [testnet],
+    logger: { level: "silent" }
+  });
+
+  await manager.connect("mock", { network });
+  await assert.rejects(() => manager.switchNetwork("testnet"), { code: WalletKitErrorCode.UNSUPPORTED_METHOD });
+  assert.equal(manager.getSession()?.account.network?.id, "mainnet");
+});
+
 test("WalletManager signs transactions without submitting when adapter supports signTransaction", async () => {
   class SignOnlyAdapter extends MockAdapter {
     capabilities = { connect: true, signTransaction: true };
@@ -1152,6 +1219,26 @@ test("validateWalletAdapter enforces the adapter contract", () => {
   assert.ok(invalid.issues.some((issue) => issue.field === "capabilities.connect"));
   assert.ok(invalid.issues.some((issue) => issue.field === "signMessage"));
   assert.ok(invalid.issues.some((issue) => issue.field === "canRecoverSession"));
+});
+
+test("validateWalletAdapter enforces granular capability contracts", () => {
+  const result = validateWalletAdapter({
+    metadata: { id: "network-wallet", name: "Network Wallet", type: "extension" },
+    capabilities: {
+      connect: true,
+      switchNetwork: true,
+      details: {
+        supportedNetworks: ["mainnet", "mainnet"],
+        transactionModes: ["sign-and-submit"]
+      }
+    },
+    connect: async () => ({ account: { address: "rNetwork" } })
+  });
+
+  assert.equal(result.valid, false);
+  assert.ok(result.issues.some((issue) => issue.field === "switchNetwork" && issue.severity === "error"));
+  assert.ok(result.issues.some((issue) => issue.field === "capabilities.details.transactionModes" && issue.severity === "error"));
+  assert.ok(result.issues.some((issue) => issue.field === "capabilities.details.supportedNetworks" && issue.severity === "warning"));
 });
 
 test("assertWalletAdapter throws a typed invalid adapter error", () => {

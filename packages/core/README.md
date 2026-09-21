@@ -7,7 +7,7 @@ Use this package when you want full control over wallet UI or when building a cu
 ## Install
 
 ```bash
-npm install @xrpl-wallet-kit/core
+npm install @xrpl-wallet-kit/core xrpl
 ```
 
 Most apps should install `@xrpl-wallet-kit/client` instead. It wires the manager, official adapters, modal UI, connect button, toast, identity, balance, and recent transaction options for you.
@@ -42,6 +42,33 @@ const txResult = await manager.signAndSubmit({
     Amount: "1000000",
   },
 });
+```
+
+Transaction request types are generic. Applications can opt into an exact XRPL transaction type while custom amendments can continue using a record payload:
+
+```ts
+import type { Payment } from "xrpl";
+import type { SignAndSubmitRequest } from "@xrpl-wallet-kit/core";
+
+const request: SignAndSubmitRequest<Payment> = {
+  txJson: {
+    TransactionType: "Payment",
+    Account: "r...",
+    Destination: "r...",
+    Amount: "1000000",
+  },
+};
+```
+
+## Networks
+
+Adapters can advertise supported networks and network-switching support through granular capability metadata. Switching is rejected before invoking the wallet when the target is not supported.
+
+```ts
+const details = manager.getCapabilityDetails();
+if (manager.can("switchNetwork") && details?.supportedNetworks?.includes("testnet")) {
+  await manager.switchNetwork("testnet");
+}
 ```
 
 `signMessage()` returns a normalized proof shape:
@@ -114,6 +141,8 @@ Capability rules:
 - `signMessage: true` requires a real `signMessage()` implementation.
 - `signTransaction: true` requires signing without submitting.
 - `signAndSubmit: true` requires submitting or delegating submission to the wallet.
+- `switchNetwork: true` requires a real `switchNetwork()` implementation.
+- `details` can declare supported networks, transaction types, wallet methods, and transaction modes.
 - Adapters should throw typed `WalletKitError`s for rejected, unsupported, unavailable, or failed flows.
 - Adapter availability checks are bounded by the manager so one slow extension cannot block the full wallet list.
 

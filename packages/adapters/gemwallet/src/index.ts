@@ -74,15 +74,16 @@ export class GemWalletAdapter extends BaseWalletAdapter {
   async signAndSubmit(request: SignAndSubmitRequest) {
     const provider = this.getProvider();
     const payload = request.walletPayload ?? request.txJson;
+    const txJson = request.txJson as Record<string, unknown>;
     const methodHint = this.resolveMethodHint(request);
     const raw =
-      methodHint === "payment" && provider.sendPayment ? await provider.sendPayment(request.walletPayload ?? this.toGemWalletPaymentPayload(request.txJson)) :
+      methodHint === "payment" && provider.sendPayment ? await provider.sendPayment(request.walletPayload ?? this.toGemWalletPaymentPayload(txJson)) :
       methodHint === "createNFTOffer" && provider.createNFTOffer ? await provider.createNFTOffer(payload) :
       methodHint === "acceptNFTOffer" && provider.acceptNFTOffer ? await provider.acceptNFTOffer(payload) :
       methodHint === "cancelNFTOffer" && provider.cancelNFTOffer ? await provider.cancelNFTOffer(payload) :
-      methodHint === "burnNFT" && provider.burnNFT ? await provider.burnNFT(request.walletPayload ?? this.toGemWalletBurnNFTPayload(request.txJson)) :
-      methodHint === "setTrustline" && provider.setTrustline ? await provider.setTrustline(request.walletPayload ?? this.toGemWalletTrustlinePayload(request.txJson)) :
-      methodHint === "setTrustline" && provider.addTrustline ? await provider.addTrustline(request.walletPayload ?? this.toGemWalletTrustlinePayload(request.txJson)) :
+      methodHint === "burnNFT" && provider.burnNFT ? await provider.burnNFT(request.walletPayload ?? this.toGemWalletBurnNFTPayload(txJson)) :
+      methodHint === "setTrustline" && provider.setTrustline ? await provider.setTrustline(request.walletPayload ?? this.toGemWalletTrustlinePayload(txJson)) :
+      methodHint === "setTrustline" && provider.addTrustline ? await provider.addTrustline(request.walletPayload ?? this.toGemWalletTrustlinePayload(txJson)) :
       provider.signAndSubmit ? await provider.signAndSubmit(payload) :
       this.unsupported(`GemWallet method: ${methodHint ?? "generic"}`);
     return normalizeTxResult(raw);

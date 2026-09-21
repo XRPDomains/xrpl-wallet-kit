@@ -138,6 +138,7 @@ export function createWalletKit(options: CreateWalletKitOptions) {
     openModal: () => modal?.open(),
     closeModal: () => modal?.close(),
     disconnect: () => manager.disconnect(),
+    switchNetwork: manager.switchNetwork.bind(manager),
     toast,
     refreshIdentity: () => button?.refreshIdentity(),
     refreshBalance: () => button?.refreshBalance(),

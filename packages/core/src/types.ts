@@ -1,4 +1,5 @@
 import type { WalletKitLogger, WalletKitLoggerOptions } from "./logger";
+import type { Transaction } from "xrpl";
 
 export type WalletNetworkId = "mainnet" | "testnet" | "devnet" | (string & {});
 export type WalletNetworkFamily = "xrpl" | (string & {});
@@ -32,6 +33,17 @@ export interface WalletCapabilities {
   payments?: boolean;
   qr?: boolean;
   deeplink?: boolean;
+  switchNetwork?: boolean;
+  details?: WalletCapabilityDetails;
+}
+
+export type WalletTransactionMode = "sign-only" | "sign-and-submit" | "multisign";
+
+export interface WalletCapabilityDetails {
+  supportedNetworks?: readonly WalletNetworkId[];
+  supportedTransactionTypes?: readonly string[];
+  supportedMethods?: readonly string[];
+  transactionModes?: readonly WalletTransactionMode[];
 }
 
 export interface WalletMetadata {
@@ -90,7 +102,9 @@ export interface WalletAppMetadata {
   icons?: string[];
 }
 
-export type TransactionPayload = Record<string, unknown>;
+export type XrplTransaction = Transaction;
+export type CustomTransactionPayload = Record<string, unknown>;
+export type TransactionPayload = XrplTransaction | CustomTransactionPayload;
 
 export interface SignMessageRequest {
   message: string;
@@ -128,15 +142,15 @@ export interface AuthenticateResult {
   raw?: unknown;
 }
 
-export interface SignAndSubmitRequest {
-  txJson: TransactionPayload;
+export interface SignAndSubmitRequest<TTransaction extends TransactionPayload = TransactionPayload> {
+  txJson: TTransaction;
   methodHint?: "payment" | "createNFTOffer" | "acceptNFTOffer" | "cancelNFTOffer" | "burnNFT" | "trustSet" | "setTrustline" | "generic";
   walletPayload?: unknown;
   submit?: boolean;
 }
 
-export interface SignTransactionRequest {
-  txJson: TransactionPayload;
+export interface SignTransactionRequest<TTransaction extends TransactionPayload = TransactionPayload> {
+  txJson: TTransaction;
   methodHint?: SignAndSubmitRequest["methodHint"];
   walletPayload?: unknown;
 }
@@ -198,6 +212,11 @@ export interface ConnectResult {
   raw?: unknown;
 }
 
+export interface SwitchNetworkResult {
+  network?: WalletNetwork;
+  raw?: unknown;
+}
+
 export interface WalletAdapter {
   adapterApiVersion?: WalletAdapterApiVersion;
   metadata: WalletMetadata;
@@ -209,6 +228,7 @@ export interface WalletAdapter {
   restoreSession?: (session: WalletSession) => Promise<ConnectResult | null>;
   canRecoverSession?: (options: ConnectOptions) => boolean | Promise<boolean>;
   recoverSession?: (options: ConnectOptions) => Promise<ConnectResult | null>;
+  switchNetwork?: (network: WalletNetwork) => Promise<SwitchNetworkResult | void>;
   signMessage?: (request: SignMessageRequest) => Promise<SignMessageResult>;
   signTransaction?: (request: SignTransactionRequest) => Promise<SignTransactionResult>;
   signAndSubmit?: (request: SignAndSubmitRequest) => Promise<TxResult>;

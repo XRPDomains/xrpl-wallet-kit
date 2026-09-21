@@ -88,6 +88,19 @@ export function validateWalletAdapter(adapter: unknown): AdapterValidationResult
     if (walletAdapter.capabilities.signAndSubmit && !isFunction(walletAdapter.signAndSubmit)) {
       addIssue(issues, "error", "signAndSubmit", "capabilities.signAndSubmit is true but signAndSubmit() is not implemented.");
     }
+    if (walletAdapter.capabilities.switchNetwork && !isFunction(walletAdapter.switchNetwork)) {
+      addIssue(issues, "error", "switchNetwork", "capabilities.switchNetwork is true but switchNetwork() is not implemented.");
+    }
+    const details = walletAdapter.capabilities.details;
+    if (details?.transactionModes?.includes("sign-only") && !walletAdapter.capabilities.signTransaction && !walletAdapter.capabilities.signAndSubmit) {
+      addIssue(issues, "error", "capabilities.details.transactionModes", "sign-only mode requires signTransaction or signAndSubmit support.");
+    }
+    if (details?.transactionModes?.includes("sign-and-submit") && !walletAdapter.capabilities.signAndSubmit) {
+      addIssue(issues, "error", "capabilities.details.transactionModes", "sign-and-submit mode requires signAndSubmit support.");
+    }
+    if (details?.supportedNetworks && new Set(details.supportedNetworks).size !== details.supportedNetworks.length) {
+      addIssue(issues, "warning", "capabilities.details.supportedNetworks", "supportedNetworks contains duplicate network ids.");
+    }
   }
 
   if (!isFunction(walletAdapter.connect)) {

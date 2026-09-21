@@ -6,7 +6,7 @@ import { DEFAULT_XRPL_NETWORKS, createNetworkRegistry, getHttpRpcUrl } from "./n
 import { normalizeTxResult, pickPath } from "./result";
 import { MemoryWalletStorage } from "./storage";
 import { WalletTransactionStore } from "./tx-store";
-import type { AddWalletTransactionRequest, AuthenticateRequest, AuthenticateResult, ConnectOptions, SignatureKind, SignAndSubmitRequest, SignMessageRequest, SignMessageResult, SignTransactionRequest, SignTransactionResult, StoredWalletSessionEnvelope, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletCapabilities, WalletManagerConfig, WalletNetwork, WalletSession, WalletStorage, WalletTransaction } from "./types";
+import type { AddWalletTransactionRequest, AuthenticateRequest, AuthenticateResult, ConnectOptions, SignatureKind, SignAndSubmitRequest, SignMessageRequest, SignMessageResult, SignTransactionRequest, SignTransactionResult, StoredWalletSessionEnvelope, TransactionPayload, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletCapabilities, WalletCapabilityDetails, WalletManagerConfig, WalletNetwork, WalletNetworkId, WalletSession, WalletStorage, WalletTransaction } from "./types";
 
 const SESSION_KEY = "session";
 export const WALLET_STORAGE_VERSION = 1;
@@ -115,12 +115,33 @@ export class WalletManager extends WalletEventEmitter {
     return this.getAdapter(adapterId)?.capabilities;
   }
 
+  getCapabilityDetails(adapterId?: string): WalletCapabilityDetails | undefined {
+    return this.getCapabilities(adapterId)?.details;
+  }
+
   can(capability: keyof WalletCapabilities, adapterId?: string): boolean {
     return Boolean(this.getCapabilities(adapterId)?.[capability]);
   }
 
   getNetwork(id = this.config.network ?? "mainnet"): WalletNetwork {
     return this.networkRegistry.resolve(id);
+  }
+
+  async switchNetwork(networkOrId: WalletNetwork | WalletNetworkId): Promise<WalletNetwork> {
+    const adapter = this.requireActiveAdapter("switchNetwork");
+    const network = typeof networkOrId === "string" ? this.getNetwork(networkOrId) : networkOrId;
+    const supportedNetworks = adapter.capabilities.details?.supportedNetworks;
+    if (supportedNetworks?.length && !supportedNetworks.includes(network.id)) {
+      throw createWalletError.unsupportedMethod(`switchNetwork(${network.id})`, adapter.metadata.name);
+    }
+
+    const result = await adapter.switchNetwork!(network);
+    const selectedNetwork = result?.network ?? network;
+    if (selectedNetwork.id !== network.id) {
+      throw createWalletError.networkMismatch(adapter.metadata.name, String(network.id), String(selectedNetwork.id));
+    }
+    this.emitNetworkChanged(adapter.metadata.id, selectedNetwork);
+    return selectedNetwork;
   }
 
   async autoReconnect(): Promise<WalletSession | null> {
@@ -437,7 +458,7 @@ export class WalletManager extends WalletEventEmitter {
     return typeof value === "string" && value.trim().length > 0;
   }
 
-  async signAndSubmit(request: SignAndSubmitRequest) {
+  async signAndSubmit<TTransaction extends TransactionPayload = TransactionPayload>(request: SignAndSubmitRequest<TTransaction>) {
     const adapter = this.requireActiveAdapter("signAndSubmit");
     try {
       this.emit("signing", { adapterId: adapter.metadata.id, kind: "transaction" });
@@ -498,7 +519,7 @@ export class WalletManager extends WalletEventEmitter {
     return [...this.transactions.values()];
   }
 
-  async signTransaction(request: SignTransactionRequest): Promise<SignTransactionResult> {
+  async signTransaction<TTransaction extends TransactionPayload = TransactionPayload>(request: SignTransactionRequest<TTransaction>): Promise<SignTransactionResult> {
     const adapter = this.getAdapter();
     if (!adapter) throw createWalletError.notConnected();
     if (typeof adapter.signTransaction !== "function" && typeof adapter.signAndSubmit !== "function") {
