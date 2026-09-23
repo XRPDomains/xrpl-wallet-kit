@@ -12,6 +12,7 @@ Before shipping your XRPL dApp to production, run through this checklist.
 ```ts
 // ✅ Production
 const manager = new WalletManager({
+  autoReconnect: true,
   network: {
     id: "mainnet",
     networkType: "MAINNET",
@@ -86,7 +87,7 @@ manager.on("error", ({ error }) => {
 
 ## ✅ Performance
 
-- [ ] `manager.recoverSession()` is called once on startup — not on every render
+- [ ] `manager.autoReconnect()` is called once on startup — not on every render
 - [ ] `WalletToast` is mounted once, not per component
 - [ ] No wallet-related network requests fire before user initiates connect
 

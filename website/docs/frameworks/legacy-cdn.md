@@ -43,12 +43,13 @@ The IIFE bundle is large because it includes all adapters and polyfills. For pro
   <script src="https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js"></script>
   <script>
     var kit = XRPLWalletKit.createWalletKit({
+  autoReconnect: true,
       wallets: 'all',
       walletConnectProjectId: 'YOUR_WC_PROJECT_ID',
       connectButton: '#connect-btn',
     });
 
-    kit.manager.recoverSession();
+    kit.manager.autoReconnect();
   </script>
 </body>
 </html>
@@ -97,7 +98,7 @@ The IIFE bundle is large because it includes all adapters and polyfills. For pro
     document.getElementById('status').textContent = 'Disconnected';
   });
 
-  manager.recoverSession();
+  manager.autoReconnect();
 </script>
 ```
 
@@ -142,7 +143,7 @@ Call the same global API from your existing page script and keep the wallet UI m
     document.getElementById('connect-section').hidden = false;
   });
 
-  manager.recoverSession();
+  manager.autoReconnect();
 </script>
 ```
 
@@ -224,6 +225,7 @@ If your HTML page uses `<script type="module">` you can also import ESM directly
   import { createWalletKit } from "https://esm.sh/@xrpl-wallet-kit/client@latest";
 
   const { manager } = createWalletKit({
+  autoReconnect: true,
     adapters: [XRPLWalletKit.createGemWalletAdapter()],
     network: "mainnet",
   });

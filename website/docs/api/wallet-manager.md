@@ -14,23 +14,13 @@ const manager = new WalletManager(config);
 
 ```ts
 interface WalletManagerConfig {
-  /** Adapter instances to register */
-  adapters: BaseWalletAdapter[];
-
-  /** Active network configuration */
-  network?: XRPLNetwork;
-
-  /** Custom session storage (default: localStorage) */
-  storage?: StorageAdapter;
-
-  /** Session storage key prefix (default: "xwk") */
-  storageKey?: string;
-
-  /** Logger instance or false to disable logging */
-  logger?: Logger | false;
-
-  /** Retry delays for session recovery in ms */
+  adapters?: WalletAdapter[];
+  network?: WalletNetworkId;
+  networks?: WalletNetwork[];
+  storage?: WalletStorage;
+  autoReconnect?: boolean;
   recoveryRetryDelaysMs?: number[];
+  logger?: WalletKitLogger | WalletKitLoggerOptions;
 }
 ```
 
@@ -47,19 +37,15 @@ const result = await manager.connect(adapterId, options?);
 | Parameter | Type | Description |
 |---|---|---|
 | `adapterId` | `string` | Adapter ID (e.g., `"xaman"`, `"gemwallet"`) |
-| `options.network` | `XRPLNetwork` | Override the active network |
+| `options.network` | `WalletNetwork` | Override the active network |
 | `options.signal` | `AbortSignal` | Cancel the connection |
 
-Returns `ConnectResult`:
+Returns the persisted `WalletSession`:
 ```ts
-interface ConnectResult {
-  account: {
-    address: string;
-    network?: XRPLNetwork;
-    networkType?: string;
-  };
-  session?: WalletSession;
-  raw?: unknown;
+interface WalletSession {
+  adapterId: string;
+  account: WalletAccount;
+  connectedAt: number;
 }
 ```
 
@@ -78,7 +64,7 @@ Sign a transaction without submitting it.
 ```ts
 const result = await manager.signTransaction({ txJson });
 // result.txBlob   — signed transaction blob (hex)
-// result.hash     — transaction hash
+// result.signed   — true when signing succeeded
 ```
 
 ### signAndSubmit()
@@ -88,7 +74,7 @@ Sign and submit a transaction to the network.
 ```ts
 const result = await manager.signAndSubmit({ txJson });
 // result.hash     — transaction hash
-// result.result   — ledger result code (e.g., "tesSUCCESS")
+// result.status   — normalized wallet/ledger status when available
 ```
 
 When a transaction hash is returned, the manager emits `tx_submitted` and records the transaction in the recent transaction store if transaction persistence is enabled.
@@ -98,16 +84,42 @@ When a transaction hash is returned, the manager emits `tx_submitted` and record
 Sign an arbitrary UTF-8 message.
 
 ```ts
-const { signature } = await manager.signMessage({ message: "Hello XRPL" });
+const proof = await manager.signMessage({ message: "Hello XRPL" });
+// proof.signatureKind — "signature" | "signedTx"
+// proof.proof         — normalized signature or signed transaction blob
 ```
 
-### recoverSession()
+### autoReconnect()
 
-Attempt to restore the previous session from storage. Call this once on app startup.
+Attempt to restore the previous session from storage. Construct the manager with `autoReconnect: true`, then call this once on app startup. `createWalletKit()` schedules it automatically when that option is enabled.
 
 ```ts
-const restored = await manager.recoverSession();
+const restored = await manager.autoReconnect();
 // null if no session to restore
+```
+
+### getCapabilities() and getCapabilityDetails()
+
+Inspect both legacy boolean flags and the granular capability metadata added in `0.1.17`.
+
+```ts
+const capabilities = manager.getCapabilities();
+const details = manager.getCapabilityDetails();
+
+details?.supportedNetworks;
+details?.supportedTransactionTypes;
+details?.supportedMethods;
+details?.transactionModes; // sign-only | sign-and-submit | multisign
+```
+
+### switchNetwork()
+
+Request a network change through the active adapter. Unsupported adapters or undeclared target networks fail before session state changes.
+
+```ts
+if (manager.can("switchNetwork")) {
+  const network = await manager.switchNetwork("testnet");
+}
 ```
 
 ### cancelPendingConnection()
@@ -159,11 +171,12 @@ manager.destroy();
 ## Events
 
 ```ts
-manager.on("connect", (result: ConnectResult) => { ... });
-manager.on("disconnect", () => { ... });
-manager.on("error", (error: WalletError) => { ... });
-manager.on("sessionRestored", (result: ConnectResult) => { ... });
-manager.on("availabilityChanged", (availability: Record<string, boolean>) => { ... });
+manager.on("connected", ({ account, session }) => { ... });
+manager.on("disconnected", ({ adapterId }) => { ... });
+manager.on("error", ({ error }) => { ... });
+manager.on("session_restored", ({ session }) => { ... });
+manager.on("accountChanged", ({ account }) => { ... });
+manager.on("networkChanged", ({ network }) => { ... });
 manager.on("tx_submitted", ({ transaction }) => { ... });
 manager.on("tx_confirmed", ({ transaction }) => { ... });
 manager.on("tx_failed", ({ transaction }) => { ... });
@@ -173,10 +186,11 @@ manager.on("tx_failed", ({ transaction }) => { ... });
 
 | Property | Type | Description |
 |---|---|---|
-| `activeSession` | `WalletSession \| null` | Current active session |
-| `activeAdapterId` | `string \| null` | ID of the connected adapter |
-| `adapters` | `Map<string, BaseWalletAdapter>` | All registered adapters |
-| `network` | `XRPLNetwork \| undefined` | Active network |
+| `adapters` | `Map<string, WalletAdapter>` | All registered adapters |
+| `networks` | `WalletNetwork[]` | Registered built-in and custom networks |
+| `networkRegistry` | `NetworkRegistry` | Resolves network IDs to metadata |
+
+Use `getSession()`, `getAccount()`, `getAdapter()`, and `getNetwork()` rather than reading internal session fields.
 
 ## WalletSession
 
@@ -185,7 +199,7 @@ interface WalletSession {
   adapterId: string;
   account: {
     address: string;
-    network?: XRPLNetwork;
+    network?: WalletNetwork;
     networkType?: string;
   };
   connectedAt: number;   // Unix timestamp

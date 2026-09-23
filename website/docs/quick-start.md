@@ -13,6 +13,7 @@ import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
 import { createWalletConnectAdapter } from "@xrpl-wallet-kit/adapter-walletconnect";
 
 const manager = new WalletManager({
+  autoReconnect: true,
   adapters: [
     createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_CLIENT_ID }),
     createGemWalletAdapter(),
@@ -63,11 +64,11 @@ That's it. The button handles the full connect → display address → disconnec
 ## 3. Listen for Events
 
 ```ts
-manager.on("connect", (result) => {
-  console.log("Connected:", result.account.address);
+manager.on("connected", ({ account }) => {
+  console.log("Connected:", account.address);
 });
 
-manager.on("disconnect", () => {
+manager.on("disconnected", () => {
   console.log("Disconnected");
 });
 
@@ -84,7 +85,7 @@ Once connected, sign and submit a Payment transaction:
 const result = await manager.signAndSubmit({
   txJson: {
     TransactionType: "Payment",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     Destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe",
     Amount: "1000000", // 1 XRP in drops
     Fee: "12",
@@ -101,7 +102,7 @@ On page reload, the manager automatically attempts to restore the previous sessi
 
 ```ts
 // Call this once on app startup
-const restored = await manager.recoverSession();
+const restored = await manager.autoReconnect();
 if (restored) {
   console.log("Session restored:", restored.account.address);
 }
@@ -126,6 +127,7 @@ if (restored) {
     import { WalletModal, WalletButton } from "@xrpl-wallet-kit/ui";
 
     const manager = new WalletManager({
+  autoReconnect: true,
       adapters: [createGemWalletAdapter()],
       network: {
         id: "testnet",
@@ -143,7 +145,7 @@ if (restored) {
       target: document.getElementById("connect-btn-root"),
     });
 
-    await manager.recoverSession();
+    await manager.autoReconnect();
   </script>
 </body>
 </html>

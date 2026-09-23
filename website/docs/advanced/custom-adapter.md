@@ -10,18 +10,30 @@ An adapter must implement `WalletAdapter` from `@xrpl-wallet-kit/core`:
 import type { WalletAdapter } from "@xrpl-wallet-kit/core";
 
 const myAdapter: WalletAdapter = {
-  id: "my-wallet",
-  name: "My Wallet",
-  icon: "https://my-wallet.io/logo.png",
+  adapterApiVersion: "1.1",
+  metadata: {
+    id: "my-wallet",
+    name: "My Wallet",
+    type: "extension",
+    icon: "https://my-wallet.io/logo.png",
+  },
+  capabilities: {
+    connect: true,
+    disconnect: true,
+    signTransaction: true,
+    details: {
+      supportedNetworks: ["mainnet", "testnet"],
+      transactionModes: ["sign-only"],
+    },
+  },
 
-  async connect(context) { /* ... */ },
+  async connect(options) { /* ... */ },
   async disconnect() { /* ... */ },
-  async signTransaction(txJson, context) { /* ... */ },
+  async signTransaction(request) { /* ... */ },
 
   // Optional but recommended:
-  async signMessage(message, context) { /* ... */ },
-  async signAndSubmitTransaction(txJson, context) { /* ... */ },
-  async recoverSession() { /* ... */ },
+  async signMessage(request) { /* ... */ },
+  async restoreSession(session) { /* ... */ },
   isAvailable() { /* ... */ },
 };
 ```
@@ -30,24 +42,24 @@ const myAdapter: WalletAdapter = {
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `id` | `string` | ✅ | Unique kebab-case ID: `"my-wallet"` |
-| `name` | `string` | ✅ | Human-readable name shown in the modal |
-| `icon` | `string` | ✅ | URL or data URI for the wallet's logo (min 64×64 px) |
-| `type` | `"extension" \| "mobile" \| "hardware" \| "web"` | — | Hint for the modal UI |
-| `downloadUrl` | `string` | — | Link shown when `isAvailable()` returns false |
-| `apiVersion` | `string` | — | Set to `WALLET_ADAPTER_API_VERSION` from core |
+| `metadata.id` | `string` | ✅ | Unique lowercase kebab-case ID: `"my-wallet"` |
+| `metadata.name` | `string` | ✅ | Human-readable name shown in the modal |
+| `metadata.icon` | `string` | — | URL or data URI for the wallet logo |
+| `metadata.type` | `"extension" \| "mobile" \| "walletconnect" \| "snap" \| "hardware" \| "embedded"` | ✅ | Wallet integration type |
+| `adapterApiVersion` | `string` | — | Set to `WALLET_ADAPTER_API_VERSION` from core |
+| `capabilities` | `WalletCapabilities` | ✅ | Methods and granular support the adapter actually implements |
 
 ## Required methods
 
-### `connect(context): Promise<ConnectResult>`
+### `connect(options): Promise<ConnectResult>`
 
 Opens the wallet, prompts the user to choose an account, and returns the session.
 
 ```ts
-import type { ConnectContext, ConnectResult } from "@xrpl-wallet-kit/core";
+import type { ConnectOptions, ConnectResult } from "@xrpl-wallet-kit/core";
 import { WalletKitError, WalletKitErrorCode } from "@xrpl-wallet-kit/core";
 
-async connect(context?: ConnectContext): Promise<ConnectResult> {
+async connect(options: ConnectOptions): Promise<ConnectResult> {
   if (!window.MyWallet) {
     throw new WalletKitError(
       WalletKitErrorCode.WALLET_NOT_FOUND,
@@ -59,7 +71,7 @@ async connect(context?: ConnectContext): Promise<ConnectResult> {
 
   if (!response || !response.address) {
     throw new WalletKitError(
-      WalletKitErrorCode.CONNECT_REJECTED,
+      WalletKitErrorCode.CONNECTION_REJECTED,
       "User rejected the connection."
     );
   }
@@ -69,8 +81,7 @@ async connect(context?: ConnectContext): Promise<ConnectResult> {
       address: response.address,
       publicKey: response.publicKey,  // include if available
     },
-    adapterId: this.id,
-    connectedAt: Date.now(),
+    raw: response,
   };
 }
 ```
@@ -89,7 +100,7 @@ async disconnect(): Promise<void> {
 }
 ```
 
-### `signTransaction(txJson, context): Promise<SignTransactionResult>`
+### `signTransaction(request): Promise<SignTransactionResult>`
 
 Asks the user to sign a prepared transaction. Returns the signed blob.
 
@@ -97,25 +108,25 @@ Asks the user to sign a prepared transaction. Returns the signed blob.
 import type { SignTransactionResult } from "@xrpl-wallet-kit/core";
 
 async signTransaction(
-  txJson: Record<string, unknown>,
-  context?: SignContext
+  request: SignTransactionRequest
 ): Promise<SignTransactionResult> {
-  const result = await window.MyWallet.signTransaction({ transaction: txJson });
+  const result = await window.MyWallet.signTransaction({ transaction: request.txJson });
 
   if (!result || result.cancelled) {
     throw new WalletKitError(WalletKitErrorCode.SIGN_REJECTED, "User cancelled signing.");
   }
 
   return {
-    signedTxBlob: result.blob,
-    // hash: result.hash,  // if the wallet returns it
+    txBlob: result.blob,
+    signed: true,
+    raw: result,
   };
 }
 ```
 
 ## Optional methods
 
-### `signMessage(message, context): Promise<SignMessageResult>`
+### `signMessage(request): Promise<SignMessageResult>`
 
 Signs an arbitrary text message. Required if you want to use `@xrpl-wallet-kit/auth`.
 
@@ -123,10 +134,9 @@ Signs an arbitrary text message. Required if you want to use `@xrpl-wallet-kit/a
 import type { SignMessageResult } from "@xrpl-wallet-kit/core";
 
 async signMessage(
-  message: string,
-  context?: SignContext
+  request: SignMessageRequest
 ): Promise<SignMessageResult> {
-  const result = await window.MyWallet.signMessage({ message });
+  const result = await window.MyWallet.signMessage({ message: request.message });
 
   return {
     signature: result.signature,         // hex compact signature
@@ -142,21 +152,18 @@ Use `"signedTx"` if the wallet returns a full signed transaction blob.
 The auth verifier branches automatically based on `signatureKind`.
 :::
 
-### `recoverSession(): Promise<WalletSession | null>`
+### `restoreSession(session): Promise<ConnectResult | null>`
 
 Attempts to restore a previous session without user interaction. Called on page load.
 
 ```ts
-async recoverSession(): Promise<WalletSession | null> {
+async restoreSession(stored: WalletSession): Promise<ConnectResult | null> {
   try {
     const session = await window.MyWallet.getConnectedSession();
     if (!session?.address) return null;
 
-    return {
-      account: { address: session.address },
-      adapterId: this.id,
-      connectedAt: session.connectedAt ?? Date.now(),
-    };
+    if (session.address !== stored.account.address) return null;
+    return { account: { ...stored.account, address: session.address }, session: stored };
   } catch {
     return null;
   }
@@ -188,20 +195,23 @@ export interface MyWalletAdapterOptions {
 
 export function createMyWalletAdapter(options: MyWalletAdapterOptions = {}): WalletAdapter {
   return {
-    id: "my-wallet",
-    name: "My Wallet",
-    icon: "https://my-wallet.io/logo.png",
-    type: "extension",
-    apiVersion: WALLET_ADAPTER_API_VERSION,
-    downloadUrl: "https://chrome.google.com/webstore/detail/my-wallet",
+    adapterApiVersion: WALLET_ADAPTER_API_VERSION,
+    metadata: {
+      id: "my-wallet",
+      name: "My Wallet",
+      icon: "https://my-wallet.io/logo.png",
+      type: "extension",
+      homepage: "https://my-wallet.io",
+    },
+    capabilities: { connect: true, disconnect: true, signTransaction: true },
 
-    async connect(context) {
+    async connect(options) {
       // use options.clientId etc.
     },
 
     async disconnect() { /* ... */ },
 
-    async signTransaction(txJson) { /* ... */ },
+    async signTransaction(request) { /* ... */ },
 
     isAvailable() {
       return typeof window !== "undefined" && !!window.MyWallet;
@@ -217,11 +227,12 @@ Use `WalletKitError` with the correct code so the manager and UI can handle erro
 | Code | When to use |
 |---|---|
 | `WALLET_NOT_FOUND` | Extension/app not installed or not detected |
-| `CONNECT_REJECTED` | User cancelled the connect prompt |
+| `CONNECTION_REJECTED` | User cancelled the connect prompt |
 | `SIGN_REJECTED` | User cancelled or rejected signing |
-| `TIMEOUT` | Wallet didn't respond within a reasonable time |
-| `NETWORK_ERROR` | Network or node connection failure |
-| `UNKNOWN` | Unexpected error not covered above |
+| `REQUEST_TIMEOUT` | Wallet didn't respond within a reasonable time |
+| `NETWORK_MISMATCH` | Wallet returned a different network |
+| `UNSUPPORTED_METHOD` | Wallet cannot perform the requested operation |
+| `UNKNOWN_ERROR` | Unexpected error not covered above |
 
 ```ts
 import { WalletKitError, WalletKitErrorCode } from "@xrpl-wallet-kit/core";
@@ -272,4 +283,4 @@ Activate the skill at the start of your Claude Code session:
 /xrpl-wallet-kit-adapter-developer
 ```
 
-Then describe the wallet's API to the agent. It will scaffold the factory function, set capability flags correctly, map errors to `WalletKitErrorCode`, implement `recoverSession()` with passive-only rules, and generate a test scaffold — all following the adapter contract automatically.
+Then describe the wallet's API to the agent. It will scaffold the factory function, set capability flags correctly, map errors to `WalletKitErrorCode`, implement `restoreSession()` with passive-only rules, and generate a test scaffold — all following the adapter contract automatically.

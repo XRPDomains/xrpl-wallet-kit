@@ -16,13 +16,14 @@ import { createDefaultAdapters } from "@xrpl-wallet-kit/client";
 import { WalletKitProvider, WalletButton } from "@xrpl-wallet-kit/react";
 
 const manager = new WalletManager({
+  autoReconnect: true,
   adapters: createDefaultAdapters({
     walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
   }),
 });
 
 // Restore previous session on load
-await manager.recoverSession();
+await manager.autoReconnect();
 
 function App() {
   return (

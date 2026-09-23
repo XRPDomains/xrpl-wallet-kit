@@ -26,7 +26,7 @@ import { WalletModal } from "@xrpl-wallet-kit/ui";
 
 const manager = new WalletManager({
   adapters: [createGemWalletAdapter()],
-  network: XRPL_MAINNET,
+  network: "mainnet",
 });
 
 // Paste your config from the playground above:

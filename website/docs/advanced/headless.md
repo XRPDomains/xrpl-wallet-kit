@@ -25,6 +25,7 @@ import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
 import { createXamanAdapter } from "@xrpl-wallet-kit/adapter-xaman";
 
 const manager = new WalletManager({
+  autoReconnect: true,
   adapters: [
     createGemWalletAdapter(),
     createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_CLIENT_ID }),
@@ -100,7 +101,7 @@ manager.off("connected");
 
 ```ts
 // Sign only — returns the signed blob, does not submit
-const { signedTxBlob } = await manager.signTransaction({
+const { txBlob } = await manager.signTransaction({
   txJson: {
     TransactionType: "Payment",
     Account: session.account.address,
@@ -193,10 +194,10 @@ class WalletPickerUI {
 
 ## Session restore on startup
 
-Always call `recoverSession()` once on app load to restore the previous session without prompting the user:
+Always call `autoReconnect()` once on app load to restore the previous session without prompting the user:
 
 ```ts
-const restored = await manager.recoverSession();
+const restored = await manager.autoReconnect();
 if (restored) {
   console.log("Session restored:", restored.account.address);
 }

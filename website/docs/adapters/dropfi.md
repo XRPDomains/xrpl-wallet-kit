@@ -73,6 +73,16 @@ The official provider exposes: `selectedAddress`, `connectedAccounts`, `selected
 | switchNetwork | ✅ | ✅ |
 | signTransaction | ❌ | ❌ |
 
+The adapter advertises `supportedNetworks: ["mainnet", "testnet", "devnet"]` and `transactionModes: ["sign-and-submit"]` through granular capability metadata.
+
+```ts
+if (manager.can("switchNetwork", "dropfi")) {
+  await manager.switchNetwork("testnet");
+}
+```
+
+The manager validates the requested network before calling DropFi, persists the selected network in the active session, and emits `networkChanged` after success.
+
 ## Message Signing
 
 DropFi returns a **compact message signature** and public key:
@@ -142,6 +152,7 @@ This works identically for both the Chrome extension and the mobile in-app brows
 - [ ] `signAndSubmit` Payment — DropFi popup shows txn, hash returned
 - [ ] `signAndSubmit` NFT offer — DropFi popup shows NFT txn, hash returned
 - [ ] `signMessage` — compact signature and public key returned, `signatureKind: "signature"`
+- [ ] `switchNetwork("testnet")` — provider switches and session network is updated
 - [ ] Page reload — session restored via `isConnected()` + address match
 - [ ] Extension not installed — modal shows install link to dropfi.app
 - [ ] Rejection — user dismisses popup, adapter throws `CONNECTION_REJECTED`
@@ -151,6 +162,7 @@ This works identically for both the Chrome extension and the mobile in-app brows
 - [ ] Connect — native approval sheet shown, address returned
 - [ ] `signAndSubmit` Payment — native signing sheet shown, hash returned
 - [ ] `signMessage` — compact signature and public key returned
+- [ ] `switchNetwork("testnet")` — native wallet switches and session network is updated
 - [ ] Page reload in WebView — session restored without re-approval
 - [ ] Open DApp in external browser (Safari/Chrome) — provider not detected (expected)
 

@@ -13,7 +13,7 @@ import {
 
 const manager = new WalletManager({
   adapters: [...],
-  network: XRPL_MAINNET,
+  network: "mainnet",
 });
 ```
 
@@ -28,16 +28,19 @@ const manager = new WalletManager({
 ```ts
 const manager = new WalletManager({
   adapters: [...],
-  network: {
+  network: "my-network",
+  networks: [{
     id: "my-network",
+    name: "My XRPL Network",
     networkType: "MAINNET",        // used for network badge color
-    url: "wss://my-xrpl-node.example.com",
+    rpcUrl: "wss://my-xrpl-node.example.com",
     httpRpcUrl: "https://my-xrpl-node.example.com",
     nativeAsset: "XRP",
     nativeAssetDecimals: 6,
-    explorerUrl: "https://livenet.xrpl.org", // optional
+    explorerTxUrl: "https://explorer.example.com/tx/{hash}",
+    explorerAccountUrl: "https://explorer.example.com/account/{address}",
     walletConnectChainId: "xrpl:0",          // optional, for WalletConnect
-  },
+  }],
 });
 ```
 
@@ -54,8 +57,21 @@ The modal displays a colored network badge when the connected network is not mai
 
 ## Switching Networks
 
-Networks are set at manager construction time. To support network switching, destroy and recreate the manager with the new network config, or implement a custom network switcher in your app layer.
+Since `0.1.17`, the manager exposes a unified network-switching API. It only invokes adapters that explicitly advertise `switchNetwork: true` and rejects targets outside the adapter's `supportedNetworks` metadata.
+
+```ts
+const details = manager.getCapabilityDetails();
+
+if (
+  manager.can("switchNetwork") &&
+  details?.supportedNetworks?.includes("testnet")
+) {
+  await manager.switchNetwork("testnet");
+}
+```
+
+On success, the manager updates and persists the active session, then emits `networkChanged`. `createWalletKit()` also exposes the bound shortcut `kit.switchNetwork()`.
 
 ::: info
-Network switching mid-session is wallet-dependent. Some wallets (e.g., Xaman) manage their own active network. Others (e.g., GemWallet) follow the user's extension setting.
+Network switching remains wallet-dependent. DropFi currently implements the unified API. Wallets without a verified switching method fail with `UNSUPPORTED_METHOD`; reconnect with the intended network instead of mutating session state manually.
 :::

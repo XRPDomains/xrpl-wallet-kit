@@ -28,13 +28,14 @@ export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig()
 
   const kit = createWalletKit({
+  autoReconnect: true,
     wallets: 'all',
     walletConnectProjectId: config.public.walletConnectProjectId,
     xamanClientId: config.public.xamanClientId,
   })
 
   // Restore session from localStorage on every page load
-  kit.manager.recoverSession()
+  kit.manager.autoReconnect()
 
   return {
     provide: {
@@ -240,7 +241,7 @@ export default defineNuxtPlugin(() => {
   const toast = new WalletToast({ manager: kit.manager })
   toast.mount()
 
-  kit.manager.recoverSession()
+  kit.manager.autoReconnect()
 
   return { provide: { walletKit: kit } }
 })
@@ -252,6 +253,7 @@ Pass `theme` and `themeMode` to `createWalletKit`:
 
 ```ts
 const kit = createWalletKit({
+  autoReconnect: true,
   wallets: 'all',
   theme: {
     accent: '#0284c7',

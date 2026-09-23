@@ -10,7 +10,7 @@ XRPL has a native decentralised exchange built into the protocol — no smart co
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "OfferCreate",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     // Sell 1 XRP, expect at least 0.50 USD in return
     TakerGets: "1000000",          // 1 XRP in drops
     TakerPays: {
@@ -30,7 +30,7 @@ await manager.signAndSubmit({
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "OfferDelete",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     OfferSequence: 42,   // sequence number of the OfferCreate transaction
   },
 });
@@ -44,7 +44,7 @@ await manager.signAndSubmit({
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "AMMDeposit",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     Asset:  { currency: "XRP" },
     Asset2: { currency: "USD", issuer: "<issuer_address>" },
     Amount: "10000000",   // XRP side in drops
@@ -59,7 +59,7 @@ await manager.signAndSubmit({
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "AMMWithdraw",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     Asset:  { currency: "XRP" },
     Asset2: { currency: "USD", issuer: "<issuer_address>" },
     LPTokenIn: {

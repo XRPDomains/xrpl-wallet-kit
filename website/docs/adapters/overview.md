@@ -41,6 +41,7 @@ import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
 import { createWalletConnectAdapter } from "@xrpl-wallet-kit/adapter-walletconnect";
 
 const manager = new WalletManager({
+  autoReconnect: true,
   adapters: [
     createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_API_KEY }),
     createGemWalletAdapter(),
@@ -48,7 +49,7 @@ const manager = new WalletManager({
       projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
     }),
   ],
-  network: XRPL_MAINNET,
+  network: "mainnet",
 });
 ```
 

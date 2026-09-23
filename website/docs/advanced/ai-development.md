@@ -24,7 +24,7 @@ It is written to be agent-readable — structured prose that any coding AI can f
 - The full `WalletAdapter` interface — every required and optional method with semantics
 - **Capability rules** — when `signMessage`, `signTransaction`, `signAndSubmit`, `payments`, `nftOffers` may be set to `true`
 - **Error mapping** — which `WalletKitErrorCode` applies to each failure case
-- **Session restore rules** — when `recoverSession()` is safe to implement vs when to return `null`
+- **Session restore rules** — when `restoreSession()` is safe to implement vs when to return `null`
 - **Cleanup requirements** — WalletConnect proposals, focus/visibility listeners, deeplink timers, storage markers
 - **Transaction normalization** — how to handle `hash`, `txHash`, `tx_hash`, `transactionHash`, nested response shapes
 - **Hard rules** — no business logic, no UI code, no secrets inside adapters
@@ -104,7 +104,7 @@ The AI should produce:
 - Accurate capability flags (e.g. `signMessage: true` only because it is implemented)
 - `WalletKitError` with the correct error code for every failure path
 - `isAvailable()` that reads `window.myWallet` without throwing
-- `recoverSession()` that reads passive provider state only — no `connect()` call inside it
+- `restoreSession()` that reads passive provider state only — no `connect()` call inside it
 
 **Step 5 — Run validation**
 
@@ -136,10 +136,10 @@ These prompts work well with Claude Code after activating the skill:
 > "Add BitgetWallet to the WalletConnect adapter's wallet list. The wallet supports EIP-155 and XRPL chains. AppStore ID: 1639703499, Play Store package: com.bitget.wallet. Icon URL: [url]. Use the walletconnect-wallet reference from the skill."
 
 **Mobile deeplink wallet:**
-> "Build a mobile deeplink adapter for WalletX. It uses a custom URI scheme `walletx://`. QR code flow on desktop, deeplink on mobile. Add `recoverSession()` using the pageshow/visibility return pattern for mobile. Use the adapter skill rules for mobile flows."
+> "Build a mobile deeplink adapter for WalletX. It uses a custom URI scheme `walletx://`. QR code flow on desktop, deeplink on mobile. Add guarded `recoverSession()` for a pending deeplink return and passive `restoreSession()` for stored sessions. Use the adapter skill rules for mobile flows."
 
 **Reviewing a contribution:**
-> "Review this adapter PR against the XRPL Wallet Kit adapter contract. Check capabilities, error codes, cleanup, and `recoverSession()` correctness. Use the adapter checklist from the skill."
+> "Review this adapter PR against the XRPL Wallet Kit adapter contract. Check capabilities, error codes, cleanup, and session restoration correctness. Use the adapter checklist from the skill."
 
 ---
 
@@ -155,7 +155,7 @@ When the skill is active, the AI automatically refuses to:
 | Set `signMessage: true` before implementing it | Capabilities must match actual method implementations |
 | Return `null` silently on user cancel | Must throw `WalletKitErrorCode.SIGN_REJECTED` |
 | Skip WalletConnect proposal cleanup | Must call `clearStaleProposals()` + `disconnectStale()` |
-| Call `connect()` inside `recoverSession()` | `recoverSession()` is passive-only |
+| Call `connect()` inside `restoreSession()` | `restoreSession()` is passive-only |
 | Submit a transaction inside `signTransaction()` | Must sign only, never submit |
 
 ---

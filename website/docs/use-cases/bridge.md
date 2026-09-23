@@ -18,7 +18,7 @@ const evmRecipient = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "Payment",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     Destination: "<bridge_custodial_address>",
     Amount: "10000000",    // 10 XRP in drops
     DestinationTag: 0,     // check the bridge docs — many require a specific tag
@@ -45,7 +45,7 @@ await manager.signAndSubmit({
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "XChainCommit",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     XChainBridge: {
       LockingChainDoor:   "<mainchain_door_account>",
       LockingChainIssue:  { currency: "XRP" },
@@ -66,7 +66,7 @@ await manager.signAndSubmit({
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "EscrowCreate",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     Destination: "<bridge_address>",
     Amount: "10000000",                                    // 10 XRP in drops
     Condition: "<crypto_condition_hex>",                   // PREIMAGE-SHA-256

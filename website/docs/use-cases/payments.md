@@ -8,7 +8,7 @@ XRPL's core strength is fast, low-fee payments settling in 3–5 seconds. The `P
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "Payment",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     Destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe",
     Amount: "5000000",   // 5 XRP in drops (1 XRP = 1,000,000 drops)
   },
@@ -23,7 +23,7 @@ Before a user can receive an IOU token, they must create a trust line with the i
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "TrustSet",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     LimitAmount: {
       currency: "USD",
       issuer: "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq",
@@ -39,7 +39,7 @@ await manager.signAndSubmit({
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "Payment",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     Destination: "<recipient_address>",
     Amount: {
       currency: "USD",
@@ -58,7 +58,7 @@ Pay in XRP; the recipient receives USD. XRPL path-finding handles the conversion
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "Payment",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     Destination: "<recipient_address>",
     Amount: {
       currency: "USD",
@@ -79,7 +79,7 @@ Required for exchange and custodial wallet deposits:
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "Payment",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     Destination: "<exchange_hot_wallet>",
     Amount: "10000000",
     DestinationTag: 12345678,   // identifies the recipient account at the exchange

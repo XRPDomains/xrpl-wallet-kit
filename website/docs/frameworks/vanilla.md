@@ -38,13 +38,14 @@ The fastest path — `createWalletKit` wires up everything automatically:
 import { createWalletKit } from "@xrpl-wallet-kit/client";
 
 const { manager, openModal } = createWalletKit({
+  autoReconnect: true,
   wallets: "all",
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
   xamanClientId: import.meta.env.VITE_XAMAN_CLIENT_ID,
   connectButton: "#connect-btn",   // CSS selector for your button element
 });
 
-await manager.recoverSession();
+await manager.autoReconnect();
 ```
 
 ```html
@@ -67,6 +68,7 @@ import { WalletModal, WalletButton } from "@xrpl-wallet-kit/ui";
 
 // 1. Create the manager
 const manager = new WalletManager({
+  autoReconnect: true,
   adapters: [
     createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_CLIENT_ID }),
     createGemWalletAdapter(),
@@ -97,7 +99,7 @@ const button = new WalletButton({
 });
 
 // 4. Restore previous session
-await manager.recoverSession();
+await manager.autoReconnect();
 ```
 
 ## Listening to Events

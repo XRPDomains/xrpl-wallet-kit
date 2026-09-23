@@ -19,6 +19,7 @@ import { createDefaultAdapters } from "@xrpl-wallet-kit/client";
 
 // Module-level singleton — safe in Next.js
 export const manager = new WalletManager({
+  autoReconnect: true,
   adapters: createDefaultAdapters({
     walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
     xamanClientId: process.env.NEXT_PUBLIC_XAMAN_CLIENT_ID,
@@ -90,7 +91,7 @@ export function ConnectButton() {
 
 ### 5. Session restore
 
-Call `recoverSession()` once on the client after mount:
+Call `autoReconnect()` once on the client after mount:
 
 ```tsx
 // components/WalletProvider.tsx
@@ -102,7 +103,7 @@ import { manager } from "@/lib/wallet-manager";
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    manager.recoverSession();
+    manager.autoReconnect();
   }, []);
 
   return (

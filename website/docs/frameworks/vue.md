@@ -31,13 +31,14 @@ import { onMounted } from 'vue'
 import { createWalletKit } from '@xrpl-wallet-kit/client'
 
 const { manager } = createWalletKit({
+  autoReconnect: true,
   wallets: 'all',
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
   xamanClientId: import.meta.env.VITE_XAMAN_CLIENT_ID,
   connectButton: '#connect-btn',
 })
 
-onMounted(() => manager.recoverSession())
+onMounted(() => manager.autoReconnect())
 </script>
 
 <template>
@@ -59,6 +60,7 @@ import type { WalletSession, WalletAccount } from '@xrpl-wallet-kit/core'
 
 // Create kit once, outside the composable, so state is shared app-wide
 const { manager, modal } = createWalletKit({
+  autoReconnect: true,
   wallets: 'all',
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
   xamanClientId: import.meta.env.VITE_XAMAN_CLIENT_ID,
@@ -81,7 +83,7 @@ manager.on('disconnected', () => {
 })
 
 export function useWalletKit() {
-  onMounted(() => manager.recoverSession())
+  onMounted(() => manager.autoReconnect())
 
   return {
     manager,
@@ -131,6 +133,7 @@ import { createWalletKit } from '@xrpl-wallet-kit/client'
 import App from './App.vue'
 
 const kit = createWalletKit({
+  autoReconnect: true,
   wallets: 'all',
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
 })
@@ -165,13 +168,14 @@ const btnRef = ref<HTMLElement | null>(null)
 let button: WalletButton | null = null
 
 const manager = new WalletManager({
+  autoReconnect: true,
   adapters: [createGemWalletAdapter()],
 })
 const modal = new WalletModal({ manager })
 
 onMounted(async () => {
   button = new WalletButton({ manager, modal, target: btnRef.value! })
-  await manager.recoverSession()
+  await manager.autoReconnect()
 })
 
 onUnmounted(() => {
@@ -247,6 +251,7 @@ Toasts appear automatically on submit, confirm, and failure — no extra wiring.
 import { createWalletKit } from '@xrpl-wallet-kit/client'
 
 createWalletKit({
+  autoReconnect: true,
   wallets: 'all',
   theme: {
     accent: '#0284c7',

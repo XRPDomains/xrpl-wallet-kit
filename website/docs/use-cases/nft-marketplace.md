@@ -20,7 +20,7 @@ const uriHex = Buffer.from(uri).toString("hex").toUpperCase();
 const result = await manager.signAndSubmit({
   txJson: {
     TransactionType: "NFTokenMint",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     NFTokenTaxon: 0,       // collection ID — your app defines the value
     TransferFee: 2500,     // 2.5% creator royalty (unit = 0.001%, max 50000)
     Flags: 8,              // tfTransferable — allows secondary sales
@@ -38,7 +38,7 @@ console.log("Minted. TX hash:", result.hash);
 const result = await manager.signAndSubmit({
   txJson: {
     TransactionType: "NFTokenCreateOffer",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     NFTokenID: "<token_id>",
     Amount: "10000000",   // 10 XRP in drops
     Flags: 1,             // tfSellNFToken
@@ -53,7 +53,7 @@ const result = await manager.signAndSubmit({
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "NFTokenAcceptOffer",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     NFTokenSellOffer: "<offer_id>",
   },
 });
@@ -65,7 +65,7 @@ await manager.signAndSubmit({
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "NFTokenCancelOffer",
-    Account: manager.activeSession?.account.address,
+    Account: manager.getSession()?.account.address,
     NFTokenOffers: ["<offer_id_1>", "<offer_id_2>"],
   },
 });

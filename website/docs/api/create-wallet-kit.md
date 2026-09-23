@@ -28,7 +28,7 @@ const { manager, modal, button, toast, openModal } = createWalletKit({
   connectButton: "#connect-btn",
 });
 
-await manager.recoverSession();
+await manager.autoReconnect();
 ```
 
 ```html
@@ -97,8 +97,8 @@ interface CreateWalletClientOptions {
   // Provide pre-built adapter instances instead of auto-creation
   adapters?: WalletAdapter[];
 
-  // Session storage — "localStorage" (default), "memory", or a custom StorageAdapter
-  storage?: "localStorage" | "memory" | StorageAdapter;
+  // Session storage — "localStorage" (default), "memory", or custom WalletStorage
+  storage?: "localStorage" | "memory" | WalletStorage;
 
   // WalletConnect Project ID (required for WalletConnect adapter)
   walletConnectProjectId?: string;
@@ -147,6 +147,7 @@ kit.toast          // WalletToast instance (undefined if no modal)
 kit.openModal()    // () => void — open the modal programmatically
 kit.closeModal()   // () => void — close the modal
 kit.disconnect()   // () => void — disconnect the active wallet
+kit.switchNetwork("testnet") // switch through the active adapter when supported
 kit.getSession()   // () => WalletSession | null — current session
 kit.signAndSubmit  // manager.signAndSubmit (bound)
 kit.signTransaction// manager.signTransaction (bound)
@@ -280,11 +281,11 @@ When `adapters` is provided, the `wallets` and `walletConnectProjectId` fields a
 
 ## Session Restore
 
-Call `recoverSession()` once on startup:
+Call `autoReconnect()` once on startup:
 
 ```ts
-const { manager } = createWalletKit({ wallets: "all", ... });
-await manager.recoverSession();
+const { manager } = createWalletKit({ wallets: "all", autoReconnect: true, ... });
+await manager.autoReconnect();
 ```
 
 ## `createWalletClient`
