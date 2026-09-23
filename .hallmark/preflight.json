@@ -1,0 +1,21 @@
+{
+  "scope": "single-page",
+  "target": "website/index.md",
+  "framework": "VitePress 1.3 with Vue 3",
+  "existingSystem": {
+    "theme": "XRPDomains documentation theme",
+    "palette": "cool blue accent, cool-white surfaces, slate ink",
+    "typography": "Plus Jakarta Sans with JetBrains Mono",
+    "motion": "short ease-out transitions with reduced-motion fallbacks"
+  },
+  "assets": [
+    "website/public/logo.svg",
+    "website/.vitepress/theme/components/PlaygroundWidget.vue"
+  ],
+  "constraints": [
+    "Preserve VitePress routing and documentation content",
+    "Use the existing live playground as the product proof",
+    "Do not introduce generated imagery or fake browser chrome",
+    "Verify 320, 375, 414, 768, and desktop widths"
+  ]
+}

@@ -1,11 +1,14 @@
 import DefaultTheme from "vitepress/theme";
+import HomePage from "./components/HomePage.vue";
 import PlaygroundWidget from "./components/PlaygroundWidget.vue";
 import "./custom.css";
 import "./theme-xrpdomains.css";
+import "./home.css";
 
 export default {
   extends: DefaultTheme,
   enhanceApp({ app }) {
+    app.component("HomePage", HomePage);
     app.component("PlaygroundWidget", PlaygroundWidget);
 
     // Inject XRPDomains theme class so .xd-theme rules activate.

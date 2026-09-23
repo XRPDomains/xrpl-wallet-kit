@@ -10,7 +10,7 @@ export default defineConfig({
 
   head: [
     ["link", { rel: "icon", type: "image/svg+xml", href: "/logo.svg" }],
-    ["meta", { name: "theme-color", content: "#0284c7" }],
+    ["meta", { name: "theme-color", content: "#0f172a" }],
     // Upgrade any http:// prefetch/preflight requests to https:// automatically.
     // Prevents Mixed Content errors when the reverse proxy terminates TLS.
     ["meta", { "http-equiv": "Content-Security-Policy", content: "upgrade-insecure-requests" }],
@@ -74,7 +74,7 @@ export default defineConfig({
           { text: "Installation", link: "/docs/installation" },
           { text: "Quick Start", link: "/docs/quick-start" },
           { text: "Playground", link: "/docs/playground" },
-          { text: "🎨 Theme Builder", link: "/docs/theme-builder" },
+          { text: "Theme Builder", link: "/docs/theme-builder" },
         ],
       },
       {
@@ -130,7 +130,7 @@ export default defineConfig({
           { text: "Bundle & Performance", link: "/docs/advanced/bundle-performance" },
           { text: "Headless Core", link: "/docs/advanced/headless" },
           { text: "Custom Adapter", link: "/docs/advanced/custom-adapter" },
-          { text: "🤖 Building with AI", link: "/docs/advanced/ai-development" },
+          { text: "Building with AI", link: "/docs/advanced/ai-development" },
         ],
       },
       {
