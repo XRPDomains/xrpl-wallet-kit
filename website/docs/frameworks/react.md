@@ -5,25 +5,32 @@
 ## Installation
 
 ```bash
-npm install @xrpl-wallet-kit/react @xrpl-wallet-kit/client
+npm install @xrpl-wallet-kit/react @xrpl-wallet-kit/core \
+  @xrpl-wallet-kit/adapter-gemwallet @xrpl-wallet-kit/adapter-crossmark
 ```
+
+## Choosing a setup
+
+| You want | Use | Bundle profile |
+| --- | --- | --- |
+| Default wallets with the least setup | `client` + `react` | Largest |
+| Selected wallets with the kit modal | `client/selective` + `react` + named adapters | Medium |
+| Your own wallet interface | `core` + named adapters | Smallest |
+
+The all-in-one client includes first-party adapter factories. If your app supports only a few wallets, import those adapter packages directly as shown below.
 
 ## Quick Start
 
 ```tsx
 import { WalletManager } from "@xrpl-wallet-kit/core";
-import { createDefaultAdapters } from "@xrpl-wallet-kit/client";
+import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
+import { createCrossmarkAdapter } from "@xrpl-wallet-kit/adapter-crossmark";
 import { WalletKitProvider, WalletButton } from "@xrpl-wallet-kit/react";
 
 const manager = new WalletManager({
   autoReconnect: true,
-  adapters: createDefaultAdapters({
-    walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-  }),
+  adapters: [createGemWalletAdapter(), createCrossmarkAdapter()],
 });
-
-// Restore previous session on load
-await manager.autoReconnect();
 
 function App() {
   return (
@@ -106,11 +113,31 @@ interface WalletKitContextValue {
   account: WalletAccount | null;
   status: "disconnected" | "connecting" | "connected";
   wallets: WalletMetadata[];       // all registered adapters
+  availability: Record<string, boolean | "unknown">;
+  refreshAvailability: () => Promise<void>;
   connect: (adapterId: string) => Promise<WalletSession>;
   disconnect: () => Promise<void>;
   openModal: () => void;
   closeModal: () => void;
-  modal: WalletModal;
+  modal: WalletModal | null;       // null during SSR and before client mount
+}
+```
+
+For a custom selector, treat `"unknown"` as a pending check rather than as unavailable:
+
+```tsx
+function WalletList() {
+  const { wallets, availability, connect } = useWalletKit();
+
+  return wallets.map((wallet) => (
+    <button
+      key={wallet.id}
+      disabled={availability[wallet.id] !== true}
+      onClick={() => connect(wallet.id)}
+    >
+      {wallet.name}
+    </button>
+  ));
 }
 ```
 
@@ -230,9 +257,9 @@ function CustomConnectButton() {
 
 ## SSR / Server Components
 
-`WalletKitProvider` uses `useLayoutEffect` in the browser and `useEffect` on the server (no hydration mismatch). The modal is created client-side only.
+`WalletKitProvider` keeps its children and a deterministic context value in server-rendered HTML. The modal is created client-side only, so `modal` is initially `null`; `openModal()` and `closeModal()` are safe no-ops until it mounts.
 
-For Next.js App Router, use the dedicated `@xrpl-wallet-kit/next` package — it re-exports everything with the required `"use client"` directive.
+The React package publishes a `"use client"` boundary and works directly in Next.js App Router Client Components. The dedicated `@xrpl-wallet-kit/next` package remains available as a thin discoverability alias. See the [Next.js guide](/docs/frameworks/next) for provider placement.
 
 ## TypeScript
 

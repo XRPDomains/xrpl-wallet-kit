@@ -4,6 +4,11 @@
   "description": "Browser-ready XRPL Wallet Kit bundle for vanilla JavaScript and legacy HTML sites.",
   "license": "MIT",
   "type": "module",
+  "sideEffects": [
+    "./dist/index.js",
+    "./dist/xrpl-wallet-kit.iife*.js",
+    "./dist/xrpl-wallet-kit-legacy-bridge.js"
+  ],
   "main": "./dist/xrpl-wallet-kit.iife.js",
   "types": "./dist/index.d.ts",
   "exports": {

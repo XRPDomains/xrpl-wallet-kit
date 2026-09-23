@@ -1,12 +1,23 @@
 # Next.js
 
-`@xrpl-wallet-kit/next` is a thin wrapper around `@xrpl-wallet-kit/react` that adds the `"use client"` directive required for Next.js App Router. The API is identical to the React package.
+`@xrpl-wallet-kit/next` is a thin discoverability wrapper around the client-safe React bindings. The API is identical to `@xrpl-wallet-kit/react`, which also publishes its own `"use client"` boundary.
 
 ## Installation
 
 ```bash
-npm install @xrpl-wallet-kit/next @xrpl-wallet-kit/client
+npm install @xrpl-wallet-kit/next @xrpl-wallet-kit/core \
+  @xrpl-wallet-kit/adapter-gemwallet @xrpl-wallet-kit/adapter-crossmark
 ```
+
+## Choosing a setup
+
+| You want | Use | Bundle profile |
+| --- | --- | --- |
+| Default wallets with the least setup | `client` + `next` | Largest |
+| Selected wallets with the kit modal | `client/selective` + `next` + named adapters | Medium |
+| Your own wallet interface | `core` + named adapters | Smallest |
+
+The example below uses named adapters so Next.js does not pull every first-party adapter into the client graph.
 
 ## App Router Setup
 
@@ -15,21 +26,19 @@ npm install @xrpl-wallet-kit/next @xrpl-wallet-kit/client
 ```ts
 // lib/wallet-manager.ts
 import { WalletManager } from "@xrpl-wallet-kit/core";
-import { createDefaultAdapters } from "@xrpl-wallet-kit/client";
+import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
+import { createCrossmarkAdapter } from "@xrpl-wallet-kit/adapter-crossmark";
 
 // Module-level singleton — safe in Next.js
 export const manager = new WalletManager({
   autoReconnect: true,
-  adapters: createDefaultAdapters({
-    walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-    xamanClientId: process.env.NEXT_PUBLIC_XAMAN_CLIENT_ID,
-  }),
+  adapters: [createGemWalletAdapter(), createCrossmarkAdapter()],
 });
 ```
 
 ### 2. Create a Client Provider component
 
-`WalletKitProvider` uses browser APIs — it must be in a Client Component:
+The provider creates its modal in the browser, so place it in a Client Component. Its children remain present in the server-rendered HTML and the context is usable before the modal mounts:
 
 ```tsx
 // components/WalletProvider.tsx
@@ -158,7 +167,7 @@ export default function RootLayout({ children }) {
 
 ## Pages Router
 
-If you are on the older Pages Router, import from `@xrpl-wallet-kit/react` directly instead — the `"use client"` directive is App Router–specific and not needed:
+If you are on the older Pages Router, you can import from `@xrpl-wallet-kit/react` directly:
 
 ```tsx
 // pages/_app.tsx

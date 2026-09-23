@@ -4,6 +4,7 @@
   "description": "Xaman adapter for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

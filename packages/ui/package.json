@@ -4,6 +4,7 @@
   "description": "Framework-agnostic XRPL wallet modal, connect button, QR panel, and account panel UI.",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

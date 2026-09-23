@@ -1,3 +1,5 @@
+"use client";
+
 export * from "./types";
 export * from "./themes";
 export * from "./config";

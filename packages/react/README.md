@@ -10,6 +10,16 @@ This package provides a provider, hooks, and a React `WalletButton` wrapper arou
 npm install @xrpl-wallet-kit/react @xrpl-wallet-kit/client
 ```
 
+## Choosing a setup
+
+| You want | Use | Bundle profile |
+| --- | --- | --- |
+| Default wallets with the least setup | `client` + `react` | Largest |
+| Selected wallets with the kit modal | `client/selective` + `react` + named adapters | Medium |
+| Your own buttons and views | `core` + named adapters | Smallest |
+
+`@xrpl-wallet-kit/client` statically includes the first-party adapter factories. For a selective build, create `WalletManager` with only the adapter packages your app supports.
+
 ## Setup
 
 ```tsx
@@ -90,6 +100,25 @@ Status values:
 - `connecting`
 - `connected`
 
+`useWalletKit()` also exposes `availability` and `refreshAvailability()`. Availability starts as `"unknown"` during SSR and resolves to a boolean after mount, so custom selectors can avoid hydration mismatches and disabled-wallet guesswork.
+
+```tsx
+const { wallets, availability, connect } = useWalletKit();
+
+return wallets.map((wallet) => {
+  const state = availability[wallet.id];
+  return (
+    <button
+      key={wallet.id}
+      disabled={state !== true}
+      onClick={() => connect(wallet.id)}
+    >
+      {wallet.name}{state === "unknown" ? " (checking)" : ""}
+    </button>
+  );
+});
+```
+
 The provider syncs connection, account, network, stale session, expired session, and transaction-related manager events so consumers re-render from wallet state changes.
 
 ## Notes
@@ -97,3 +126,5 @@ The provider syncs connection, account, network, stale session, expired session,
 - Create the wallet kit once at module scope or inside a stable app-level initializer.
 - Use `@xrpl-wallet-kit/client` for the default adapter/UI wiring.
 - Use `@xrpl-wallet-kit/core` directly only when building a custom integration.
+- In Next.js App Router, place the provider in a Client Component. The package publishes its own `"use client"` boundary; the local directive is still useful because the component creates browser-side configuration.
+- Provider children remain in server-rendered HTML. `modal` is `null` until the client mounts; `openModal()` and `closeModal()` are safe no-ops before then.

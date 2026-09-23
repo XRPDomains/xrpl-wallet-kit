@@ -75,7 +75,15 @@ WalletManager
         `-- Ledger
 ```
 
-Most applications should start with `@xrpl-wallet-kit/client`. Advanced integrations can compose `@xrpl-wallet-kit/core`, `@xrpl-wallet-kit/ui`, and individual adapters directly.
+## Choosing a setup
+
+| You want | Use | Bundle profile |
+| --- | --- | --- |
+| Default wallets with the least setup | `@xrpl-wallet-kit/client` and `createWalletKit()` | Largest; includes first-party adapter factories |
+| Selected wallets with the kit modal | `client/selective`, `react`, and only the adapters you choose | Medium |
+| Your own wallet interface | `core` and only the adapters you choose | Smallest |
+
+Start with `client` when integration speed matters most. Use `@xrpl-wallet-kit/client/selective` with named adapter packages when download size matters or the app supports only a small wallet set. See the [React](https://xrpdomains.xyz/xrpl-wallet-kit/docs/frameworks/react) and [Next.js](https://xrpdomains.xyz/xrpl-wallet-kit/docs/frameworks/next) guides for provider placement and client-component boundaries.
 
 ## Install
 

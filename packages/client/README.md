@@ -16,6 +16,22 @@ For React apps, also install `@xrpl-wallet-kit/react`.
 npm install @xrpl-wallet-kit/client @xrpl-wallet-kit/react
 ```
 
+## Choosing an entry
+
+- `@xrpl-wallet-kit/client` provides the batteries-included factory and first-party adapter exports. It has the largest bundle profile.
+- `@xrpl-wallet-kit/client/selective` provides core, UI, storage resolution, and a manager factory without importing any wallet adapter. Install and pass only the adapter packages your app supports.
+
+```ts
+import { createWalletClient } from "@xrpl-wallet-kit/client/selective";
+import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
+
+const manager = createWalletClient({
+  adapters: [createGemWalletAdapter()],
+  network: "mainnet",
+  storage: "localStorage",
+});
+```
+
 ## Quick Start
 
 ```ts

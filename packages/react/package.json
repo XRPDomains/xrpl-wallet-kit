@@ -4,6 +4,8 @@
   "description": "React bindings and hooks for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

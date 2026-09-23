@@ -10,6 +10,10 @@ This package keeps Next.js integrations pointed at the client-safe React binding
 npm install @xrpl-wallet-kit/next @xrpl-wallet-kit/client
 ```
 
+## Choosing a setup
+
+Use `@xrpl-wallet-kit/client` for the shortest default-wallet setup. For a smaller selective build, combine `@xrpl-wallet-kit/core`, `@xrpl-wallet-kit/react` (or this package), and only the adapter packages you support. The client package includes the first-party adapter factories even when configuration enables a subset.
+
 ## Client Component Usage
 
 ```tsx
@@ -50,7 +54,8 @@ The exported `WalletButton` also supports host attributes and a `WalletButtonHan
 
 ## App Router Notes
 
-- Use this package from Client Components only.
+- Use wallet hooks and browser configuration from Client Components. Provider children remain present in server-rendered HTML.
+- `@xrpl-wallet-kit/react` now publishes the same client boundary; this package remains a Next-specific discoverability alias.
 - Prefix browser-exposed environment variables with `NEXT_PUBLIC_`.
 - Keep auth verification and private API secrets in server routes.
 - For Sign-In with XRPL, pair this package with `@xrpl-wallet-kit/auth`.

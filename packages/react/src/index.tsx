@@ -1,9 +1,12 @@
-import React, { createContext, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
+"use client";
+
+import React, { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { WalletAccount, WalletCapabilities, WalletManager, WalletMetadata, WalletSession } from "@xrpl-wallet-kit/core";
 import { createWalletButton, createWalletModal } from "@xrpl-wallet-kit/ui";
 import type { WalletButtonController, WalletButtonOptions, WalletModal, WalletUiConfig } from "@xrpl-wallet-kit/ui";
 
 export type WalletKitStatus = "disconnected" | "connecting" | "connected";
+export type WalletAvailabilityState = Record<string, boolean | "unknown">;
 
 export interface WalletKitContextValue {
   manager: WalletManager;
@@ -11,11 +14,13 @@ export interface WalletKitContextValue {
   session: WalletSession | null;
   status: WalletKitStatus;
   wallets: WalletMetadata[];
+  availability: WalletAvailabilityState;
+  refreshAvailability: () => Promise<void>;
   connect: (adapterId: string) => Promise<WalletSession>;
   disconnect: () => Promise<void>;
   openModal: () => void;
   closeModal: () => void;
-  modal: WalletModal;
+  modal: WalletModal | null;
 }
 
 export interface WalletKitProviderProps {
@@ -39,7 +44,19 @@ export function WalletKitProvider(props: WalletKitProviderProps) {
   const [session, setSession] = useState<WalletSession | null>(props.manager.getSession());
   const [status, setStatus] = useState<WalletKitStatus>(props.manager.getSession() ? "connected" : "disconnected");
   const [modal, setModal] = useState<WalletModal | null>(null);
+  const [availability, setAvailability] = useState<WalletAvailabilityState>(() => createUnknownAvailability(props.manager));
   const modalRef = useRef<WalletModal | null>(null);
+  const availabilityRequestRef = useRef(0);
+
+  const refreshAvailability = useCallback(async () => {
+    const requestId = ++availabilityRequestRef.current;
+    try {
+      const nextAvailability = await props.manager.getWalletAvailability();
+      if (requestId === availabilityRequestRef.current) setAvailability(nextAvailability);
+    } catch {
+      if (requestId === availabilityRequestRef.current) setAvailability(createUnknownAvailability(props.manager));
+    }
+  }, [props.manager]);
 
   useClientLayoutEffect(() => {
     if (typeof document === "undefined") return;
@@ -58,11 +75,20 @@ export function WalletKitProvider(props: WalletKitProviderProps) {
   }, [props.ui]);
 
   useEffect(() => {
+    setAvailability(createUnknownAvailability(props.manager));
+    void refreshAvailability();
+    return () => {
+      availabilityRequestRef.current += 1;
+    };
+  }, [props.manager, refreshAvailability]);
+
+  useEffect(() => {
     const syncSession = () => setSession(props.manager.getSession());
     const offConnecting = props.manager.on("connecting", () => setStatus("connecting"));
     const offConnected = props.manager.on("connected", (event) => {
       setSession(event.session ?? null);
       setStatus("connected");
+      void refreshAvailability();
     });
     const offDisconnected = props.manager.on("disconnected", () => {
       setSession(null);
@@ -97,27 +123,30 @@ export function WalletKitProvider(props: WalletKitProviderProps) {
       offExpired();
       offError();
     };
-  }, [props.manager]);
+  }, [props.manager, refreshAvailability]);
 
-  const value = useMemo<WalletKitContextValue | null>(() => {
-    if (!modal) return null;
+  const value = useMemo<WalletKitContextValue>(() => {
     return {
       manager: props.manager,
       account: session?.account ?? null,
       session,
       status,
       wallets: props.manager.getWallets(),
+      availability,
+      refreshAvailability,
       connect: (adapterId) => props.manager.connect(adapterId),
       disconnect: () => props.manager.disconnect(),
-      openModal: () => modal.open(),
-      closeModal: () => modal.close(),
+      openModal: () => modal?.open(),
+      closeModal: () => modal?.close(),
       modal
     };
-  }, [props.manager, session, status, modal]);
-
-  if (!value) return null;
+  }, [props.manager, session, status, availability, refreshAvailability, modal]);
 
   return <WalletKitContext.Provider value={value}>{props.children}</WalletKitContext.Provider>;
+}
+
+function createUnknownAvailability(manager: WalletManager): WalletAvailabilityState {
+  return Object.fromEntries(manager.getWallets().map((wallet) => [wallet.id, "unknown"]));
 }
 
 export function useWalletKit(): WalletKitContextValue {
@@ -169,7 +198,7 @@ export const WalletButton = forwardRef<WalletButtonHandle, ReactWalletButtonProp
   }), []);
 
   useEffect(() => {
-    if (!targetRef.current) return;
+    if (!targetRef.current || !modal) return;
     buttonRef.current = createWalletButton({
       manager,
       modal,
