@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/adapter-gemwallet",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "GemWallet adapter for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@gemwallet/api": "^3.7.0",
-    "@xrpl-wallet-kit/core": "0.1.17"
+    "@xrpl-wallet-kit/core": "0.1.18"
   },
   "publishConfig": {
     "access": "public"
