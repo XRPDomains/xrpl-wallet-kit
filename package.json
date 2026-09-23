@@ -31,6 +31,7 @@
     "dev:html-legacy": "npm --workspace @xrpl-wallet-kit/example-html-legacy-bundle run dev"
   },
   "devDependencies": {
+    "@rollup/plugin-inject": "^5.0.5",
     "@types/react": "^18.3.28",
     "@vitejs/plugin-react": "^4.3.4",
     "@walletconnect/modal": "^2.7.0",

@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import type { Plugin } from "vite";
+import inject from "@rollup/plugin-inject";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -49,6 +50,11 @@ export default defineConfig(({ mode }) => {
         fileName: () => minified ? "xrpl-wallet-kit.iife.min.js" : "xrpl-wallet-kit.iife.js"
       },
       rollupOptions: {
+        plugins: [
+          inject({
+            Buffer: ["buffer", "Buffer"]
+          })
+        ],
         output: {
           extend: true
         }
