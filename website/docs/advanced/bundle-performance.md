@@ -1,119 +1,83 @@
 # Bundle & Performance
 
-## Package Sizes
+## Choose an Entry Point
 
-Install only what you need. Each package is independent and tree-shakeable:
+`@xrpl-wallet-kit/client` provides synchronous factories with built-in adapters.
+The `wallets` option selects adapters at runtime; it does not remove their SDKs
+from the build. Existing `createWalletKit()` and `createWalletClient()` calls
+remain synchronous and compatible.
 
-| Package | Gzipped | What it includes |
-|---|---|---|
-| `@xrpl-wallet-kit/core` | ~5.7 KB | WalletManager, session storage, error types, network config |
-| `@xrpl-wallet-kit/ui` | ~12 KB | WalletModal, WalletButton, WalletToast, themes, locales |
-| `@xrpl-wallet-kit/react` | ~3 KB | WalletKitProvider, hooks, WalletButton component |
-| `@xrpl-wallet-kit/adapter-xaman` | ~4 KB | Xaman OAuth adapter |
-| `@xrpl-wallet-kit/adapter-gemwallet` | ~1 KB | GemWallet extension adapter |
-| `@xrpl-wallet-kit/adapter-walletconnect` | ~2 KB + WC SDK | WalletConnect v2 adapter |
-| `@xrpl-wallet-kit/client` | Sum of above | All packages bundled |
-| `@xrpl-wallet-kit/browser` | ~528 KB | IIFE bundle with all adapters + polyfills |
-
-::: tip Production recommendation
-Use individual packages with a bundler (Vite, Rollup, webpack). Never use the IIFE browser bundle in production — it bundles everything regardless of what you use.
-:::
-
-## Tree-Shaking
-
-All packages ship ES modules and support tree-shaking. Install only the adapters your app actually uses:
-
-```bash
-# ✅ Minimal install — only what you need
-npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/ui
-npm install @xrpl-wallet-kit/adapter-gemwallet
-npm install @xrpl-wallet-kit/adapter-xaman
-
-# ❌ Avoid unless you need everything
-npm install @xrpl-wallet-kit/client
-```
-
-When you use `@xrpl-wallet-kit/client` with `wallets: "all"`, all adapters are included regardless. With `wallets: ["gemwallet", "xaman"]`, only those two adapter packages are bundled — but the others are still listed as dependencies and must be installed.
-
-For the smallest bundle, import adapter factories directly:
+For applications that choose adapters explicitly, use the selective entry:
 
 ```ts
-import { WalletManager } from "@xrpl-wallet-kit/core";
-import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
-import { createXamanAdapter } from "@xrpl-wallet-kit/adapter-xaman";
-// ← WalletConnect, Ledger, Crossmark, etc. are NOT included
+import { createWalletClient, XRPL_TESTNET } from '@xrpl-wallet-kit/client/selective';
+import { createGemWalletAdapter } from '@xrpl-wallet-kit/adapter-gemwallet';
+
+const manager = createWalletClient({
+  networks: [XRPL_TESTNET],
+  adapters: [createGemWalletAdapter()],
+  storage: 'memory'
+});
 ```
 
-## WalletConnect Lazy Loading
+The selective factory returns a `WalletManager`. It requires an explicit adapter
+array and does not provide the all-in-one `createWalletKit()` UI factory. Mount
+the manager with `WalletKitProvider` in React, or create UI components explicitly.
+It also accepts `storage: 'localStorage'` or a custom storage implementation.
 
-The WalletConnect SDK (`@walletconnect/modal-core`) is large (~120 KB gzip). The `@xrpl-wallet-kit/adapter-walletconnect` package loads it lazily — the SDK is not imported until the user actually clicks "WalletConnect" in the modal.
+The client package still lists the built-in adapters as install dependencies.
+To reduce installed dependencies too, use `@xrpl-wallet-kit/core` and individual
+adapter packages directly, adding `@xrpl-wallet-kit/react` or `@xrpl-wallet-kit/ui`
+only when needed.
 
-This is handled automatically — no configuration needed. You'll see it in your bundle as a dynamic import chunk.
+## Reproducible Bundle Baseline
 
-## Code Splitting
-
-If you use `createWalletKit()` or the WalletConnect adapter, your bundler will automatically split the WalletConnect SDK into a separate chunk. Verify this in your build output:
+From the repository root:
 
 ```sh
-# Vite — look for a walletconnect chunk in dist/assets/
-vite build
-ls dist/assets/ | grep walletconnect
+npm ci
+npm run check:bundle
 ```
 
-## Vite Configuration
+The fixtures in `tests/fixtures/bundle` import the built package exports, preserve
+the created manager as an observable global, and use Vite production bundling
+with esbuild minification and an ES2020 target. No source aliases are used.
 
-No special Vite config is needed. XRPL Wallet Kit ships pure ESM and works out of the box. If you encounter issues with the `xrpl` peer dependency (used only in `@xrpl-wallet-kit/auth/verifiers`), add a manual chunk:
+Baseline measured on 2026-09-25 with package version 0.1.18, Node 22.17.0 and
+Vite 6.4.3 using the repository lockfile:
 
-```ts
-// vite.config.ts
-export default defineConfig({
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          xrpl: ["xrpl"],
-        },
-      },
-    },
-  },
-});
-```
+| Fixture | JS chunks | Minified bytes | Gzip bytes | Included adapters |
+| --- | ---: | ---: | ---: | --- |
+| `client/selective` + GemWallet | 1 | 105,016 | 22,666 | GemWallet |
+| `client` with `wallets: ['gemwallet']` | 10 | 1,566,646 | 507,818 | All 7 built-in adapters |
 
-## Preload the Modal
+Sizes sum all emitted JavaScript chunks, including dynamic chunks, and gzip each
+chunk separately. They are not initial-page download sizes, npm tarball sizes,
+or Next.js application measurements. Framework runtime, UI usage and bundler
+versions can change application results. This fixture does not establish a new
+Next.js baseline.
 
-The first time `WalletModal` is opened, it injects styles into the document. To avoid any flash on first open, call `modal.preload()` after page load:
+CI checks the actual emitted module graph: the selective fixture must include
+GemWallet and exclude other adapters and WalletConnect, Ledger and Xaman SDKs.
+It also requires selective gzip size to stay below half the defaults fixture.
+Exact bytes are reported, not pinned, so dependency updates can be reviewed
+without failing on insignificant compression differences.
 
-```ts
-// After DOM is ready, before user clicks
-window.addEventListener("load", () => {
-  modal.preload?.();
-});
-```
+## Browser Script and Code Splitting
 
-## Session Storage
+The browser IIFE is useful for HTML sites that do not use a bundler. It includes
+the built-in adapters and browser polyfills in one file. Websites using the CDN
+can continue to use the `@latest` URL; selective imports require a module bundler.
 
-Session data is stored in `localStorage` by default under the key `xwk:session`. The payload is a small JSON object — well under 1 KB. Override the storage key or use in-memory storage for testing:
+ES module consumers can split dynamic imports into separate chunks. A runtime
+wallet filter does not eliminate these chunks from the generated application.
+Inspect both initial and deferred chunks in the application's production build
+when comparing delivery costs.
 
-```ts
-import { WalletManager, createMemoryStorage } from "@xrpl-wallet-kit/core";
+## React Updates
 
-const manager = new WalletManager({
-  adapters: [...],
-  storage: createMemoryStorage(),   // no localStorage writes
-});
-```
-
-## Avoiding Re-renders (React)
-
-`useWalletKit()` re-renders whenever `session`, `account`, or `status` changes. To avoid unnecessary re-renders, use the narrower hooks:
-
-```tsx
-// ✅ Only re-renders on status change
-const status = useWalletStatus();
-
-// ✅ Only re-renders when account changes
-const account = useWalletAccount();
-
-// ❌ Re-renders on any context change
-const { status, account, session, wallets, connect, ... } = useWalletKit();
-```
+`useWalletAccount()` and `useWalletStatus()` are convenience hooks over the shared
+wallet context. They currently receive context updates just like `useWalletKit()`;
+they do not provide independent subscriptions or guarantee fewer renders. Keep
+expensive derived work memoized and pass only necessary values to memoized child
+components.
