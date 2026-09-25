@@ -75,7 +75,7 @@ The IIFE bundle is large because it includes all adapters and polyfills. For pro
     network: {
       id: 'mainnet',
       networkType: 'MAINNET',
-      url: 'wss://xrplcluster.com',
+      rpcUrl: 'wss://xrplcluster.com',
       nativeAsset: 'XRP',
       nativeAssetDecimals: 6,
     }
@@ -117,7 +117,7 @@ Call the same global API from your existing page script and keep the wallet UI m
     network: {
       id: 'mainnet',
       networkType: 'MAINNET',
-      url: 'wss://xrplcluster.com',
+      rpcUrl: 'wss://xrplcluster.com',
       nativeAsset: 'XRP',
       nativeAssetDecimals: 6,
     }

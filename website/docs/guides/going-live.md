@@ -5,7 +5,7 @@ Before shipping your XRPL dApp to production, run through this checklist.
 ## ✅ Credentials & Config
 
 - [ ] Replace `VITE_WALLETCONNECT_PROJECT_ID` with your own project ID from [WalletConnect Cloud](https://cloud.walletconnect.com) — the development key rate-limits you
-- [ ] Register your Xaman client ID at [apps.xaman.dev](https://apps.xaman.dev) and replace the example key
+- [ ] Register your public Xaman API key at [apps.xaman.dev](https://apps.xaman.dev) and replace the example key
 - [ ] Set `network` to **MAINNET** — remove any testnet/devnet network config
 - [ ] Verify `storage` prefix doesn't conflict if you have multiple apps on the same domain
 
@@ -16,7 +16,7 @@ const manager = new WalletManager({
   network: {
     id: "mainnet",
     networkType: "MAINNET",
-    url: "wss://xrplcluster.com",
+    rpcUrl: "wss://xrplcluster.com",
     nativeAsset: "XRP",
     nativeAssetDecimals: 6,
   },

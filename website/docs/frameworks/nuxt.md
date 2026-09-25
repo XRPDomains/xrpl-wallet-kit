@@ -55,7 +55,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       walletConnectProjectId: process.env.NUXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-      xamanClientId: process.env.NUXT_PUBLIC_XAMAN_CLIENT_ID,
+      xamanClientId: process.env.NUXT_PUBLIC_XAMAN_API_KEY,
     },
   },
 })
@@ -64,7 +64,7 @@ export default defineNuxtConfig({
 ```sh
 # .env
 NUXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
-NUXT_PUBLIC_XAMAN_CLIENT_ID=your_xaman_client_id
+NUXT_PUBLIC_XAMAN_API_KEY=your_xaman_api_key
 ```
 
 ## `useWallet()` Composable

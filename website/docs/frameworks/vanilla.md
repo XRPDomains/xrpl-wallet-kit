@@ -41,7 +41,7 @@ const { manager, openModal } = createWalletKit({
   autoReconnect: true,
   wallets: "all",
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-  xamanClientId: import.meta.env.VITE_XAMAN_CLIENT_ID,
+  xamanClientId: import.meta.env.VITE_XAMAN_API_KEY,
   connectButton: "#connect-btn",   // CSS selector for your button element
 });
 
@@ -70,7 +70,7 @@ import { WalletModal, WalletButton } from "@xrpl-wallet-kit/ui";
 const manager = new WalletManager({
   autoReconnect: true,
   adapters: [
-    createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_CLIENT_ID }),
+    createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_API_KEY }),
     createGemWalletAdapter(),
     createWalletConnectAdapter({
       projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
@@ -79,7 +79,7 @@ const manager = new WalletManager({
   network: {
     id: "mainnet",
     networkType: "MAINNET",
-    url: "wss://xrplcluster.com",
+    rpcUrl: "wss://xrplcluster.com",
     nativeAsset: "XRP",
     nativeAssetDecimals: 6,
   },

@@ -6,7 +6,8 @@
 
 ```bash
 npm install @xrpl-wallet-kit/next @xrpl-wallet-kit/core \
-  @xrpl-wallet-kit/adapter-gemwallet @xrpl-wallet-kit/adapter-crossmark
+  @xrpl-wallet-kit/adapter-gemwallet @xrpl-wallet-kit/adapter-crossmark \
+  @xrpl-wallet-kit/adapter-xaman
 ```
 
 ## Choosing a setup
@@ -21,18 +22,27 @@ The example below uses named adapters so Next.js does not pull every first-party
 
 ## App Router Setup
 
-### 1. Create the manager (server-safe singleton)
+### 1. Create the manager
+
+This module is part of the client bundle because the provider imports it from a Client Component. Keep private server credentials out of it.
 
 ```ts
 // lib/wallet-manager.ts
 import { WalletManager } from "@xrpl-wallet-kit/core";
 import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
 import { createCrossmarkAdapter } from "@xrpl-wallet-kit/adapter-crossmark";
+import { createXamanAdapter } from "@xrpl-wallet-kit/adapter-xaman";
 
-// Module-level singleton — safe in Next.js
+// Module-level singleton shared by Client Components
 export const manager = new WalletManager({
   autoReconnect: true,
-  adapters: [createGemWalletAdapter(), createCrossmarkAdapter()],
+  // Start on testnet while developing. Change this deliberately for production.
+  network: "testnet",
+  adapters: [
+    createGemWalletAdapter(),
+    createCrossmarkAdapter(),
+    createXamanAdapter({ apiKey: process.env.NEXT_PUBLIC_XAMAN_API_KEY }),
+  ],
 });
 ```
 
@@ -129,8 +139,19 @@ Add to `.env.local` (Next.js requires the `NEXT_PUBLIC_` prefix for client-side 
 
 ```bash
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
-NEXT_PUBLIC_XAMAN_CLIENT_ID=your_xaman_client_id
+NEXT_PUBLIC_XAMAN_API_KEY=your_xaman_api_key
 ```
+
+`NEXT_PUBLIC_*` values are inlined into browser JavaScript at build time. The Xaman API key is a public application credential intended for client use; never put a private signing key, seed, or server secret in these variables. Restart the development server after changing `.env.local`, and rebuild before deploying changed values.
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Xaman does not appear | Configure `NEXT_PUBLIC_XAMAN_API_KEY` and pass it as `apiKey` when creating the adapter. |
+| The app connects to mainnet unexpectedly | Set `network: "testnet"` explicitly during development. `WalletManager` defaults to mainnet when `network` is omitted. |
+| A changed env value is ignored | Restart `next dev`; for production, rebuild because public env values are embedded in the client bundle. |
+| `window is not defined` or browser SDK errors | Create and use wallet adapters only through the client-side provider path shown above. |
 
 ## Drop-in WalletButton
 
