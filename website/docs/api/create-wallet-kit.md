@@ -24,7 +24,7 @@ const { manager, modal, button, toast, openModal } = createWalletKit({
   },
   wallets: "all",
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-  xamanClientId: import.meta.env.VITE_XAMAN_CLIENT_ID,
+  xamanClientId: import.meta.env.VITE_XAMAN_API_KEY,
   connectButton: "#connect-btn",
 });
 
@@ -271,7 +271,7 @@ import { createMyCustomAdapter } from "./adapters/my-adapter";
 
 createWalletKit({
   adapters: [
-    createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_CLIENT_ID }),
+    createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_API_KEY }),
     createMyCustomAdapter(),
   ],
 });

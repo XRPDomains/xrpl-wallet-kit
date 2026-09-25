@@ -15,7 +15,7 @@ import { createWalletConnectAdapter } from "@xrpl-wallet-kit/adapter-walletconne
 const manager = new WalletManager({
   autoReconnect: true,
   adapters: [
-    createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_CLIENT_ID }),
+    createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_API_KEY }),
     createGemWalletAdapter(),
     createWalletConnectAdapter({
       projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
@@ -24,7 +24,7 @@ const manager = new WalletManager({
   network: {
     id: "mainnet",
     networkType: "MAINNET",
-    url: "wss://xrplcluster.com",
+    rpcUrl: "wss://xrplcluster.com",
     nativeAsset: "XRP",
     nativeAssetDecimals: 6,
   },
@@ -132,7 +132,7 @@ if (restored) {
       network: {
         id: "testnet",
         networkType: "TESTNET",
-        url: "wss://s.altnet.rippletest.net:51233",
+        rpcUrl: "wss://s.altnet.rippletest.net:51233",
         nativeAsset: "XRP",
         nativeAssetDecimals: 6,
       },

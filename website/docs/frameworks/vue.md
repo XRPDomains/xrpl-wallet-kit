@@ -34,7 +34,7 @@ const { manager } = createWalletKit({
   autoReconnect: true,
   wallets: 'all',
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-  xamanClientId: import.meta.env.VITE_XAMAN_CLIENT_ID,
+  xamanClientId: import.meta.env.VITE_XAMAN_API_KEY,
   connectButton: '#connect-btn',
 })
 
@@ -63,7 +63,7 @@ const { manager, modal } = createWalletKit({
   autoReconnect: true,
   wallets: 'all',
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-  xamanClientId: import.meta.env.VITE_XAMAN_CLIENT_ID,
+  xamanClientId: import.meta.env.VITE_XAMAN_API_KEY,
 })
 
 const session = ref<WalletSession | null>(null)

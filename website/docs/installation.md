@@ -69,7 +69,7 @@ pnpm add @xrpl-wallet-kit/client
 ```
 :::
 
-The client package re-exports core, ui, and all adapters. Bundlers will tree-shake unused adapters automatically.
+The client package re-exports core, UI, and all adapters for convenience. For a smaller production bundle, use `@xrpl-wallet-kit/client/selective` with named adapter packages; importing the default client can retain adapter SDKs that cannot be fully tree-shaken.
 
 ## React / Next.js
 
@@ -144,14 +144,14 @@ Some adapters require credentials. Add them to your `.env` file (never commit se
 ```bash [Vite]
 # .env.local
 VITE_WALLETCONNECT_PROJECT_ID=your_project_id_here
-VITE_XAMAN_CLIENT_ID=your_xaman_client_id_here
+VITE_XAMAN_API_KEY=your_xaman_api_key_here
 ```
 ```bash [Next.js]
 # .env.local
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
-NEXT_PUBLIC_XAMAN_CLIENT_ID=your_xaman_client_id_here
+NEXT_PUBLIC_XAMAN_API_KEY=your_xaman_api_key_here
 ```
 :::
 
 Get your WalletConnect Project ID at [cloud.walletconnect.com](https://cloud.walletconnect.com).  
-Get your Xaman Client ID at [apps.xaman.dev](https://apps.xaman.dev).
+Get your public Xaman API key at [apps.xaman.dev](https://apps.xaman.dev). These browser-exposed application credentials identify your dApp; they are not wallet seeds or private server secrets.

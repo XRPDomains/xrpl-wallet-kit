@@ -44,7 +44,7 @@ Add `SESSION_SECRET` to `.env.local`:
 # .env.local
 SESSION_SECRET=at-least-32-characters-random-secret-here
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
-NEXT_PUBLIC_XAMAN_CLIENT_ID=your_xaman_client_id
+NEXT_PUBLIC_XAMAN_API_KEY=your_xaman_api_key
 XRPL_NODE_URL=wss://xrplcluster.com
 ```
 

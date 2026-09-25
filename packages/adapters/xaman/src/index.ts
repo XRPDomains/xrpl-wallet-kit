@@ -7,6 +7,7 @@ export const XAMAN_ICON = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAAC
 const XAMAN_PENDING_RECOVERY_TTL_MS = 180000;
 const XAMAN_RESTORE_READY_TIMEOUT_MS = 2500;
 const DEFAULT_MAX_LAST_LEDGER_SEQUENCE_EXTENSION = 50;
+let didWarnAboutMissingConfiguration = false;
 
 export interface XamanPkceAuth {
   authorize(): Promise<XamanAuthResult | undefined | Error>;
@@ -81,6 +82,13 @@ export class XamanAdapter extends BaseWalletAdapter {
 
   constructor(private options: XamanAdapterOptions) {
     super();
+    if (!options.apiKey && !options.auth && !options.sdk && !didWarnAboutMissingConfiguration) {
+      didWarnAboutMissingConfiguration = true;
+      console.warn(
+        "[XRPL Wallet Kit] XamanAdapter was created without an apiKey, auth, or sdk. " +
+        "The adapter will be unavailable. Pass your public Xaman API key as apiKey."
+      );
+    }
     this.sdk = options.sdk;
     this.auth = options.auth;
     this.recoveryStorage = options.recoveryStorage ?? createBrowserWalletStorage("");

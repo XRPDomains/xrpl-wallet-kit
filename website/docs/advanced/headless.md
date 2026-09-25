@@ -28,12 +28,12 @@ const manager = new WalletManager({
   autoReconnect: true,
   adapters: [
     createGemWalletAdapter(),
-    createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_CLIENT_ID }),
+    createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_API_KEY }),
   ],
   network: {
     id: "mainnet",
     networkType: "MAINNET",
-    url: "wss://xrplcluster.com",
+    rpcUrl: "wss://xrplcluster.com",
     nativeAsset: "XRP",
     nativeAssetDecimals: 6,
   },
