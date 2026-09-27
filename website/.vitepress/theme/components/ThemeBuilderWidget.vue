@@ -13,7 +13,7 @@
           <h1 class="tb-title">Theme Builder</h1>
           <p class="tb-subtitle">Configure the wallet modal live — copy the generated config when you're done.</p>
         </div>
-        <div class="tb-presets">
+        <div class="tb-presets tb-presets-desktop">
           <span class="tb-presets-label">Presets</span>
           <button
             v-for="p in presets" :key="p.id"
@@ -27,8 +27,33 @@
       <div class="tb-main">
         <aside class="tb-controls">
 
+          <div class="tb-presets tb-presets-mobile">
+            <label class="tb-presets-label" for="tb-mobile-preset">Preset</label>
+            <select
+              id="tb-mobile-preset"
+              class="tb-select tb-preset-select"
+              :value="activePreset"
+              @change="applyPresetById(($event.target as HTMLSelectElement).value)"
+            >
+              <option v-if="activePreset === 'custom'" value="custom" disabled>Custom</option>
+              <option v-for="p in presets" :key="p.id" :value="p.id">{{ p.label }}</option>
+            </select>
+          </div>
+
+          <div class="tb-control-tabs" role="tablist" aria-label="Configuration sections">
+            <button
+              v-for="tab in mobileControlTabs"
+              :key="tab.value"
+              class="tb-control-tab"
+              role="tab"
+              :aria-selected="mobileControlTab === tab.value"
+              :class="{ active: mobileControlTab === tab.value }"
+              @click="mobileControlTab = tab.value"
+            >{{ tab.label }}</button>
+          </div>
+
           <!-- Group: Display -->
-          <div class="tb-group">
+          <div v-show="!isCompactPage || mobileControlTab === 'display'" class="tb-group">
             <button class="tb-group-hd" @click="toggle('display')">
               <span>Display</span>
               <span class="tb-arrow" :class="{ open: !collapsed.display }">▾</span>
@@ -68,7 +93,7 @@
           </div>
 
           <!-- Group: Connect Button -->
-          <div class="tb-group">
+          <div v-show="!isCompactPage || mobileControlTab === 'button'" class="tb-group">
             <button class="tb-group-hd" @click="toggle('button')">
               <span>Connect Button</span>
               <span class="tb-arrow" :class="{ open: !collapsed.button }">▾</span>
@@ -93,7 +118,7 @@
           </div>
 
           <!-- Group: Colors -->
-          <div class="tb-group">
+          <div v-show="!isCompactPage || mobileControlTab === 'colors'" class="tb-group tb-group-colors">
             <button class="tb-group-hd" @click="toggle('colors')">
               <span>Colors</span>
               <span class="tb-arrow" :class="{ open: !collapsed.colors }">▾</span>
@@ -246,7 +271,7 @@
           </div>
 
           <!-- Group: Radius -->
-          <div class="tb-group">
+          <div v-show="!isCompactPage || mobileControlTab === 'radius'" class="tb-group">
             <button class="tb-group-hd" @click="toggle('radius')">
               <span>Radius</span>
               <span class="tb-arrow" :class="{ open: !collapsed.radius }">▾</span>
@@ -290,7 +315,7 @@
           </div>
           <div class="tb-preview-outer" :class="previewDevice === 'mobile' ? 'tb-mobile' : 'tb-desktop'">
             <!-- Phone bezel (mobile only) -->
-            <template v-if="previewDevice === 'mobile'">
+            <template v-if="previewDevice === 'mobile' && !isCompactPage">
               <div class="tb-phone">
                 <div class="tb-phone-screen">
                   <!-- Status bar: time | island | icons — all on one row -->
@@ -323,7 +348,14 @@
             <!-- Desktop: plain frame -->
             <template v-else>
               <div class="tb-preview-frame" :class="config.mode === 'dark' ? 'tb-dark-bg' : 'tb-light-bg'">
-                <div ref="mountRef" class="tb-mount"></div>
+                <div
+                  ref="mountRef"
+                  class="tb-mount"
+                  :class="{
+                    'tb-preview-mobile': previewDevice === 'mobile' && !isCompactPage,
+                    'tb-preview-compact': isCompactPage,
+                  }"
+                ></div>
               </div>
             </template>
           </div>
@@ -411,11 +443,20 @@ function goBack() {
   if (window.history.length > 1) {
     window.history.back()
   } else {
-    window.location.href = '/docs/playground'
+    window.location.href = './playground.html'
   }
 }
 
 const previewDevice = ref<'desktop' | 'mobile'>('desktop')
+const isCompactPage = ref(false)
+type MobileControlTab = 'display' | 'button' | 'colors' | 'radius'
+const mobileControlTab = ref<MobileControlTab>('display')
+const mobileControlTabs: Array<{ value: MobileControlTab; label: string }> = [
+  { value: 'display', label: 'Display' },
+  { value: 'button', label: 'Button' },
+  { value: 'colors', label: 'Colors' },
+  { value: 'radius', label: 'Radius' },
+]
 type PreviewState = 'wallets' | 'connecting' | 'error'
 const previewState = ref<PreviewState>('wallets')
 const activePreset  = ref<string>('default')
@@ -429,6 +470,19 @@ let kitBundle:      any = null
 const KIT_BUNDLE_URL = 'https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js'
 let inlineObserver: MutationObserver | null = null
 let previewSession: any = null
+let compactPageQuery: MediaQueryList | null = null
+
+function syncCompactPage(event: MediaQueryListEvent | MediaQueryList) {
+  const wasCompact = isCompactPage.value
+  isCompactPage.value = event.matches
+  if (event.matches) {
+    previewDevice.value = 'mobile'
+    Object.assign(collapsed, { display: false, button: false, colors: false, radius: false })
+  }
+  if (wasCompact !== event.matches && kitLoaded.value) {
+    nextTick(renderPreview)
+  }
+}
 
 // ── Options ───────────────────────────────────────────────────
 const layouts = [
@@ -705,6 +759,11 @@ function applyPreset(p: (typeof presets)[0]) {
   Object.assign(config, p.config)
 }
 
+function applyPresetById(id: string) {
+  const preset = presets.find((item) => item.id === id)
+  if (preset) applyPreset(preset)
+}
+
 function setConfig(key: keyof typeof config, value: string) {
   activePreset.value = 'custom'
   if (key === 'mode') {
@@ -843,7 +902,9 @@ function renderPreview() {
   const sdkThemeName = getSdkThemeName()
 
   const btnWrap = document.createElement('div')
-  btnWrap.style.cssText = 'display:flex;align-items:center;justify-content:center;padding:32px 24px 16px;'
+  btnWrap.style.cssText = isCompactPage.value
+    ? 'display:flex;align-items:center;justify-content:center;padding:12px 16px 10px;'
+    : 'display:flex;align-items:center;justify-content:center;padding:32px 24px 16px;'
   mount.appendChild(btnWrap)
 
   const themeObj: Record<string, string | number> = {
@@ -876,7 +937,7 @@ function renderPreview() {
   })
 
   // Persistent observer: moves every overlay SDK creates (incl. internal nav) into preview frame
-  const isMobile = previewDevice.value === 'mobile'
+  const isMobile = previewDevice.value === 'mobile' && !isCompactPage.value
   inlineObserver = setupInlineObserver(mount, isMobile)
 
   buttonInstance = new WalletButtonController({
@@ -1148,6 +1209,9 @@ watch(previewDevice, async () => {
 
 onMounted(async () => {
   try {
+    compactPageQuery = window.matchMedia('(max-width: 900px)')
+    syncCompactPage(compactPageQuery)
+    compactPageQuery.addEventListener('change', syncCompactPage)
     await loadKit()
     renderPreview()
   } catch (e) {
@@ -1156,6 +1220,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  compactPageQuery?.removeEventListener('change', syncCompactPage)
+  compactPageQuery = null
   if (inlineObserver) { inlineObserver.disconnect(); inlineObserver = null }
   if (buttonInstance) { try { buttonInstance.destroy() } catch {} }
   if (modalInstance)  { try { modalInstance.destroy()  } catch {} }
@@ -1243,6 +1309,10 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
+.tb-presets-mobile { display: none; }
+
+.tb-control-tabs { display: none; }
+
 .tb-presets-label {
   font-size: 11px;
   font-weight: 600;
@@ -1279,7 +1349,88 @@ onUnmounted(() => {
 }
 
 @media (max-width: 900px) {
-  .tb-main { grid-template-columns: 1fr; }
+  .tb-inner { padding: 24px 16px 56px; }
+  .tb-header { margin-bottom: 20px; }
+  .tb-presets-desktop { display: none; }
+  .tb-main { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .tb-preview-col { order: -1; gap: 10px; }
+  .tb-controls {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+  .tb-presets-mobile {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--vp-c-border);
+  }
+  .tb-preset-select {
+    min-height: 34px;
+    padding-block: 5px;
+  }
+  .tb-control-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    padding: 6px;
+    border-bottom: 1px solid var(--vp-c-border);
+    background: var(--vp-c-bg-mute);
+  }
+  .tb-control-tab {
+    min-width: 0;
+    min-height: 36px;
+    padding: 6px 4px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--vp-c-text-2);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .tb-control-tab.active {
+    background: var(--vp-c-bg);
+    color: var(--vp-c-brand-1);
+    box-shadow: 0 0 0 1px var(--vp-c-border);
+  }
+  .tb-control-tab:focus-visible {
+    outline: 2px solid var(--vp-c-brand-1);
+    outline-offset: 1px;
+  }
+  .tb-controls > .tb-group .tb-group-hd { display: none; }
+  .tb-controls > .tb-group .tb-group-bd { padding: 14px; }
+  .tb-group-colors .tb-group-bd {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 10px;
+  }
+  .tb-group-colors .tb-section:first-child { grid-column: 1 / -1; }
+  .tb-view-toggle { display: none; }
+  .tb-preview-col .tb-preview-bar { display: none; }
+  .tb-preview-col .tb-state-samples { display: none; }
+  .tb-preview-outer { justify-content: stretch; }
+  .tb-preview-outer.tb-mobile .tb-preview-frame { width: 100%; }
+  .tb-preview-frame {
+    min-height: 0;
+    border-radius: 12px;
+  }
+  .tb-code-panel { margin-top: 18px; }
+}
+
+@media (max-width: 420px) {
+  .tb-topbar { padding: 0 12px; }
+  .tb-inner { padding-inline: 12px; }
+  .tb-title { font-size: 25px; }
+  .tb-state-toggle {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+  .tb-state-btn { min-width: 0; padding-inline: 8px; }
+  .tb-preset-btn { padding-inline: 11px; }
 }
 
 /* ── Controls sidebar ────────────────────────────────────────── */
@@ -1921,4 +2072,58 @@ onUnmounted(() => {
   border-right: none !important;
   transform: none !important;
 }
+
+/* On an actual narrow page, show the wallet list as a normal preview block.
+   Bottom-sheet positioning remains available in the desktop device simulator. */
+.tb-mount.tb-preview-compact {
+  min-height: 0;
+  height: auto;
+  overflow: visible;
+}
+
+.tb-mount.tb-preview-compact .xwk-overlay {
+  display: block !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+}
+
+.tb-mount.tb-preview-compact .xwk-modal {
+  width: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  transform: none !important;
+}
+
+.tb-mount.tb-preview-compact .xwk-header {
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  padding: 4px 12px;
+}
+
+.tb-mount.tb-preview-compact .xwk-close,
+.tb-mount.tb-preview-compact .xwk-back {
+  height: 38px;
+  width: 38px;
+}
+
+.tb-mount.tb-preview-compact .xwk-body {
+  max-height: none;
+  padding: 8px 12px 10px;
+}
+
+.tb-mount.tb-preview-compact .xwk-grid { gap: 6px; }
+
+.tb-mount.tb-preview-compact .xwk-wallet {
+  min-height: 48px;
+  padding: 8px 10px;
+}
+
+.tb-mount.tb-preview-compact .xwk-wallet img:not(.xwk-mini-icon),
+.tb-mount.tb-preview-compact .xwk-icon-fallback {
+  height: 36px;
+  width: 36px;
+}
+
+.tb-mount.tb-preview-compact .xwk-footer { padding: 7px 12px 9px; }
 </style>
