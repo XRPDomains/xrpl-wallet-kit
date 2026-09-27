@@ -387,6 +387,27 @@
   color: var(--xd-accent) !important;
 }
 
+/* Keep the mobile navigation on its own opaque theme surface. VitePress
+   updates the document theme while this panel is mounted, so relying only
+   on its inherited nav-screen token can leave the open menu transparent. */
+@media (max-width: 767px) {
+  .xd-theme .VPNavScreen {
+    background-color: var(--xd-bg);
+    color: var(--xd-ink);
+  }
+
+  .xd-theme .VPNavScreenMenuLink,
+  .xd-theme .VPNavScreenMenuGroup .button {
+    border-color: var(--xd-border);
+    color: var(--xd-ink);
+  }
+
+  .xd-theme .VPNavScreenAppearance {
+    background-color: var(--xd-surface);
+    color: var(--xd-ink-soft);
+  }
+}
+
 /* ── 11. Hero section ───────────────────────────────────────── */
 .xd-theme .VPHero .name {
   -webkit-text-fill-color: var(--xd-ink);
