@@ -378,8 +378,10 @@
 
 .dark.xd-theme .VPNav {
   background: rgba(14,17,26,0.94);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* A backdrop filter makes the fixed VPNavScreen use VPNav as its
+     containing block, collapsing the mobile menu to zero height. */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .xd-theme .VPNavBarMenuLink.active,

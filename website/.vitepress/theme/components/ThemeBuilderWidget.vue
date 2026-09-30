@@ -336,7 +336,7 @@
                   </div>
                   <!-- Wallet content -->
                   <div class="tb-preview-frame" :class="config.mode === 'dark' ? 'tb-dark-bg' : 'tb-light-bg'">
-                    <div ref="mountRef" class="tb-mount tb-preview-mobile"></div>
+                    <div ref="mountRef" class="tb-mount tb-preview-mobile" :style="previewThemeVars"></div>
                   </div>
                   <!-- Home indicator -->
                   <div class="tb-phone-btm" :class="config.mode === 'dark' ? 'tb-dark-bg' : 'tb-light-bg'">
@@ -351,6 +351,7 @@
                 <div
                   ref="mountRef"
                   class="tb-mount"
+                  :style="previewThemeVars"
                   :class="{
                     'tb-preview-mobile': previewDevice === 'mobile' && !isCompactPage,
                     'tb-preview-compact': isCompactPage,
@@ -750,6 +751,7 @@ const previewThemeVars = computed(() => {
     '--tb-kit-success': theme.success,
     '--tb-kit-error': theme.error,
     '--tb-kit-radius': theme.walletRadius,
+    '--tb-kit-modal-radius': theme.radius,
     '--tb-kit-font': theme.fontFamily,
   } as Record<string, string | number>
 })
@@ -902,6 +904,7 @@ function renderPreview() {
   const sdkThemeName = getSdkThemeName()
 
   const btnWrap = document.createElement('div')
+  btnWrap.className = 'tb-connect-slot'
   btnWrap.style.cssText = isCompactPage.value
     ? 'display:flex;align-items:center;justify-content:center;padding:12px 16px 10px;'
     : 'display:flex;align-items:center;justify-content:center;padding:32px 24px 16px;'
@@ -1413,9 +1416,14 @@ onUnmounted(() => {
   .tb-preview-col .tb-state-samples { display: none; }
   .tb-preview-outer { justify-content: stretch; }
   .tb-preview-outer.tb-mobile .tb-preview-frame { width: 100%; }
-  .tb-preview-frame {
+  .tb-preview-col .tb-preview-frame {
     min-height: 0;
-    border-radius: 12px;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    isolation: auto;
+    transform: none;
   }
   .tb-code-panel { margin-top: 18px; }
 }
@@ -2041,7 +2049,7 @@ onUnmounted(() => {
    stays contained inside the preview frame, regardless of JS patching. */
 
 /* Base: desktop centered layout */
-.tb-mount .xwk-overlay {
+.tb-mount :deep(.xwk-overlay) {
   position: relative !important;
   inset: unset !important;
   z-index: 1 !important;
@@ -2056,13 +2064,13 @@ onUnmounted(() => {
 }
 
 /* Mobile: bottom-sheet layout — mirrors SDK @media(max-width:640px) via class */
-.tb-mount.tb-preview-mobile .xwk-overlay {
+.tb-mount.tb-preview-mobile :deep(.xwk-overlay) {
   align-items: flex-end !important;
   justify-content: stretch !important;
   padding: 0 !important;
   min-height: 480px;
 }
-.tb-mount.tb-preview-mobile .xwk-modal {
+.tb-mount.tb-preview-mobile :deep(.xwk-modal) {
   width: 100% !important;
   max-width: none !important;
   border-bottom-left-radius: 0 !important;
@@ -2076,54 +2084,70 @@ onUnmounted(() => {
 /* On an actual narrow page, show the wallet list as a normal preview block.
    Bottom-sheet positioning remains available in the desktop device simulator. */
 .tb-mount.tb-preview-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   min-height: 0;
   height: auto;
   overflow: visible;
 }
 
-.tb-mount.tb-preview-compact .xwk-overlay {
-  display: block !important;
-  min-height: 0 !important;
-  padding: 0 !important;
+.tb-mount.tb-preview-compact > :deep(.tb-connect-slot) {
+  padding: 6px 0 2px !important;
 }
 
-.tb-mount.tb-preview-compact .xwk-modal {
-  width: 100% !important;
-  max-width: none !important;
+.tb-mount.tb-preview-compact :deep(.xwk-overlay) {
+  display: block !important;
+  min-height: 0 !important;
+  padding: 0 6px 14px !important;
+}
+
+.tb-mount.tb-preview-compact :deep(.xwk-modal) {
+  width: min(100%, 480px) !important;
+  max-width: 480px !important;
   max-height: none !important;
-  border: 0 !important;
-  border-radius: 0 !important;
+  margin: 0 auto !important;
+  border: 1px solid var(--tb-kit-border) !important;
+  border-radius: var(--tb-kit-modal-radius) !important;
+  border-bottom-left-radius: var(--tb-kit-modal-radius) !important;
+  border-bottom-right-radius: var(--tb-kit-modal-radius) !important;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.10) !important;
+  overflow: hidden !important;
   transform: none !important;
 }
 
-.tb-mount.tb-preview-compact .xwk-header {
+.tb-dark-bg .tb-mount.tb-preview-compact :deep(.xwk-modal) {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28) !important;
+}
+
+.tb-mount.tb-preview-compact :deep(.xwk-header) {
   grid-template-columns: 38px minmax(0, 1fr) 38px;
   padding: 4px 12px;
 }
 
-.tb-mount.tb-preview-compact .xwk-close,
-.tb-mount.tb-preview-compact .xwk-back {
+.tb-mount.tb-preview-compact :deep(.xwk-close),
+.tb-mount.tb-preview-compact :deep(.xwk-back) {
   height: 38px;
   width: 38px;
 }
 
-.tb-mount.tb-preview-compact .xwk-body {
+.tb-mount.tb-preview-compact :deep(.xwk-body) {
   max-height: none;
   padding: 8px 12px 10px;
 }
 
-.tb-mount.tb-preview-compact .xwk-grid { gap: 6px; }
+.tb-mount.tb-preview-compact :deep(.xwk-grid) { gap: 6px; }
 
-.tb-mount.tb-preview-compact .xwk-wallet {
+.tb-mount.tb-preview-compact :deep(.xwk-wallet) {
   min-height: 48px;
   padding: 8px 10px;
 }
 
-.tb-mount.tb-preview-compact .xwk-wallet img:not(.xwk-mini-icon),
-.tb-mount.tb-preview-compact .xwk-icon-fallback {
+.tb-mount.tb-preview-compact :deep(.xwk-wallet img:not(.xwk-mini-icon)),
+.tb-mount.tb-preview-compact :deep(.xwk-icon-fallback) {
   height: 36px;
   width: 36px;
 }
 
-.tb-mount.tb-preview-compact .xwk-footer { padding: 7px 12px 9px; }
+.tb-mount.tb-preview-compact :deep(.xwk-footer) { padding: 7px 12px 9px; }
 </style>
