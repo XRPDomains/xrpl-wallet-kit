@@ -378,13 +378,36 @@
 
 .dark.xd-theme .VPNav {
   background: rgba(14,17,26,0.94);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* A backdrop filter makes the fixed VPNavScreen use VPNav as its
+     containing block, collapsing the mobile menu to zero height. */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .xd-theme .VPNavBarMenuLink.active,
 .xd-theme .VPNavBarMenuLink:hover {
   color: var(--xd-accent) !important;
+}
+
+/* Keep the mobile navigation on its own opaque theme surface. VitePress
+   updates the document theme while this panel is mounted, so relying only
+   on its inherited nav-screen token can leave the open menu transparent. */
+@media (max-width: 767px) {
+  .xd-theme .VPNavScreen {
+    background-color: var(--xd-bg);
+    color: var(--xd-ink);
+  }
+
+  .xd-theme .VPNavScreenMenuLink,
+  .xd-theme .VPNavScreenMenuGroup .button {
+    border-color: var(--xd-border);
+    color: var(--xd-ink);
+  }
+
+  .xd-theme .VPNavScreenAppearance {
+    background-color: var(--xd-surface);
+    color: var(--xd-ink-soft);
+  }
 }
 
 /* ── 11. Hero section ───────────────────────────────────────── */
