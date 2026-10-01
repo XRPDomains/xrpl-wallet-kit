@@ -5,7 +5,7 @@
 ## Installation
 
 ```bash
-npm install @xrpl-wallet-kit/next @xrpl-wallet-kit/core \
+npm install @xrpl-wallet-kit/next @xrpl-wallet-kit/core xrpl \
   @xrpl-wallet-kit/adapter-gemwallet @xrpl-wallet-kit/adapter-crossmark \
   @xrpl-wallet-kit/adapter-xaman
 ```
