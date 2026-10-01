@@ -11,6 +11,8 @@ npm install @xrpl-wallet-kit/react @xrpl-wallet-kit/core xrpl \
 
 ## Choosing a setup
 
+TypeScript projects also need `@types/node` for the XRPL SDK declarations (`npm install --save-dev @types/node`) if the framework has not already installed it.
+
 | You want | Use | Bundle profile |
 | --- | --- | --- |
 | Default wallets with the least setup | `client` + `react` | Largest |
