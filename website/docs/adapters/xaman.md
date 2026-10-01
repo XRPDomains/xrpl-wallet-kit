@@ -106,7 +106,7 @@ await manager.autoReconnect();
 
 ## Known Limitations
 
-- No `signTransaction` (sign-only without submit).
+- No separate adapter `signTransaction` method; manager sign-only requests use the explicitly declared `sign-only` fallback and return `txBlob`.
 - Message signing produces a transaction blob proof, not a compact signature.
 - Requires a browser environment with popup/redirect support for the OAuth2 flow.
 - Domain must be whitelisted in the Xaman developer portal.

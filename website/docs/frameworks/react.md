@@ -5,11 +5,13 @@
 ## Installation
 
 ```bash
-npm install @xrpl-wallet-kit/react @xrpl-wallet-kit/core \
+npm install @xrpl-wallet-kit/react @xrpl-wallet-kit/core xrpl \
   @xrpl-wallet-kit/adapter-gemwallet @xrpl-wallet-kit/adapter-crossmark
 ```
 
 ## Choosing a setup
+
+TypeScript projects also need `@types/node` for the XRPL SDK declarations (`npm install --save-dev @types/node`) if the framework has not already installed it.
 
 | You want | Use | Bundle profile |
 | --- | --- | --- |

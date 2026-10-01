@@ -5,12 +5,14 @@
 ## Installation
 
 ```bash
-npm install @xrpl-wallet-kit/next @xrpl-wallet-kit/core \
+npm install @xrpl-wallet-kit/next @xrpl-wallet-kit/core xrpl \
   @xrpl-wallet-kit/adapter-gemwallet @xrpl-wallet-kit/adapter-crossmark \
   @xrpl-wallet-kit/adapter-xaman
 ```
 
 ## Choosing a setup
+
+TypeScript projects need `@types/node` for the XRPL SDK declarations. Next.js normally installs it during TypeScript setup; otherwise run `npm install --save-dev @types/node`.
 
 | You want | Use | Bundle profile |
 | --- | --- | --- |

@@ -75,7 +75,7 @@ export interface XamanAdapterOptions {
 
 export class XamanAdapter extends BaseWalletAdapter {
   metadata: WalletMetadata;
-  capabilities: WalletCapabilities = { connect: true, signMessage: true, signAndSubmit: true, qr: true, deeplink: true, nftOffers: true, payments: true };
+  capabilities: WalletCapabilities = { connect: true, signMessage: true, signAndSubmit: true, qr: true, deeplink: true, nftOffers: true, payments: true, details: { transactionModes: ["sign-only", "sign-and-submit"] } };
   private sdk?: XamanSdkLike;
   private auth?: XamanPkceAuth;
   private recoveryStorage: WalletStorage;

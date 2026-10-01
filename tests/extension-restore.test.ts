@@ -386,6 +386,24 @@ test("DropFi restoreSession waits briefly for delayed extension injection", asyn
   }
 });
 
+test("WalletManager preserves Xaman sign-only fallback without submitting", async () => {
+  const sdk = createXamanSdk({ account: session.account.address, signedIn: true });
+  let payload: unknown;
+  sdk.payload.createAndSubscribe = async (request) => {
+    payload = request;
+    return { created: { uuid: "sign-only" }, resolved: Promise.resolve() };
+  };
+  sdk.payload.get = async () => ({ meta: { signed: true }, response: { hex: "SIGNED_XAMAN_BLOB" } });
+  const storage = new MemoryWalletStorage();
+  await storage.setItem("session", JSON.stringify({ ...session, adapterId: "xaman" }));
+  const manager = new WalletManager({ adapters: [new XamanAdapter({ sdk })], storage, autoReconnect: true, accountStatus: { enabled: false } });
+  await manager.autoReconnect();
+  const result = await manager.signTransaction({ txJson: { TransactionType: "Payment" } });
+  assert.equal(result.txBlob, "SIGNED_XAMAN_BLOB");
+  assert.deepEqual(payload, { txjson: { TransactionType: "Payment" }, options: { submit: false } });
+  manager.destroy();
+});
+
 function createXamanSdk(state: { account?: string; signedIn?: boolean; networkType?: string } = {}): XamanSdkLike {
   return {
     state: {
