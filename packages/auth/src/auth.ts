@@ -21,6 +21,7 @@ class WalletAuthController implements WalletAuth {
   private listeners = new Set<WalletAuthChangeHandler>();
   private destroyed = false;
   private signing = false;
+  private requestVersion = 0;
 
   constructor(
     private readonly manager: WalletAuthManager,
@@ -45,10 +46,17 @@ class WalletAuthController implements WalletAuth {
     }
 
     this.signing = true;
+    const requestVersion = ++this.requestVersion;
+    const assertCurrentRequest = () => {
+      this.ensureActive();
+      if (requestVersion !== this.requestVersion) throw new Error("Sign-in request was cancelled.");
+      if (this.manager.getSession() !== initialSession) throw new Error("Wallet session changed during sign-in.");
+    };
     this.setState({ status: "loading", address: account.address, error: null });
 
     try {
       const nonce = await this.adapter.getNonce();
+      assertCurrentRequest();
       const issuedAt = new Date();
       const expirationTime = new Date(issuedAt.getTime() + (merged.expiresIn ?? DEFAULT_EXPIRES_IN_SECONDS) * 1000);
       const message = this.adapter.createMessage({
@@ -68,6 +76,7 @@ class WalletAuthController implements WalletAuth {
       }
 
       const signResult = await this.manager.signMessage({ message, account });
+      assertCurrentRequest();
       if (!isWalletAuthSignInResult(signResult)) {
         throw new Error("Wallet did not return a verifiable signature proof.");
       }
@@ -82,6 +91,7 @@ class WalletAuthController implements WalletAuth {
         publicKey: signResult.publicKey,
         raw: signResult.raw
       });
+      assertCurrentRequest();
       if (!verifyOk) throw new Error("Authentication rejected by server.");
 
       const result = {
@@ -97,7 +107,9 @@ class WalletAuthController implements WalletAuth {
       this.setState({ status: "authenticated", address: account.address, error: null });
       return result;
     } catch (error) {
-      this.setState({ status: "error", address: null, error });
+      if (!this.destroyed && requestVersion === this.requestVersion) {
+        this.setState({ status: "error", address: null, error });
+      }
       throw normalizeAuthError(error);
     } finally {
       this.signing = false;
@@ -105,6 +117,7 @@ class WalletAuthController implements WalletAuth {
   }
 
   async signOut(): Promise<void> {
+    this.requestVersion += 1;
     try {
       await this.adapter.signOut?.();
     } finally {
@@ -125,6 +138,7 @@ class WalletAuthController implements WalletAuth {
   }
 
   destroy(): void {
+    this.requestVersion += 1;
     this.destroyed = true;
     this.listeners.clear();
   }

@@ -1046,6 +1046,7 @@ test("WalletManager signs transactions without submitting when adapter supports 
 
 test("WalletManager falls back to signAndSubmit with submit false for signTransaction", async () => {
   class FallbackSignAdapter extends MockAdapter {
+    capabilities = { connect: true, signMessage: true, signAndSubmit: true, details: { transactionModes: ["sign-only" as const] } };
     lastSubmitValue: boolean | undefined;
 
     async signAndSubmit(request: { submit?: boolean }) {
@@ -1071,6 +1072,7 @@ test("WalletManager falls back to signAndSubmit with submit false for signTransa
 
 test("WalletManager recovers a signed blob from a nested adapter response", async () => {
   class NestedBlobAdapter extends MockAdapter {
+    capabilities = { connect: true, signMessage: true, signAndSubmit: true, details: { transactionModes: ["sign-only" as const] } };
     async signAndSubmit() {
       return { signed: true, raw: { response: { hex: "NESTED_BLOB" } } };
     }

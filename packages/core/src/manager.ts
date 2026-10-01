@@ -300,27 +300,38 @@ export class WalletManager extends WalletEventEmitter {
   async connect(adapterId: string, options: ConnectOptions = {}): Promise<WalletSession> {
     const adapter = this.requireAdapter(adapterId);
     const network = options.network ?? this.getNetwork();
+    const controller = new AbortController();
+    const abortFromCaller = () => controller.abort();
+    options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+    if (options.signal?.aborted) controller.abort();
+    const assertPending = () => {
+      if (controller.signal.aborted || this.pendingAbortController !== controller) {
+        throw new Error("Wallet connection was cancelled");
+      }
+    };
     try {
-      await this.cancelPendingConnection(adapterId);
+      await this.cancelPendingConnection();
       if (this.activeAdapterId && this.activeAdapterId !== adapterId) {
         await this.disconnect();
       }
       this.pendingAdapterId = adapterId;
-      this.pendingAbortController = new AbortController();
+      this.pendingAbortController = controller;
       this.emit("connecting", { adapterId });
       if (adapter.isAvailable && !await this.isAdapterAvailable(adapter)) {
         throw createWalletError.walletNotAvailable(adapter.metadata.name);
       }
-      const signal = options.signal ?? this.pendingAbortController.signal;
+      assertPending();
+      const signal = controller.signal;
       const result = await adapter.connect({ ...options, network, walletId: adapterId, signal });
-      if (signal.aborted || this.pendingAdapterId !== adapterId) {
-        throw new Error("Wallet connection was cancelled");
-      }
+      assertPending();
       this.assertAccountNetwork(adapter, result.account, network, "connect");
       const session = await this.enrichSession(this.withWalletMetadata(result.session ?? { adapterId, account: { ...result.account, network }, connectedAt: Date.now() }, adapter));
+      assertPending();
       this.setSession(session);
       await this.saveSession(session);
+      assertPending();
       await this.loadPersistedTransactions(session);
+      assertPending();
       this.emit("connected", { adapterId, account: session.account, session });
       return session;
     } catch (error) {
@@ -332,7 +343,8 @@ export class WalletManager extends WalletEventEmitter {
       this.emit("error", { adapterId, error: normalized });
       throw normalized;
     } finally {
-      if (this.pendingAdapterId === adapterId) {
+      options.signal?.removeEventListener("abort", abortFromCaller);
+      if (this.pendingAbortController === controller) {
         this.pendingAdapterId = null;
         this.pendingAbortController = undefined;
       }
@@ -359,6 +371,7 @@ export class WalletManager extends WalletEventEmitter {
   }
 
   async disconnect(): Promise<void> {
+    this.cancelTransactionConfirmations();
     const adapterId = this.activeAdapterId ?? undefined;
     const adapter = this.getAdapter();
     try {
@@ -378,6 +391,7 @@ export class WalletManager extends WalletEventEmitter {
     } finally {
       this.activeAdapterId = null;
       this.activeSession = null;
+      this.cancelTransactionConfirmations();
       this.transactions.clear();
       await this.storage.removeItem(SESSION_KEY);
       this.emit("disconnected", { adapterId });
@@ -460,6 +474,10 @@ export class WalletManager extends WalletEventEmitter {
 
   async signAndSubmit<TTransaction extends TransactionPayload = TransactionPayload>(request: SignAndSubmitRequest<TTransaction>) {
     const adapter = this.requireActiveAdapter("signAndSubmit");
+    if (request.submit === false && typeof adapter.signTransaction !== "function"
+      && !adapter.capabilities.details?.transactionModes?.includes("sign-only")) {
+      throw createWalletError.unsupportedMethod("signTransaction", adapter.metadata.name);
+    }
     try {
       this.emit("signing", { adapterId: adapter.metadata.id, kind: "transaction" });
       const result = normalizeTxResult(await adapter.signAndSubmit!(request));
@@ -522,7 +540,9 @@ export class WalletManager extends WalletEventEmitter {
   async signTransaction<TTransaction extends TransactionPayload = TransactionPayload>(request: SignTransactionRequest<TTransaction>): Promise<SignTransactionResult> {
     const adapter = this.getAdapter();
     if (!adapter) throw createWalletError.notConnected();
-    if (typeof adapter.signTransaction !== "function" && typeof adapter.signAndSubmit !== "function") {
+    const supportsSignOnlyFallback = typeof adapter.signAndSubmit === "function"
+      && adapter.capabilities.details?.transactionModes?.includes("sign-only");
+    if (typeof adapter.signTransaction !== "function" && !supportsSignOnlyFallback) {
       throw createWalletError.unsupportedMethod("signTransaction", adapter.metadata.name);
     }
 
@@ -668,6 +688,7 @@ export class WalletManager extends WalletEventEmitter {
       if (controller?.signal.aborted) return;
       try {
         const result = await this.lookupTransaction(transaction.hash, rpcUrl, controller?.signal);
+        if (controller?.signal.aborted) return;
         if (!result || !result.validated) continue;
         if (result.transactionResult === "tesSUCCESS") {
           this.addTransaction({

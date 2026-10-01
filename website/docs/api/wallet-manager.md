@@ -69,6 +69,8 @@ const result = await manager.signTransaction({ txJson });
 
 ### signAndSubmit()
 
+Sign-only requests require a native adapter `signTransaction()` method or an explicit `details.transactionModes` entry of `"sign-only"`. Unsupported adapters reject with `UNSUPPORTED_METHOD` before prompting the wallet. This also applies to `signAndSubmit({ submit: false })`; existing adapters that only submit must not be used for sign-only flows.
+
 Sign and submit a transaction to the network.
 
 ```ts
