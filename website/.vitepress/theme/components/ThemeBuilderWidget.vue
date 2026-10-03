@@ -25,7 +25,7 @@
 
       <!-- Main: accordion controls + preview -->
       <div class="tb-main">
-        <aside class="tb-controls">
+        <aside class="tb-controls" @pointerdown.stop>
 
           <div class="tb-presets tb-presets-mobile">
             <label class="tb-presets-label" for="tb-mobile-preset">Preset</label>
@@ -50,6 +50,35 @@
               :class="{ active: mobileControlTab === tab.value }"
               @click="mobileControlTab = tab.value"
             >{{ tab.label }}</button>
+          </div>
+
+          <!-- Group: Wallets -->
+          <div v-show="!isCompactPage || mobileControlTab === 'wallets'" class="tb-group tb-group-wallets">
+            <button class="tb-group-hd" @click="toggle('wallets')">
+              <span>Wallets</span>
+              <span class="tb-arrow" :class="{ open: !collapsed.wallets }">▾</span>
+            </button>
+            <div v-show="!collapsed.wallets" class="tb-group-bd">
+              <div class="tb-wallets-summary">
+                <span>{{ selectedWalletIds.length }} of {{ walletOptions.length }} shown</span>
+                <button
+                  class="tb-text-btn"
+                  :disabled="selectedWalletIds.length === walletOptions.length"
+                  @click="selectAllWallets"
+                >Select all</button>
+              </div>
+              <div class="tb-wallet-options">
+                <label v-for="wallet in walletOptions" :key="wallet.id" class="tb-wallet-option">
+                  <input
+                    type="checkbox"
+                    :checked="selectedWalletIds.includes(wallet.id)"
+                    :disabled="selectedWalletIds.length === 1 && selectedWalletIds.includes(wallet.id)"
+                    @change="toggleWallet(wallet.id)"
+                  />
+                  <span>{{ wallet.label }}</span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <!-- Group: Display -->
@@ -430,6 +459,7 @@ const config = reactive({
 
 // ── Accordion collapsed state ─────────────────────────────────
 const collapsed = reactive({
+  wallets: false,
   display: false,
   button:  false,
   colors:  false,
@@ -450,9 +480,10 @@ function goBack() {
 
 const previewDevice = ref<'desktop' | 'mobile'>('desktop')
 const isCompactPage = ref(false)
-type MobileControlTab = 'display' | 'button' | 'colors' | 'radius'
-const mobileControlTab = ref<MobileControlTab>('display')
+type MobileControlTab = 'wallets' | 'display' | 'button' | 'colors' | 'radius'
+const mobileControlTab = ref<MobileControlTab>('wallets')
 const mobileControlTabs: Array<{ value: MobileControlTab; label: string }> = [
+  { value: 'wallets', label: 'Wallets' },
   { value: 'display', label: 'Display' },
   { value: 'button', label: 'Button' },
   { value: 'colors', label: 'Colors' },
@@ -470,7 +501,34 @@ let buttonInstance: any = null
 let kitBundle:      any = null
 const KIT_BUNDLE_URL = 'https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js'
 let inlineObserver: MutationObserver | null = null
-let previewSession: any = null
+let inlineObserverCleanup: (() => void) | null = null
+let previewManager: any = null
+const previewFrames = new Set<number>()
+let previewUpdateFrame: number | null = null
+
+function schedulePreviewFrame(callback: () => void) {
+  const id = window.requestAnimationFrame(() => {
+    previewFrames.delete(id)
+    callback()
+  })
+  previewFrames.add(id)
+}
+
+function cancelPreviewFrames() {
+  previewFrames.forEach(id => window.cancelAnimationFrame(id))
+  previewFrames.clear()
+  previewUpdateFrame = null
+}
+
+function queuePreview() {
+  if (!kitLoaded.value || previewUpdateFrame !== null) return
+  previewUpdateFrame = window.requestAnimationFrame(() => {
+    if (previewUpdateFrame !== null) previewFrames.delete(previewUpdateFrame)
+    previewUpdateFrame = null
+    renderPreview()
+  })
+  previewFrames.add(previewUpdateFrame)
+}
 let compactPageQuery: MediaQueryList | null = null
 
 function syncCompactPage(event: MediaQueryListEvent | MediaQueryList) {
@@ -478,7 +536,7 @@ function syncCompactPage(event: MediaQueryListEvent | MediaQueryList) {
   isCompactPage.value = event.matches
   if (event.matches) {
     previewDevice.value = 'mobile'
-    Object.assign(collapsed, { display: false, button: false, colors: false, radius: false })
+    Object.assign(collapsed, { wallets: false, display: false, button: false, colors: false, radius: false })
   }
   if (wasCompact !== event.matches && kitLoaded.value) {
     nextTick(renderPreview)
@@ -513,6 +571,32 @@ const btnSizes = [
   { value: 'md', label: 'MD' },
   { value: 'lg', label: 'LG' },
 ]
+type WalletOptionId = 'xaman' | 'gemwallet' | 'crossmark' | 'dropfi' | 'xrplsnap' | 'walletconnect'
+const walletOptions: Array<{ id: WalletOptionId; label: string }> = [
+  { id: 'xaman', label: 'Xaman' },
+  { id: 'gemwallet', label: 'GemWallet' },
+  { id: 'crossmark', label: 'Crossmark' },
+  { id: 'dropfi', label: 'DropFi' },
+  { id: 'xrplsnap', label: 'MetaMask' },
+  { id: 'walletconnect', label: 'WalletConnect' },
+]
+const selectedWalletIds = ref<WalletOptionId[]>(walletOptions.map((wallet) => wallet.id))
+
+function toggleWallet(id: WalletOptionId) {
+  const selected = selectedWalletIds.value
+  if (selected.includes(id)) {
+    if (selected.length === 1) return
+    selectedWalletIds.value = selected.filter((walletId) => walletId !== id)
+  } else {
+    selectedWalletIds.value = walletOptions
+      .map((wallet) => wallet.id)
+      .filter((walletId) => walletId === id || selected.includes(walletId))
+  }
+}
+
+function selectAllWallets() {
+  selectedWalletIds.value = walletOptions.map((wallet) => wallet.id)
+}
 const previewStates: Array<{ value: PreviewState; label: string }> = [
   { value: 'wallets',     label: 'Wallets' },
   { value: 'connecting',  label: 'Connecting' },
@@ -812,6 +896,16 @@ const codeSnippet = computed(() => {
   const sizeLine      = config.size   !== 'default' ? `\n  size: "${config.size}",`        : ''
   const themePart     = themeLines.length ? `\n  theme: {\n${themeLines.join('\n')}\n  },` : ''
 
+  const walletLines = selectedWalletIds.value.map((id) => `    "${id}",`).join('\n')
+  const credentialLines: string[] = []
+  if (selectedWalletIds.value.includes('xaman')) {
+    credentialLines.push('  xamanClientId: "YOUR_XAMAN_CLIENT_ID",')
+  }
+  if (selectedWalletIds.value.includes('walletconnect')) {
+    credentialLines.push('  walletConnectProjectId: "YOUR_WALLETCONNECT_PROJECT_ID",')
+  }
+  const credentials = credentialLines.length ? `\n${credentialLines.join('\n')}` : ''
+  const managerSnippet = `const manager = createWalletClient({\n  wallets: [\n${walletLines}\n  ],${credentials}\n})`
   const modalSnippet = `const modal = new WalletModal({\n  manager,${themeModeLine}${themeNameLine}${layoutLine}${sizeLine}${themePart}\n})`
 
   const btnLines: string[] = []
@@ -824,7 +918,7 @@ const codeSnippet = computed(() => {
     ? `\n\nconst button = new WalletButtonController({\n  manager,\n  modal,\n${btnLines.join('\n')}\n})\nbutton.mount('#connect-btn')`
     : ''
 
-  return modalSnippet + btnSnippet
+  return managerSnippet + '\n\n' + modalSnippet + btnSnippet
 })
 
 async function copyCode() {
@@ -865,16 +959,39 @@ function buildMockManager() {
           createXrplSnapAdapter, createXamanAdapter, createWalletConnectAdapter } = kitBundle
 
   const adapters: any[] = []
-  try { adapters.push(createXamanAdapter({ apiKey: '1c7dfba7-aadd-4b03-bafb-ca5c8f84bb4f' })) } catch {}
-  try { adapters.push(createGemWalletAdapter()) } catch {}
-  try { adapters.push(createCrossmarkAdapter()) } catch {}
-  try { adapters.push(createDropFiAdapter()) } catch {}
-  try { adapters.push(createXrplSnapAdapter()) } catch {}
-  try {
-    adapters.push(createWalletConnectAdapter({ projectId: '7e0944cf9202885569eb41182016baed', useModal: true, modalMode: 'always' }))
-  } catch {}
+  if (selectedWalletIds.value.includes('xaman') && !previewManager?.getAdapter('xaman')) {
+    try { adapters.push(createXamanAdapter({ apiKey: '1c7dfba7-aadd-4b03-bafb-ca5c8f84bb4f' })) } catch {}
+  }
+  if (selectedWalletIds.value.includes('gemwallet') && !previewManager?.getAdapter('gemwallet')) {
+    try { adapters.push(createGemWalletAdapter()) } catch {}
+  }
+  if (selectedWalletIds.value.includes('crossmark') && !previewManager?.getAdapter('crossmark')) {
+    try { adapters.push(createCrossmarkAdapter()) } catch {}
+  }
+  if (selectedWalletIds.value.includes('dropfi') && !previewManager?.getAdapter('dropfi')) {
+    try { adapters.push(createDropFiAdapter()) } catch {}
+  }
+  if (selectedWalletIds.value.includes('xrplsnap') && !previewManager?.getAdapter('xrplsnap')) {
+    try { adapters.push(createXrplSnapAdapter()) } catch {}
+  }
+  if (selectedWalletIds.value.includes('walletconnect') && !previewManager?.getAdapter('walletconnect')) {
+    try {
+      adapters.push(createWalletConnectAdapter({ projectId: '7e0944cf9202885569eb41182016baed', useModal: true, modalMode: 'always' }))
+    } catch {}
+  }
 
-  return new WalletManager({ adapters, network: 'mainnet' })
+  if (!previewManager) previewManager = new WalletManager({ adapters, network: 'mainnet' })
+  else adapters.forEach(adapter => previewManager.register(adapter))
+  const activeId = previewManager.getSession()?.adapterId
+  if (activeId && !selectedWalletIds.value.includes(activeId)) {
+    void previewManager.disconnect().then(queuePreview).catch((error: unknown) => {
+      console.warn('Theme Builder: failed to disconnect disabled wallet', error)
+    })
+  }
+  for (const id of previewManager.adapters.keys()) {
+    if (!selectedWalletIds.value.includes(id)) previewManager.adapters.delete(id)
+  }
+  return previewManager
 }
 
 function getSdkThemeName(): string | undefined {
@@ -886,11 +1003,12 @@ function getSdkThemeName(): string | undefined {
 function renderPreview() {
   if (!kitBundle || !mountRef.value) return
 
+  cancelPreviewFrames()
+  inlineObserverCleanup?.()
+  inlineObserverCleanup = null
   if (inlineObserver) { inlineObserver.disconnect(); inlineObserver = null }
   if (buttonInstance) { try { buttonInstance.destroy() } catch {}; buttonInstance = null }
   if (modalInstance)  { try { modalInstance.destroy()  } catch {}; modalInstance  = null }
-  document.querySelectorAll('.xwk-overlay').forEach(el => el.remove())
-  document.head.querySelectorAll('style[data-xwk-style]').forEach(el => el.remove())
 
   const mount = mountRef.value
   mount.innerHTML = ''
@@ -899,8 +1017,6 @@ function renderPreview() {
   const { WalletModal, WalletButtonController } = kitBundle
   const manager = buildMockManager()
   if (!manager) return
-  hydratePreviewSession(manager)
-  trackPreviewSession(manager)
   const sdkThemeName = getSdkThemeName()
 
   const btnWrap = document.createElement('div')
@@ -946,6 +1062,7 @@ function renderPreview() {
   buttonInstance = new WalletButtonController({
     manager,
     modal:     modalInstance,
+    accountPanelMount: mount,
     themeName: sdkThemeName as any,
     themeMode: config.mode     as any,
     variant:   config.btnVariant as any,
@@ -956,56 +1073,24 @@ function renderPreview() {
 
   // Auto-open the modal for unconnected previews; preserve connected sessions
   // across theme/layout changes so controls can be tuned in the real account state.
-  requestAnimationFrame(() => {
+  schedulePreviewFrame(() => {
     try {
       if (manager.getSession?.()) return
       modalInstance?.open()
-      requestAnimationFrame(() => replayModalState(manager))
+      schedulePreviewFrame(() => replayModalState(manager))
     } catch {}
   })
 }
 
-function hydratePreviewSession(manager: any) {
-  if (!previewSession || !manager) return
-  try {
-    const adapterId = previewSession.adapterId
-    const adapter = manager.getAdapter?.(adapterId)
-    const network = manager.getNetwork?.(previewSession.account?.network)
-    const session = {
-      ...previewSession,
-      wallet: adapter?.metadata ?? previewSession.wallet,
-      account: {
-        ...previewSession.account,
-        network: network ?? previewSession.account?.network,
-      },
-    }
-    manager.activeSession = session
-    manager.activeAdapterId = adapterId
-  } catch {}
-}
-
-function trackPreviewSession(manager: any) {
-  try {
-    manager.on?.('connected', ({ session }: { session?: any }) => {
-      if (session) previewSession = session
-    })
-    manager.on?.('session_restored', ({ session }: { session?: any }) => {
-      if (session) previewSession = session
-    })
-    manager.on?.('disconnected', () => { previewSession = null })
-    manager.on?.('session_expired', () => { previewSession = null })
-  } catch {}
-}
-
 function replayModalState(manager: any) {
   if (!modalInstance || !manager) return
-  const adapterId = 'gemwallet'
+  const adapterId = selectedWalletIds.value[0]
   try {
     if (previewState.value === 'connecting') {
       manager.emit?.('connecting', { adapterId, recovering: false })
     } else if (previewState.value === 'error') {
       manager.emit?.('connecting', { adapterId, recovering: false })
-      requestAnimationFrame(() => {
+      schedulePreviewFrame(() => {
         manager.emit?.('error', {
           adapterId,
           error: { message: 'Wallet request failed. Please check the wallet and try again.' },
@@ -1044,7 +1129,8 @@ function applyOverlayContainment(overlay: HTMLElement, container: HTMLElement, i
     })
     const applyModal = () => {
       const modal = overlay.querySelector('.xwk-modal') as HTMLElement | null
-      if (!modal) { requestAnimationFrame(applyModal); return }
+      if (!overlay.isConnected) return
+      if (!modal) return
       Object.assign(modal.style, {
         width:                   '100%',
         maxWidth:                'none',
@@ -1058,7 +1144,7 @@ function applyOverlayContainment(overlay: HTMLElement, container: HTMLElement, i
         transform:               'none',
       })
     }
-    requestAnimationFrame(applyModal)
+    schedulePreviewFrame(applyModal)
   } else {
     Object.assign(overlay.style, {
       display:    'grid',
@@ -1142,13 +1228,21 @@ function applyPortalContainment(portal: HTMLElement, container: HTMLElement, isM
   const applyInner = () => {
     const backdrop = portal.querySelector('.xwk-account-overlay') as HTMLElement | null
     const panel    = portal.querySelector('.xwk-account-panel-modal') as HTMLElement | null
-    if (!backdrop || !panel) { requestAnimationFrame(applyInner); return }
+    if (!portal.isConnected || !backdrop || !panel) return
     applyPortalInnerStyles(portal, backdrop, panel, isMobile)
   }
-  requestAnimationFrame(applyInner)
+  schedulePreviewFrame(applyInner)
 }
 
 function setupInlineObserver(container: HTMLElement, isMobile: boolean): MutationObserver {
+  // Older CDN bundles portal to body. Only contain a portal opened by this preview.
+  let previewInteraction = false
+  const onPreviewClick = () => {
+    previewInteraction = true
+    schedulePreviewFrame(() => { previewInteraction = false })
+  }
+  container.addEventListener('click', onPreviewClick, true)
+  inlineObserverCleanup = () => container.removeEventListener('click', onPreviewClick, true)
   // Watch BOTH container and document.body:
   // - WalletModal overlay (.xwk-overlay): SDK → appends to options.mount (container) ✓
   // - WalletButton account portal (.xwk-account-portal): always goes to document.body
@@ -1159,10 +1253,10 @@ function setupInlineObserver(container: HTMLElement, isMobile: boolean): Mutatio
       for (const node of Array.from(mut.addedNodes)) {
         if (!(node instanceof HTMLElement)) continue
 
-        if (node.classList.contains('xwk-overlay')) {
+        if (node.classList.contains('xwk-overlay') && container.contains(node)) {
           applyOverlayContainment(node, container, isMobile)
 
-        } else if (node.classList.contains('xwk-account-portal')) {
+        } else if (node.classList.contains('xwk-account-portal') && (container.contains(node) || previewInteraction)) {
           applyPortalContainment(node, container, isMobile)
           // Also watch this portal's direct children so QR/back re-renders are caught
           mo.observe(node, { childList: true })
@@ -1170,13 +1264,13 @@ function setupInlineObserver(container: HTMLElement, isMobile: boolean): Mutatio
         } else if (node.classList.contains('xwk-account-overlay')) {
           // Portal innerHTML was replaced (QR view, back button) — re-apply inner styles
           const portal = node.parentElement
-          if (portal?.classList.contains('xwk-account-portal')) {
+          if (portal?.classList.contains('xwk-account-portal') && container.contains(portal)) {
             const panel = node.querySelector('.xwk-account-panel-modal') as HTMLElement | null
             if (panel) {
               applyPortalInnerStyles(portal, node, panel, isMobile)
             } else {
               // panel not yet in DOM — rAF fallback
-              requestAnimationFrame(() => {
+              schedulePreviewFrame(() => {
                 const p = node.querySelector('.xwk-account-panel-modal') as HTMLElement | null
                 if (p) applyPortalInnerStyles(portal, node, p, isMobile)
               })
@@ -1190,10 +1284,10 @@ function setupInlineObserver(container: HTMLElement, isMobile: boolean): Mutatio
   mo.observe(document.body, { childList: true })
 
   // Catch elements already in DOM at observer start (auto-open, leftover from previous render)
-  for (const el of Array.from(document.querySelectorAll('.xwk-overlay')) as HTMLElement[]) {
+  for (const el of Array.from(container.querySelectorAll('.xwk-overlay')) as HTMLElement[]) {
     applyOverlayContainment(el, container, isMobile)
   }
-  for (const el of Array.from(document.querySelectorAll('.xwk-account-portal')) as HTMLElement[]) {
+  for (const el of Array.from(container.querySelectorAll('.xwk-account-portal')) as HTMLElement[]) {
     applyPortalContainment(el, container, isMobile)
     mo.observe(el, { childList: true })
   }
@@ -1201,8 +1295,9 @@ function setupInlineObserver(container: HTMLElement, isMobile: boolean): Mutatio
   return mo
 }
 
-watch(config, () => { if (kitLoaded.value) renderPreview() }, { deep: true })
-watch(previewState, () => { if (kitLoaded.value) renderPreview() })
+watch(config, () => { if (kitLoaded.value) queuePreview() }, { deep: true })
+watch(selectedWalletIds, () => { if (kitLoaded.value) queuePreview() }, { deep: true })
+watch(previewState, () => { if (kitLoaded.value) queuePreview() })
 watch(previewDevice, async () => {
   if (kitLoaded.value) {
     await nextTick()   // wait for phone/plain frame DOM swap
@@ -1225,6 +1320,11 @@ onMounted(async () => {
 onUnmounted(() => {
   compactPageQuery?.removeEventListener('change', syncCompactPage)
   compactPageQuery = null
+  cancelPreviewFrames()
+  inlineObserverCleanup?.()
+  inlineObserverCleanup = null
+  previewManager?.destroy()
+  previewManager = null
   if (inlineObserver) { inlineObserver.disconnect(); inlineObserver = null }
   if (buttonInstance) { try { buttonInstance.destroy() } catch {} }
   if (modalInstance)  { try { modalInstance.destroy()  } catch {} }
@@ -1376,7 +1476,7 @@ onUnmounted(() => {
   }
   .tb-control-tabs {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 4px;
     padding: 6px;
     border-bottom: 1px solid var(--vp-c-border);
@@ -1439,6 +1539,7 @@ onUnmounted(() => {
   }
   .tb-state-btn { min-width: 0; padding-inline: 8px; }
   .tb-preset-btn { padding-inline: 11px; }
+  .tb-control-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 /* ── Controls sidebar ────────────────────────────────────────── */
@@ -2079,6 +2180,56 @@ onUnmounted(() => {
   border-left: none !important;
   border-right: none !important;
   transform: none !important;
+}
+
+/* ── Wallet selection ────────────────────────────────────────── */
+.tb-wallets-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--vp-c-text-3);
+  font-size: 11px;
+}
+
+.tb-text-btn {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--vp-c-brand-1);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tb-text-btn:disabled { color: var(--vp-c-text-3); cursor: default; }
+.tb-text-btn:focus-visible { outline: 2px solid var(--vp-c-brand-1); outline-offset: 2px; }
+
+.tb-wallet-options {
+  display: grid;
+  gap: 0;
+}
+
+.tb-wallet-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  border-top: 1px solid var(--vp-c-border);
+  color: var(--vp-c-text-1);
+  font-size: 12px;
+  cursor: pointer;
+}
+.tb-wallet-option input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--vp-c-brand-1);
+}
+.tb-wallet-option:has(input:disabled) { cursor: default; }
+
+@media (max-width: 900px) {
+  .tb-group-wallets .tb-group-bd { gap: 10px; }
+  .tb-wallet-options { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 14px; }
 }
 
 /* On an actual narrow page, show the wallet list as a normal preview block.

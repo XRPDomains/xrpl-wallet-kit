@@ -30,6 +30,8 @@ export class WalletManager extends WalletEventEmitter {
   private activeAdapterId: string | null = null;
   private pendingAdapterId: string | null = null;
   private pendingAbortController?: AbortController;
+  private lifecycleVersion = 0;
+  private sessionMutation: Promise<void> = Promise.resolve();
   private autoReconnectPromise?: Promise<WalletSession | null>;
   private transactions = new Map<string, WalletTransaction>();
   private pendingConfirmations = new Map<string, AbortController>();
@@ -141,95 +143,121 @@ export class WalletManager extends WalletEventEmitter {
       throw createWalletError.networkMismatch(adapter.metadata.name, String(network.id), String(selectedNetwork.id));
     }
     this.emitNetworkChanged(adapter.metadata.id, selectedNetwork);
+    await this.sessionMutation;
     return selectedNetwork;
   }
 
   async autoReconnect(): Promise<WalletSession | null> {
     if (!this.config.autoReconnect) return null;
     if (this.autoReconnectPromise) return this.autoReconnectPromise;
-    this.autoReconnectPromise = this.runAutoReconnect().finally(() => {
-      this.autoReconnectPromise = undefined;
+    const pending = this.runAutoReconnect(this.lifecycleVersion).finally(() => {
+      if (this.autoReconnectPromise === pending) this.autoReconnectPromise = undefined;
     });
+    this.autoReconnectPromise = pending;
     return this.autoReconnectPromise;
   }
 
-  private async runAutoReconnect(): Promise<WalletSession | null> {
+  private async runAutoReconnect(version: number): Promise<WalletSession | null> {
     const serialized = await this.storage.getItem(SESSION_KEY);
-    if (!serialized) return this.recoverPendingReturnSession();
+    if (version !== this.lifecycleVersion) return null;
+    if (!serialized) return this.recoverPendingReturnSession(version);
     const session = this.parseStoredSession(serialized);
     if (!session) {
-      await this.storage.removeItem(SESSION_KEY);
+      await this.mutateStoredSession(() => this.storage.removeItem(SESSION_KEY));
+      if (version !== this.lifecycleVersion) return null;
       this.emit("session_expired", {});
       return null;
     }
     const adapter = this.adapters.get(session.adapterId);
     if (!adapter) {
-      await this.storage.removeItem(SESSION_KEY);
+      await this.mutateStoredSession(() => this.storage.removeItem(SESSION_KEY));
+      if (version !== this.lifecycleVersion) return null;
       this.emit("session_expired", { adapterId: session.adapterId });
       return null;
     }
     try {
       if (adapter.restoreSession) {
         const restoredResult = await this.withTimeout(adapter.restoreSession(session), DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS);
+        if (version !== this.lifecycleVersion) return null;
         if (restoredResult.timedOut) {
-          await this.clearStoredSessionAsStale(session, "restore_timeout");
+          await this.clearStoredSessionAsStale(session, "restore_timeout", version);
+          if (version !== this.lifecycleVersion) return null;
           return null;
         }
         const restored = restoredResult.value;
         if (!restored?.session) {
-          await this.clearStoredSessionAsStale(session, "restore_unavailable");
+          await this.clearStoredSessionAsStale(session, "restore_unavailable", version);
+          if (version !== this.lifecycleVersion) return null;
           return null;
         }
         this.assertSessionNetwork(adapter, restored.session, this.getNetwork(), "restoreSession");
         const enrichedSession = await this.enrichSession(this.withWalletMetadata(restored.session, adapter));
+        if (version !== this.lifecycleVersion) return null;
         this.setSession(enrichedSession);
         await this.loadPersistedTransactions(enrichedSession);
+        if (version !== this.lifecycleVersion) return null;
         this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
+        if (version !== this.lifecycleVersion) return null;
         this.emit("connected", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
         return enrichedSession;
       }
 
       if (adapter.isAvailable) {
         const availability = await this.withTimeout(Promise.resolve(adapter.isAvailable()), DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS);
+        if (version !== this.lifecycleVersion) return null;
         if (availability.timedOut) {
-          await this.clearStoredSessionAsStale(session, "availability_timeout");
+          await this.clearStoredSessionAsStale(session, "availability_timeout", version);
+          if (version !== this.lifecycleVersion) return null;
           return null;
         }
         if (!availability.value) {
-          await this.clearStoredSessionAsStale(session, "adapter_unavailable");
+          await this.clearStoredSessionAsStale(session, "adapter_unavailable", version);
+          if (version !== this.lifecycleVersion) return null;
           return null;
         }
       }
 
       if (session.expiresAt && session.expiresAt <= Date.now()) {
-        await this.clearStoredSessionAsStale(session, "session_expired");
+        await this.clearStoredSessionAsStale(session, "session_expired", version);
+        if (version !== this.lifecycleVersion) return null;
         return null;
       }
 
       const enrichedSession = await this.enrichSession(this.withWalletMetadata(session, adapter));
+      if (version !== this.lifecycleVersion) return null;
       this.assertSessionNetwork(adapter, enrichedSession, this.getNetwork(), "autoReconnect");
       this.setSession(enrichedSession);
       await this.loadPersistedTransactions(enrichedSession);
+      if (version !== this.lifecycleVersion) return null;
       this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession, stale: true });
+      if (version !== this.lifecycleVersion) return null;
       this.emit("connected", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
       return enrichedSession;
     } catch (error) {
+      if (version !== this.lifecycleVersion) return null;
       this.logger.warn("Auto reconnect failed", error);
-      await this.storage.removeItem(SESSION_KEY);
+      await this.mutateStoredSession(() => this.storage.removeItem(SESSION_KEY));
+      if (version !== this.lifecycleVersion) return null;
       this.emit("session_expired", { adapterId: session.adapterId });
       return null;
     }
   }
 
-  private async recoverPendingReturnSession(): Promise<WalletSession | null> {
+  private async recoverPendingReturnSession(version: number): Promise<WalletSession | null> {
     const network = this.getNetwork();
     const adaptersWithRecovery = [...this.adapters.values()].filter((adapter) => adapter.recoverSession);
     const recoverableAdapters: WalletAdapter[] = [];
     for (const adapter of adaptersWithRecovery) {
       try {
-        if (adapter.canRecoverSession && !await adapter.canRecoverSession({ network, walletId: adapter.metadata.id })) continue;
+        if (adapter.canRecoverSession) {
+          const canRecover = await adapter.canRecoverSession({ network, walletId: adapter.metadata.id });
+          if (version !== this.lifecycleVersion) return null;
+          if (!canRecover) continue;
+        }
+        if (version !== this.lifecycleVersion) return null;
         recoverableAdapters.push(adapter);
       } catch (error) {
+        if (version !== this.lifecycleVersion) return null;
         this.logger.warn(`Session recovery availability check failed for ${adapter.metadata.id}`, error);
       }
     }
@@ -247,6 +275,7 @@ export class WalletManager extends WalletEventEmitter {
         break;
       }
       if (delayMs > 0) await this.delay(Math.min(delayMs, remainingBeforeDelay));
+      if (version !== this.lifecycleVersion) return null;
       for (const adapter of recoverableAdapters) {
         const remaining = recoveryDeadline - Date.now();
         if (remaining <= 0) {
@@ -259,6 +288,7 @@ export class WalletManager extends WalletEventEmitter {
             this.emit("connecting", { adapterId: adapter.metadata.id, recovering: true });
           }
           const recovery = await this.withTimeout(adapter.recoverSession?.({ network, walletId: adapter.metadata.id }), remaining);
+          if (version !== this.lifecycleVersion) return null;
           if (recovery.timedOut) {
             timedOut = true;
             this.logger.warn(`Session recovery timed out for ${adapter.metadata.id}`);
@@ -268,13 +298,18 @@ export class WalletManager extends WalletEventEmitter {
           if (!recovered?.session) continue;
           this.assertSessionNetwork(adapter, recovered.session, network, "recoverSession");
           const enrichedSession = await this.enrichSession(this.withWalletMetadata(recovered.session, adapter));
+          if (version !== this.lifecycleVersion) return null;
           this.setSession(enrichedSession);
           await this.saveSession(enrichedSession);
+          if (version !== this.lifecycleVersion) return null;
           await this.loadPersistedTransactions(enrichedSession);
+          if (version !== this.lifecycleVersion) return null;
           this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
+          if (version !== this.lifecycleVersion) return null;
           this.emit("connected", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
           return enrichedSession;
         } catch (error) {
+          if (version !== this.lifecycleVersion) return null;
           this.logger.warn(`Session recovery failed for ${adapter.metadata.id}`, error);
         }
       }
@@ -288,8 +323,9 @@ export class WalletManager extends WalletEventEmitter {
     return null;
   }
 
-  private async clearStoredSessionAsStale(session: WalletSession, reason: string): Promise<void> {
-    await this.storage.removeItem(SESSION_KEY);
+  private async clearStoredSessionAsStale(session: WalletSession, reason: string, version: number): Promise<void> {
+    await this.mutateStoredSession(() => this.storage.removeItem(SESSION_KEY));
+    if (version !== this.lifecycleVersion) return;
     this.emit("session_stale", { adapterId: session.adapterId, account: session.account, session, reason });
   }
 
@@ -298,6 +334,7 @@ export class WalletManager extends WalletEventEmitter {
   }
 
   async connect(adapterId: string, options: ConnectOptions = {}): Promise<WalletSession> {
+    this.invalidateRestoration();
     const adapter = this.requireAdapter(adapterId);
     const network = options.network ?? this.getNetwork();
     const controller = new AbortController();
@@ -371,6 +408,7 @@ export class WalletManager extends WalletEventEmitter {
   }
 
   async disconnect(): Promise<void> {
+    this.invalidateRestoration();
     this.cancelTransactionConfirmations();
     const adapterId = this.activeAdapterId ?? undefined;
     const adapter = this.getAdapter();
@@ -393,7 +431,7 @@ export class WalletManager extends WalletEventEmitter {
       this.activeSession = null;
       this.cancelTransactionConfirmations();
       this.transactions.clear();
-      await this.storage.removeItem(SESSION_KEY);
+      await this.mutateStoredSession(() => this.storage.removeItem(SESSION_KEY));
       this.emit("disconnected", { adapterId });
     }
   }
@@ -598,10 +636,16 @@ export class WalletManager extends WalletEventEmitter {
   }
 
   destroy(): void {
+    this.invalidateRestoration();
     this.cancelTransactionConfirmations();
     void this.cancelPendingConnection();
     // Adapter sign methods usually cannot be aborted externally; callers should ignore late results after teardown.
     this.removeAllListeners();
+  }
+
+  private invalidateRestoration(): void {
+    this.lifecycleVersion += 1;
+    this.autoReconnectPromise = undefined;
   }
 
   private setSession(session: WalletSession): void {
@@ -744,6 +788,7 @@ export class WalletManager extends WalletEventEmitter {
     const address = session.account.address;
     if (!address) return;
     const transactions = await this.transactionStore.get(address, this.transactionNetworkId(session.account));
+    if (this.activeSession !== session) return;
     this.transactions.clear();
     transactions.forEach((transaction) => this.transactions.set(transaction.hash, transaction));
     transactions.forEach((transaction) => {
@@ -808,13 +853,19 @@ export class WalletManager extends WalletEventEmitter {
     return adapter;
   }
 
+  private mutateStoredSession(operation: () => void | Promise<void>): Promise<void> {
+    const pending = this.sessionMutation.catch(() => undefined).then(operation);
+    this.sessionMutation = pending;
+    return pending;
+  }
+
   private async saveSession(session: WalletSession): Promise<void> {
     const envelope: StoredWalletSessionEnvelope = {
       version: WALLET_STORAGE_VERSION,
       session,
       updatedAt: Date.now()
     };
-    await this.storage.setItem(SESSION_KEY, JSON.stringify(envelope));
+    await this.mutateStoredSession(() => this.storage.setItem(SESSION_KEY, JSON.stringify(envelope)));
   }
 
   private parseStoredSession(serialized: string): WalletSession | null {

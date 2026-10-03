@@ -147,6 +147,30 @@ export abstract class BaseWalletAdapter implements WalletAdapter {
     await this.runCleanup();
   }
 
+  // Cancels local waiting, not necessarily the provider's underlying request.
+  protected withAbort<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    const cancelled = () => createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled"));
+    if (signal?.aborted) return Promise.reject(cancelled());
+    if (!signal) return Promise.resolve().then(operation);
+    return new Promise<T>((resolve, reject) => {
+      let listening = true;
+      const abort = () => { cleanup(); reject(cancelled()); };
+      const cleanup = () => {
+        if (!listening) return;
+        listening = false;
+        signal.removeEventListener("abort", abort);
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      Promise.resolve().then(() => {
+        if (signal.aborted) throw cancelled();
+        return operation();
+      }).then(
+        value => { cleanup(); resolve(value); },
+        error => { cleanup(); reject(error); }
+      );
+    });
+  }
+
   protected unsupported(method: string): never {
     throw createWalletError.unsupportedMethod(method, this.metadata.name);
   }

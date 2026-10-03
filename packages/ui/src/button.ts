@@ -22,6 +22,8 @@ export class WalletButtonController {
   private balanceLoading = false;
   private activationStatus: "active" | "unfunded" | "unknown" = "unknown";
   private balanceRequest = 0;
+  private balanceController?: AbortController;
+  private balanceInFlight?: { key: string; resolver: WalletButtonOptions["balanceResolver"]; promise: Promise<void> };
   private balanceDebounceTimer?: number;
   private balanceDebounceSession: WalletSession | null = null;
   private readonly balanceRefreshTimers = new Set<number>();
@@ -109,7 +111,7 @@ export class WalletButtonController {
       this.clearIdentitySettleTimer();
       this.clearBalanceRefreshTimers();
       this.clearBalanceDebounce();
-      this.balanceRequest += 1;
+      this.cancelBalance();
       this.balance = null;
       this.balanceLoading = false;
       this.activationStatus = "unknown";
@@ -128,12 +130,14 @@ export class WalletButtonController {
       this.render();
     }));
     this.offEvents.push(options.manager.on("accountChanged", () => {
+      this.cancelBalance();
       this.clearBalanceRefreshTimers();
       const session = options.manager.getSession();
       this.renderConnectedState(session);
       this.queueBalanceRefresh(session);
     }));
     this.offEvents.push(options.manager.on("networkChanged", () => {
+      this.cancelBalance();
       this.clearBalanceRefreshTimers();
       const session = options.manager.getSession();
       this.renderConnectedState(session);
@@ -188,6 +192,7 @@ export class WalletButtonController {
   }
 
   destroy(): void {
+    this.cancelBalance();
     this.removePanelListeners();
     this.removeAccountPanelPortal();
     this.syncPanelScrollLock(false);
@@ -272,6 +277,8 @@ export class WalletButtonController {
 
   private handleDocumentPointerDown(event: PointerEvent): void {
     if (!this.panelOpen || !this.target) return;
+    if (this.options.accountPanelMount && event.target instanceof Node
+      && !this.options.accountPanelMount.contains(event.target)) return;
     if (event.target instanceof Node && this.target.contains(event.target)) return;
     if (event.target instanceof Node && this.accountPanelPortal?.contains(event.target)) return;
     this.panelOpen = false;
@@ -289,7 +296,7 @@ export class WalletButtonController {
       this.render();
       return;
     }
-    if (event.key !== "Tab" || this.options.accountPanelMode !== "modal") return;
+    if (event.key !== "Tab" || this.options.accountPanelMode !== "modal" || this.options.accountPanelMount) return;
     const focusable = this.getAccountPanelFocusableElements();
     if (!focusable.length) {
       event.preventDefault();
@@ -311,7 +318,7 @@ export class WalletButtonController {
 
   private syncPanelListeners(): void {
     this.removePanelListeners();
-    this.syncPanelScrollLock(this.panelOpen && this.options.accountPanelMode === "modal");
+    this.syncPanelScrollLock(this.panelOpen && this.options.accountPanelMode === "modal" && !this.options.accountPanelMount);
     if (!this.panelOpen) return;
     document.addEventListener("pointerdown", this.onDocumentPointerDown);
     document.addEventListener("keydown", this.onDocumentKeyDown);
@@ -333,7 +340,7 @@ export class WalletButtonController {
     portal.dataset.xwkEntering = entering ? "true" : "false";
     this.ensureStyles();
     portal.innerHTML = this.renderPanel();
-    if (entering) document.body.appendChild(portal);
+    if (entering) (this.options.accountPanelMount ?? document.body).appendChild(portal);
     this.accountPanelPortal = portal;
     this.bindPanelActions(portal);
     this.renderAddressQrIfNeeded(portal);
@@ -546,7 +553,30 @@ export class WalletButtonController {
     return `${session.account.network?.id ?? session.account.networkType ?? "unknown"}:${this.getSessionAddress(session)}`;
   }
 
-  private async resolveBalance(session: WalletSession | null): Promise<void> {
+  private cancelBalance(): void {
+    this.balanceRequest += 1;
+    this.balanceController?.abort();
+    this.balanceController = undefined;
+    this.balanceInFlight = undefined;
+  }
+
+  private resolveBalance(session: WalletSession | null): Promise<void> {
+    const key = session ? this.identityCacheKey(session) + ":" + (session.account.network?.rpcUrl ?? "") : "";
+    if (session && this.options.showBalance && this.balanceInFlight?.key === key
+      && this.balanceInFlight.resolver === this.options.balanceResolver) return this.balanceInFlight.promise;
+    this.cancelBalance();
+    const controller = new AbortController();
+    this.balanceController = controller;
+    const promise = this.runBalance(session, controller.signal);
+    const entry = { key, resolver: this.options.balanceResolver, promise };
+    this.balanceInFlight = entry;
+    void promise.finally(() => {
+      if (this.balanceInFlight === entry) this.balanceInFlight = undefined;
+    });
+    return promise;
+  }
+
+  private async runBalance(session: WalletSession | null, signal: AbortSignal): Promise<void> {
     if (!session || !this.options.showBalance || !this.options.balanceResolver) {
       this.balance = null;
       this.balanceLoading = false;
@@ -573,9 +603,10 @@ export class WalletButtonController {
       const result = await this.options.balanceResolver({
         address,
         network: session.account.network,
-        session
+        session,
+        signal
       });
-      if (requestId !== this.balanceRequest) return;
+      if (signal.aborted || requestId !== this.balanceRequest) return;
       this.balance = this.normalizeBalance(result);
       this.activationStatus = this.balance?.activationStatus ?? (this.balance ? "active" : "unknown");
       session.account.activationStatus = this.activationStatus;
@@ -654,7 +685,7 @@ export class WalletButtonController {
       ? `<button class="xwk-account-back" type="button" data-xwk-account-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button>`
       : `<span></span>`;
     if (this.options.accountPanelMode === "modal") {
-      return `<div class="xwk-account-overlay" data-xwk-account-overlay role="presentation"><section class="xwk-account-panel xwk-account-panel-modal${panelStateClass}" role="dialog" aria-modal="true" aria-label="${this.escapeHtml(title)}" tabindex="-1"><div class="xwk-account-modal-header">${leading}<h2>${this.escapeHtml(title)}</h2><button class="xwk-account-close" type="button" data-xwk-account-close aria-label="${this.escapeHtml(messages.close)}">&times;</button></div><div class="xwk-account-modal-body">${content}</div></section></div>`;
+      return `<div class="xwk-account-overlay" data-xwk-account-overlay role="presentation"><section class="xwk-account-panel xwk-account-panel-modal${panelStateClass}" role="dialog" aria-modal="${this.options.accountPanelMount ? "false" : "true"}" aria-label="${this.escapeHtml(title)}" tabindex="-1"><div class="xwk-account-modal-header">${leading}<h2>${this.escapeHtml(title)}</h2><button class="xwk-account-close" type="button" data-xwk-account-close aria-label="${this.escapeHtml(messages.close)}">&times;</button></div><div class="xwk-account-modal-body">${content}</div></section></div>`;
     }
 
     const dropdownBack = this.addressQrOpen || this.historyOpen

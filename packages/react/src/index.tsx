@@ -82,7 +82,10 @@ export function WalletKitProvider(props: WalletKitProviderProps) {
     };
   }, [props.manager, refreshAvailability]);
 
-  useEffect(() => {
+  useClientLayoutEffect(() => {
+    const initialSession = props.manager.getSession();
+    setSession(initialSession);
+    setStatus(initialSession ? "connected" : "disconnected");
     const syncSession = () => setSession(props.manager.getSession());
     const offConnecting = props.manager.on("connecting", () => setStatus("connecting"));
     const offConnected = props.manager.on("connected", (event) => {

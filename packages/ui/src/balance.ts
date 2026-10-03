@@ -4,8 +4,11 @@ import type { WalletBalance, WalletBalanceResolver } from "./types";
 const FALLBACK_RESERVE_BASE_DROPS = 10_000_000;
 const FALLBACK_RESERVE_INC_DROPS = 2_000_000;
 
-export function createXrpBalanceResolver(): WalletBalanceResolver {
-  return async ({ address, network }) => {
+export function createXrpBalanceResolver(options: { timeoutMs?: number; reserveTtlMs?: number } = {}): WalletBalanceResolver {
+  const timeoutMs = options.timeoutMs ?? 5000;
+  const reserveTtlMs = options.reserveTtlMs ?? 60_000;
+  const reserves = new Map<string, { expiresAt: number; value: { baseDrops: number; incDrops: number } }>();
+  return async ({ address, network, signal }) => {
     if (!network?.rpcUrl) return null;
     const symbol = getNativeAsset(network);
     const endpoint = getHttpRpcUrl(network);
@@ -13,7 +16,7 @@ export function createXrpBalanceResolver(): WalletBalanceResolver {
     const accountInfo = await rpc<AccountInfoResult>(endpoint, {
       method: "account_info",
       params: [{ account: address, ledger_index: "validated" }]
-    });
+    }, signal, timeoutMs);
 
     if (accountInfo.result?.error === "actNotFound") {
       return {
@@ -38,10 +41,17 @@ export function createXrpBalanceResolver(): WalletBalanceResolver {
     if (balanceDrops == null || accountInfo.result?.error) return null;
 
     const ownerCount = accountData?.OwnerCount ?? 0;
-    const reserveInfo = await resolveReserve(endpoint).catch(() => ({
-      baseDrops: FALLBACK_RESERVE_BASE_DROPS,
-      incDrops: FALLBACK_RESERVE_INC_DROPS
-    }));
+    const cached = reserves.get(endpoint);
+    const reserveInfo = cached && cached.expiresAt > Date.now() ? cached.value : await resolveReserve(endpoint, signal, timeoutMs).then(value => {
+      reserves.set(endpoint, { value, expiresAt: Date.now() + reserveTtlMs });
+      return value;
+    }).catch((error) => {
+      if (signal?.aborted) throw error;
+      return {
+        baseDrops: FALLBACK_RESERVE_BASE_DROPS,
+        incDrops: FALLBACK_RESERVE_INC_DROPS
+      };
+    });
     const reserveDrops = reserveInfo.baseDrops + ownerCount * reserveInfo.incDrops;
     const availableDrops = Math.max(balanceDrops - reserveDrops, 0);
     const reserveLocked = balanceDrops > 0 && availableDrops <= 0;
@@ -68,18 +78,29 @@ export function createXrpBalanceResolver(): WalletBalanceResolver {
   };
 }
 
-async function rpc<T>(endpoint: string, payload: unknown): Promise<T> {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  if (!response.ok) throw new Error(`Wallet RPC request failed: ${response.status}`);
-  return response.json() as Promise<T>;
+async function rpc<T>(endpoint: string, payload: unknown, signal?: AbortSignal, timeoutMs = 5000): Promise<T> {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) controller.abort();
+  const timer = setTimeout(abort, timeoutMs);
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`Wallet RPC request failed: ${response.status}`);
+    return await response.json() as T;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", abort);
+  }
 }
 
-async function resolveReserve(endpoint: string): Promise<{ baseDrops: number; incDrops: number }> {
-  const serverState = await rpc<ServerStateResult>(endpoint, { method: "server_state", params: [] });
+async function resolveReserve(endpoint: string, signal?: AbortSignal, timeoutMs?: number): Promise<{ baseDrops: number; incDrops: number }> {
+  const serverState = await rpc<ServerStateResult>(endpoint, { method: "server_state", params: [] }, signal, timeoutMs);
   const ledger = serverState.result?.state?.validated_ledger;
   const baseDrops = parseReserveDrops(ledger?.reserve_base, ledger?.reserve_base_xrp, FALLBACK_RESERVE_BASE_DROPS);
   const incDrops = parseReserveDrops(ledger?.reserve_inc, ledger?.reserve_inc_xrp, FALLBACK_RESERVE_INC_DROPS);

@@ -68,7 +68,7 @@ export class XrplSnapAdapter extends BaseWalletAdapter {
       throw createWalletError.walletNotAvailable("MetaMask Snaps", error);
     });
     await this.withAbort(
-      ethereum.request({ method: "wallet_requestSnaps", params: { [this.snapId]: {} } }).catch((error) => {
+      () => ethereum.request({ method: "wallet_requestSnaps", params: { [this.snapId]: {} } }).catch((error) => {
         if (this.isSnapsUnsupportedError(error)) {
           throw createWalletError.walletNotAvailable("MetaMask Snaps", error);
         }
@@ -79,7 +79,7 @@ export class XrplSnapAdapter extends BaseWalletAdapter {
     this.activeAddress = undefined;
     this.activeProvider = ethereum;
     await this.selectSnapNetwork(options);
-    const snap = await this.withAbort(this.invokeSnap("xrpl_getAccount", undefined), options.signal);
+    const snap = await this.withAbort(() => this.invokeSnap("xrpl_getAccount", undefined), options.signal);
     const address = (snap as { account?: string }).account;
     const publicKey = (snap as { publicKey?: string }).publicKey;
     if (!address) throw new Error("XRPL Snap did not return an XRPL address");
@@ -444,35 +444,6 @@ export class XrplSnapAdapter extends BaseWalletAdapter {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  private withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
-    if (!signal) return promise;
-    if (signal.aborted) return Promise.reject(createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled")));
-    return new Promise<T>((resolve, reject) => {
-      let settled = false;
-      const cleanup = () => signal.removeEventListener("abort", abort);
-      const abort = () => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        reject(createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled")));
-      };
-      signal.addEventListener("abort", abort, { once: true });
-      promise.then(
-        (value) => {
-          if (settled) return;
-          settled = true;
-          cleanup();
-          resolve(value);
-        },
-        (error) => {
-          if (settled) return;
-          settled = true;
-          cleanup();
-          reject(error);
-        }
-      );
-    });
-  }
 }
 
 export function createXrplSnapAdapter(options?: XrplSnapAdapterOptions) { return new XrplSnapAdapter(options); }

@@ -475,8 +475,9 @@ test("WalletButton balance refresh is event-driven when showBalance is enabled",
     handlers.get("tx_submitted")?.();
     await waitForMicrotasks();
 
-    assert.equal(calls, 6);
-    assert.equal(session.balance?.value, "6");
+    // The immediate timer stub makes both submitted refreshes overlap; share that work.
+    assert.equal(calls, 5);
+    assert.equal(session.balance?.value, "5");
   } finally {
     (globalThis as { window?: unknown }).window = originalWindow;
   }

@@ -35,20 +35,18 @@
     "@rollup/plugin-inject": "^5.0.5",
     "@types/react": "^18.3.28",
     "@vitejs/plugin-react": "^4.3.4",
-    "@walletconnect/modal": "^2.7.0",
-    "@walletconnect/sign-client": "^2.23.9",
-    "@walletconnect/types": "^2.23.9",
-    "@walletconnect/utils": "^2.23.9",
     "buffer": "^6.0.3",
     "dependency-cruiser": "^17.4.0",
     "husky": "^9.1.7",
     "jscpd": "^4.2.3",
     "knip": "^6.14.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-test-renderer": "^19.2.6",
     "tsx": "^4.22.3",
     "typescript": "^5.5.4",
     "vite": "^6.4.3",
-    "xumm": "^1.8.0",
-    "xumm-oauth2-pkce": "^2.8.7"
+    "xrpl": "^4.0.0"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "4.60.4"

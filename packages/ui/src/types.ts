@@ -123,6 +123,7 @@ export type WalletBalanceResolver = (context: {
   address: string;
   network?: WalletNetwork;
   session: WalletSession;
+  signal?: AbortSignal;
 }) => Promise<WalletBalance | string | number | null>;
 
 export interface WalletModalController {
@@ -166,6 +167,8 @@ export interface WalletButtonOptions {
   disconnect?: boolean;
   accountPanel?: boolean;
   accountPanelMode?: WalletAccountPanelMode;
+  /** Optional portal host for embedded previews; defaults to document.body. */
+  accountPanelMount?: HTMLElement;
   showBalance?: boolean;
   size?: WalletButtonSize;
   variant?: WalletButtonVariant;

@@ -16,6 +16,7 @@ export class WalletTransactionStore {
   private readonly staleSubmittedMs: number;
   private readonly storage: WalletStorage;
   private readonly now: () => number;
+  private readonly mutations = new Map<string, Promise<unknown>>();
 
   constructor(options: WalletTransactionStoreOptions = {}) {
     this.max = Math.max(1, Math.floor(options.max ?? DEFAULT_MAX_TRANSACTIONS));
@@ -25,41 +26,59 @@ export class WalletTransactionStore {
   }
 
   async get(accountAddress: string, networkId: string): Promise<WalletTransaction[]> {
-    const transactions = this.normalize(await this.readList(this.key(networkId, accountAddress)));
-    const now = this.now();
-    let changed = false;
-    const normalized = transactions.map((transaction) => {
-      if (
-        transaction.status === "submitted"
-        && this.staleSubmittedMs > 0
-        && now - transaction.submittedAt > this.staleSubmittedMs
-      ) {
-        changed = true;
-        return { ...transaction, status: "unknown" as const };
-      }
-      return transaction;
+    return this.serialize(accountAddress, async () => {
+      const transactions = this.normalize(await this.readList(this.key(networkId, accountAddress)));
+      const now = this.now();
+      let changed = false;
+      const normalized = transactions.map((transaction) => {
+        if (
+          transaction.status === "submitted"
+          && this.staleSubmittedMs > 0
+          && now - transaction.submittedAt > this.staleSubmittedMs
+        ) {
+          changed = true;
+          return { ...transaction, status: "unknown" as const };
+        }
+        return transaction;
+      });
+      if (changed) await this.writeList(this.key(networkId, accountAddress), normalized);
+      return normalized;
     });
-    if (changed) await this.writeList(this.key(networkId, accountAddress), normalized);
-    return normalized;
   }
 
   async add(accountAddress: string, networkId: string, transaction: WalletTransaction): Promise<void> {
-    const key = this.key(networkId, accountAddress);
-    const current = await this.readList(key);
-    const withoutDuplicate = current.filter((item) => item.hash !== transaction.hash);
-    const next = this.normalize([transaction, ...withoutDuplicate]).slice(0, this.max);
-    await this.writeList(key, next);
-    await this.addIndex(accountAddress, networkId);
+    return this.serialize(accountAddress, async () => {
+      const key = this.key(networkId, accountAddress);
+      const current = await this.readList(key);
+      const withoutDuplicate = current.filter((item) => item.hash !== transaction.hash);
+      const next = this.normalize([transaction, ...withoutDuplicate]).slice(0, this.max);
+      await this.writeList(key, next);
+      await this.addIndex(accountAddress, networkId);
+    });
   }
 
   async clear(accountAddress: string, networkId?: string): Promise<void> {
-    if (networkId) {
-      await this.storage.removeItem(this.key(networkId, accountAddress));
-      return;
-    }
-    const index = await this.readIndex(accountAddress);
-    await Promise.all(index.map((id) => this.storage.removeItem(this.key(id, accountAddress))));
-    await this.storage.removeItem(this.indexKey(accountAddress));
+    return this.serialize(accountAddress, async () => {
+      if (networkId) {
+        await this.storage.removeItem(this.key(networkId, accountAddress));
+        return;
+      }
+      const index = await this.readIndex(accountAddress);
+      await Promise.all(index.map((id) => this.storage.removeItem(this.key(id, accountAddress))));
+      await this.storage.removeItem(this.indexKey(accountAddress));
+    });
+  }
+
+  // Serialize by account so network lists and their shared index mutate together.
+  // This queue is instance-local; storage shared across tabs needs external coordination.
+  private serialize<T>(account: string, operation: () => Promise<T>): Promise<T> {
+    const previous = this.mutations.get(account) ?? Promise.resolve();
+    const pending = previous.catch(() => undefined).then(operation);
+    this.mutations.set(account, pending);
+    void pending.finally(() => {
+      if (this.mutations.get(account) === pending) this.mutations.delete(account);
+    }).catch(() => undefined);
+    return pending;
   }
 
   private normalize(transactions: WalletTransaction[]): WalletTransaction[] {

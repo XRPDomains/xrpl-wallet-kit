@@ -40,7 +40,7 @@ export class CrossmarkAdapter extends BaseWalletAdapter {
 
   async connect(options: ConnectOptions) {
     const signInAndWait = this.requireMethod("signInAndWait");
-    const result = await this.withAbort(signInAndWait(this.randomHex()), options.signal);
+    const result = await this.withAbort(() => signInAndWait(this.randomHex()), options.signal);
     const address = this.pickString(result, ["response.data.address", "response.address", "address"]);
     if (!address) throw new Error("Crossmark did not return an XRPL address");
     const publicKey = this.pickString(result, ["response.data.publicKey", "response.data.public_key", "response.publicKey", "publicKey"]);
@@ -152,35 +152,6 @@ export class CrossmarkAdapter extends BaseWalletAdapter {
     return typeof value === "string" && value.trim() ? value : undefined;
   }
 
-  private withAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
-    if (!signal) return promise;
-    if (signal.aborted) return Promise.reject(createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled")));
-    return new Promise<T>((resolve, reject) => {
-      let settled = false;
-      const cleanup = () => signal.removeEventListener("abort", abort);
-      const abort = () => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        reject(createWalletError.connectionRejected(this.metadata.name, new Error("Connection was cancelled")));
-      };
-      signal.addEventListener("abort", abort, { once: true });
-      promise.then(
-        (value) => {
-          if (settled) return;
-          settled = true;
-          cleanup();
-          resolve(value);
-        },
-        (error) => {
-          if (settled) return;
-          settled = true;
-          cleanup();
-          reject(error);
-        }
-      );
-    });
-  }
 }
 
 export function createCrossmarkAdapter(options?: CrossmarkAdapterOptions) { return new CrossmarkAdapter(options); }
