@@ -1,9 +1,6 @@
 # Multisign Coordination
 
-::: warning Unreleased
-These helpers and the prepared-only Ledger multisign behavior are available on
-repository `main`. They are not yet included in the published npm/CDN release.
-:::
+Available starting in v0.1.19.
 
 Use the opt-in core helpers to verify and combine signer contributions without
 modifying the prepared transaction. Install `xrpl` alongside the kit.

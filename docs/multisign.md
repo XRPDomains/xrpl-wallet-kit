@@ -1,6 +1,6 @@
 # Multisign Coordination
 
-Release status: available on repository `main`; npm/CDN publication is pending.
+Available starting in v0.1.19.
 
 Core provides opt-in, asynchronous helpers for collecting independently signed
 XRPL transactions. Install the optional `xrpl` peer dependency to use them.

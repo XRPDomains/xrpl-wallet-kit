@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.19
+
+### Added
+
+- Opt-in transaction preflight policies, request lifecycle diagnostics and cancellation.
+- Reusable adapter conformance checks through `@xrpl-wallet-kit/core/testing`.
+- Opt-in XRPL Wallet Standard discovery and legacy adapter registration bridge.
+- Multisign contribution verification, deterministic combination and quorum/fee-gated submission helpers.
+
+### Fixed
+
+- Signing/session race conditions, stale-operation cleanup and React lifecycle handling.
+- Mobile theme-builder preview, wallet selection controls and dark-mode navigation.
+- Onboarding configuration and selective entry-point documentation.
+
+### Migration
+
+- Default Ledger multisign signing now requires a fully prepared transaction and does not autofill each contribution. Prepare all fields once before collecting signatures. Single-sign behavior is unchanged.
+- Wallet discovery and preflight remain opt-in. GhostSig integration is planned, not included.
+
 ## 0.1.3
 
 ### Fixed
