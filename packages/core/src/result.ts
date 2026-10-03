@@ -1,4 +1,14 @@
-import type { TxResult } from "./types";
+import type { SignTransactionResult, TxResult } from "./types";
+
+export function normalizeSignTransactionResult(raw: unknown): SignTransactionResult {
+  const txBlob = pickPath(raw, ["txBlob", "tx_blob", "result.txBlob", "result.tx_blob", "response.txBlob",
+    "response.tx_blob", "raw.txBlob", "raw.tx_blob", "response.hex", "raw.response.hex", "tx_json", "result.tx_json"]);
+  const signed = pickPath(raw, ["signed", "result.signed"]);
+  const rejected = pickPath(raw, ["rejected", "result.rejected"]);
+  return { txBlob: typeof txBlob === "string" ? txBlob : undefined,
+    signed: typeof signed === "boolean" ? signed : Boolean(txBlob),
+    rejected: typeof rejected === "boolean" ? rejected : undefined, raw };
+}
 
 export function pickPath(source: unknown, paths: string[]): unknown {
   if (!source || typeof source !== "object") return undefined;

@@ -6,6 +6,7 @@
 - [ ] `npm.cmd test`
 - [ ] `npm.cmd run build:browser`
 - [ ] Adapter passes `assertWalletAdapter(adapter)`.
+- [ ] Adapter runs the [conformance suite](./conformance.md) with isolated provider fixtures and reviews every skipped scenario.
 - [ ] Fresh consumer TypeScript import resolves package types.
 
 ## Contract v1

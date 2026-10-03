@@ -5,7 +5,7 @@ import { WalletEventEmitter } from "./events";
 import { createWalletKitLogger } from "./logger";
 import type { WalletKitLogger } from "./logger";
 import { DEFAULT_XRPL_NETWORKS, createNetworkRegistry, getHttpRpcUrl } from "./networks";
-import { normalizeTxResult, pickPath } from "./result";
+import { normalizeSignTransactionResult, normalizeTxResult, pickPath } from "./result";
 import { MemoryWalletStorage } from "./storage";
 import { WalletTransactionStore } from "./tx-store";
 import type { AddWalletTransactionRequest, AuthenticateRequest, AuthenticateResult, ConnectOptions, SignatureKind, SignAndSubmitRequest, SignMessageRequest, SignMessageResult, SignTransactionRequest, SignTransactionResult, StoredWalletSessionEnvelope, TransactionPayload, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletCapabilities, WalletCapabilityDetails, WalletManagerConfig, WalletNetwork, WalletNetworkId, WalletSession, WalletStorage, WalletTransaction } from "./types";
@@ -1025,32 +1025,9 @@ export class WalletManager extends WalletEventEmitter {
     if (/reject|denied|cancelled|canceled|closed/i.test(message)) {
       return createWalletError.connectionRejected(adapter.metadata.name, error);
     }
+    if (/timeout|timed out/i.test(message)) {
+      return createWalletError.requestTimeout(message, error);
+    }
     return createWalletError.connectionFailed(adapter.metadata.name, error);
   }
 }
-
-function normalizeSignTransactionResult(raw: unknown): SignTransactionResult {
-  const txBlob = pickPath(raw, [
-    "txBlob",
-    "tx_blob",
-    "result.txBlob",
-    "result.tx_blob",
-    "response.txBlob",
-    "response.tx_blob",
-    "raw.txBlob",
-    "raw.tx_blob",
-    "response.hex",
-    "raw.response.hex",
-    "tx_json",
-    "result.tx_json"
-  ]);
-  const signed = pickPath(raw, ["signed", "result.signed"]);
-  const rejected = pickPath(raw, ["rejected", "result.rejected"]);
-  return {
-    txBlob: typeof txBlob === "string" ? txBlob : undefined,
-    signed: typeof signed === "boolean" ? signed : Boolean(txBlob),
-    rejected: typeof rejected === "boolean" ? rejected : undefined,
-    raw
-  };
-}
-

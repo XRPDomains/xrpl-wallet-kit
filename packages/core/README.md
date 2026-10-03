@@ -6,6 +6,10 @@ Use this package when you want full control over wallet UI or when building a cu
 
 ## Install
 
+Adapter authors can import the runner-neutral conformance harness from
+`@xrpl-wallet-kit/core/testing`. See [Adapter Conformance](../../docs/adapters/conformance.md)
+for isolated provider fixtures, capability-based scenarios and package/browser smoke.
+
 ```bash
 npm install @xrpl-wallet-kit/core xrpl
 ```
