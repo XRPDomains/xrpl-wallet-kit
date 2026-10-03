@@ -106,7 +106,37 @@ export type XrplTransaction = Transaction;
 export type CustomTransactionPayload = Record<string, unknown>;
 export type TransactionPayload = XrplTransaction | CustomTransactionPayload;
 
-export interface SignMessageRequest {
+export interface WalletRequestOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  requestId?: string;
+  onRequestProgress?: (progress: WalletRequestProgress) => void;
+}
+
+export type WalletRequestState = "pending" | "opened" | "connected" | "signed" | "submitted" | "expired" | "cancelled" | "failed";
+export type WalletRequestKind = "connect" | "sign-message" | "sign-only" | "sign-and-submit";
+export interface WalletRequestProgress {
+  state: "opened" | "signed" | "submitted" | "expired";
+  providerRequestId?: string;
+  hash?: string;
+}
+export interface WalletRequest {
+  readonly id: string;
+  readonly adapterId: string;
+  readonly kind: WalletRequestKind;
+  readonly state: WalletRequestState;
+  readonly pending: boolean;
+  readonly startedAt: number;
+  readonly updatedAt: number;
+  readonly account?: string;
+  readonly networkId?: WalletNetworkId;
+  readonly providerRequestId?: string;
+  readonly hash?: string;
+  /** A cancelled/expired dispatched submission may still have reached the ledger. */
+  readonly outcomeUnknown: boolean;
+}
+
+export interface SignMessageRequest extends WalletRequestOptions {
   message: string;
   account?: WalletAccount;
 }
@@ -122,7 +152,7 @@ export interface SignMessageResult {
   raw?: unknown;
 }
 
-export interface AuthenticateRequest {
+export interface AuthenticateRequest extends WalletRequestOptions {
   statement: string;
   expiresIn?: number;
   account?: WalletAccount;
@@ -142,7 +172,7 @@ export interface AuthenticateResult {
   raw?: unknown;
 }
 
-export interface SignAndSubmitRequest<TTransaction extends TransactionPayload = TransactionPayload> {
+export interface SignAndSubmitRequest<TTransaction extends TransactionPayload = TransactionPayload> extends WalletRequestOptions {
   txJson: TTransaction;
   methodHint?: "payment" | "createNFTOffer" | "acceptNFTOffer" | "cancelNFTOffer" | "burnNFT" | "trustSet" | "setTrustline" | "generic";
   walletPayload?: unknown;
@@ -150,7 +180,7 @@ export interface SignAndSubmitRequest<TTransaction extends TransactionPayload = 
   preflight?: TransactionPreflightPolicy | false;
 }
 
-export interface SignTransactionRequest<TTransaction extends TransactionPayload = TransactionPayload> {
+export interface SignTransactionRequest<TTransaction extends TransactionPayload = TransactionPayload> extends WalletRequestOptions {
   txJson: TTransaction;
   methodHint?: SignAndSubmitRequest["methodHint"];
   walletPayload?: unknown;
@@ -240,10 +270,9 @@ export interface AddWalletTransactionRequest {
   metadata?: Record<string, unknown>;
 }
 
-export interface ConnectOptions {
+export interface ConnectOptions extends WalletRequestOptions {
   network?: WalletNetwork;
   walletId?: string;
-  signal?: AbortSignal;
 }
 
 export interface ConnectResult {
@@ -291,9 +320,11 @@ export type WalletEventName =
   | "session_restored"
   | "session_stale"
   | "session_expired"
-  | "transaction_preflight";
+  | "transaction_preflight"
+  | "request_changed";
 
 export interface WalletEvents {
+  request_changed: { request: WalletRequest };
   connecting: { adapterId: string; recovering?: boolean };
   connected: { adapterId: string; account: WalletAccount; session?: WalletSession };
   disconnected: { adapterId?: string };

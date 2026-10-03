@@ -42,6 +42,9 @@ Use the template in `docs/adapters/templates/adapter-package` as a starting poin
 
 ## Stable contract
 
+Follow [Request Lifecycle and Cancellation](../request-lifecycle.md) for local
+abort/timeout handling, provider progress, and background/reload behavior.
+
 Read `adapter-contract.md` before implementing a third-party adapter. It defines Wallet Adapter Contract v1, including required fields, optional recovery hooks, capability rules, and validation helpers.
 
 At minimum, every adapter package should run `assertWalletAdapter(adapter)` in its own tests before doing provider-specific smoke tests.

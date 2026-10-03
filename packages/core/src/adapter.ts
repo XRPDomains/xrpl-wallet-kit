@@ -1,5 +1,6 @@
-import type { WalletAdapter, WalletAdapterApiVersion, WalletAdapterType, WalletMetadata } from "./types";
+import type { WalletAdapter, WalletAdapterApiVersion, WalletAdapterType, WalletMetadata, WalletRequestOptions } from "./types";
 import { createWalletError } from "./errors";
+import { waitForWalletRequest } from "./request";
 
 export const WALLET_ADAPTER_API_VERSION: WalletAdapterApiVersion = "1.1";
 
@@ -173,6 +174,16 @@ export abstract class BaseWalletAdapter implements WalletAdapter {
 
   protected unsupported(method: string): never {
     throw createWalletError.unsupportedMethod(method, this.metadata.name);
+  }
+
+  protected withWalletRequest<T>(request: WalletRequestOptions, operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    const callerSignal = request.signal;
+    const controller = new AbortController();
+    const abort = () => controller.abort(callerSignal?.reason);
+    callerSignal?.addEventListener("abort", abort, { once: true });
+    if (callerSignal?.aborted) abort();
+    return waitForWalletRequest(() => operation(controller.signal), { signal: controller.signal, timeoutMs: request.timeoutMs },
+      error => controller.abort(error)).finally(() => callerSignal?.removeEventListener("abort", abort));
   }
 
   protected addCleanup(handler: () => void | Promise<void>): () => void {

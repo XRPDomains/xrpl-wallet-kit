@@ -5,6 +5,7 @@ export * from "./logger";
 export * from "./manager";
 export * from "./networks";
 export { validateTransactionPreflight } from "./preflight";
+export { assertWalletRequestActive, waitForWalletRequest } from "./request";
 export * from "./result";
 export * from "./storage";
 export * from "./types";

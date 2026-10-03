@@ -101,6 +101,9 @@ Apps should read `signatureKind`. Some wallets return compact message signatures
 
 ## Transaction Lifecycle
 
+For signing request IDs, pending states, AbortSignal, timeouts, and mobile return
+behavior, see [Request Lifecycle and Cancellation](../../docs/request-lifecycle.md).
+
 When `signAndSubmit()` returns a hash, the manager records the transaction and emits lifecycle events.
 
 ```ts

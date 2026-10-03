@@ -137,7 +137,7 @@ test("session changes during asynchronous preflight prevent wallet dispatch", as
   const wait = new Promise<void>(resolve => { release = resolve; });
   const { manager, adapter } = await setup({ checks: [async () => { entered(); await wait; }] });
   const pending = manager.signTransaction({ txJson: tx });
-  const rejection = assert.rejects(pending, { code: WalletKitErrorCode.PREFLIGHT_FAILED });
+  const rejection = assert.rejects(pending, { code: WalletKitErrorCode.REQUEST_CANCELLED });
   await started;
   await manager.disconnect();
   release();
@@ -185,7 +185,7 @@ test("hooks receive the correct mode for each public signing path", async () => 
 test("account changes in signing listeners cannot dispatch previously validated intent", async () => {
   const { manager, adapter } = await setup({});
   manager.on("signing", () => manager.emitAccountChanged(adapter.metadata.id, { ...account, address: "rChanged" }));
-  await assert.rejects(manager.signTransaction({ txJson: tx }), { code: WalletKitErrorCode.PREFLIGHT_FAILED });
+  await assert.rejects(manager.signTransaction({ txJson: tx }), { code: WalletKitErrorCode.REQUEST_CANCELLED });
   assert.equal(adapter.calls.length, 0);
   await manager.destroy();
 });
