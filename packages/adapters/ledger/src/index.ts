@@ -1,4 +1,4 @@
-import { BaseWalletAdapter, createWalletError } from "@xrpl-wallet-kit/core";
+import { BaseWalletAdapter, createWalletError, validateMultisignTransaction } from "@xrpl-wallet-kit/core";
 import type {
   ConnectOptions,
   ConnectResult,
@@ -316,38 +316,21 @@ export class LedgerAdapter extends BaseWalletAdapter {
     if (!this.xrp || !this.session) throw createWalletError.notConnected();
     if (!this.network) throw createWalletError.connectionFailed(this.metadata.name, new Error("XRPL network is required for Ledger signing"));
 
-    const { Client, encode, encodeForMultiSigning } = await import("xrpl");
-    const client = new Client(this.network.rpcUrl);
-    await client.connect();
-    try {
-      const input = asRecord(tx);
-      if (Array.isArray(input.Signers) && input.Signers.length > 0) {
-        throw createWalletError.unsupportedMethod("adding a signer to a populated Signers array", this.metadata.name);
-      }
-      const prepared = await client.autofill({
-        ...input,
-        Account: typeof input.Account === "string" ? input.Account : this.session.address,
-        SigningPubKey: ""
-      } as any) as unknown as Record<string, unknown>;
-      delete prepared.TxnSignature;
-      delete prepared.Signers;
-      prepared.SigningPubKey = "";
+    const { encode, encodeForMultiSigning } = await import("xrpl");
+    const prepared = await validateMultisignTransaction(asRecord(tx));
 
-      const publicKey = (this.session.publicKey ?? (await this.xrp.getAddress(this.derivationPath, false, false)).publicKey).toUpperCase();
-      const signingBlob = encodeForMultiSigning(prepared as never, this.session.address).toUpperCase();
-      const signature = await this.withTimeout(
-        this.xrp.signTransaction(this.derivationPath, signingBlob),
-        "Ledger multisigning timeout. Please confirm the transaction on your Ledger device."
-      );
-      if (!signature) throw new Error("Ledger did not return a transaction signature");
+    const publicKey = (this.session.publicKey ?? (await this.xrp.getAddress(this.derivationPath, false, false)).publicKey).toUpperCase();
+    const signingBlob = encodeForMultiSigning(prepared as never, this.session.address).toUpperCase();
+    const signature = await this.withTimeout(
+      this.xrp.signTransaction(this.derivationPath, signingBlob),
+      "Ledger multisigning timeout. Please confirm the transaction on your Ledger device."
+    );
+    if (!signature) throw new Error("Ledger did not return a transaction signature");
 
-      const signer = { Signer: { Account: this.session.address, SigningPubKey: publicKey, TxnSignature: signature.toUpperCase() } };
-      const signedTx = { ...prepared, Signers: [signer] };
-      const txBlob = encode(signedTx as never);
-      return { txBlob, signed: true, raw: { txBlob, signedTx, signer } };
-    } finally {
-      await client.disconnect();
-    }
+    const signer = { Signer: { Account: this.session.address, SigningPubKey: publicKey, TxnSignature: signature.toUpperCase() } };
+    const signedTx = { ...prepared, Signers: [signer] };
+    const txBlob = encode(signedTx as never);
+    return { txBlob, signed: true, raw: { txBlob, signedTx, signer } };
   }
 
   private async createTransport(): Promise<LedgerTransport> {

@@ -88,6 +88,16 @@ const result = await manager.signAndSubmit({
 
 The adapter requires a network URL (`options.network.rpcUrl`) to autofill and submit. It connects and disconnects from the XRPL network per transaction.
 
+### Multisign
+
+For multisign sign-only requests, set `SigningPubKey: ""` and provide the fully
+prepared source `Account`, `Sequence`/ticket fields, `Fee`, `LastLedgerSequence`
+and network-specific fields. Omit `Signers` and `TxnSignature`. The default
+multisign path signs these exact fields without autofill or an RPC connection.
+Changing them requires collecting all signatures again. Custom sessions must
+implement `signMultisignTransaction`. Multisign submission through the adapter
+remains unsupported: use [core multisign coordination](../configuration/multisign).
+
 ### Multiple Accounts
 
 Use `getAccounts()` to browse multiple Ledger accounts before connecting:

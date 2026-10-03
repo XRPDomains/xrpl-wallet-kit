@@ -39,6 +39,7 @@ const kit = createWalletKit({
 - `signTransaction()` supports XRPL multisigning when `SigningPubKey` is empty. It returns a signed blob plus the signer contribution under `raw.signer`/`raw.signedTx` for the dApp to combine with other signers.
 - `signAndSubmit()` rejects multisign payloads with `UNSUPPORTED_METHOD`; the dApp must combine a quorum of signer contributions before submission.
 - A custom `connectLedger` session must implement `signMultisignTransaction()` to opt into multisigning.
+- Default multisign signing requires a fully prepared transaction (`Account`, `Sequence`/ticket fields, `Fee`, `LastLedgerSequence`, `SigningPubKey: ""`, no signature fields). It does not autofill or connect to RPC. Prepare once before collecting signatures; see [core coordination helpers](../../../docs/multisign.md).
 
 ## Options
 

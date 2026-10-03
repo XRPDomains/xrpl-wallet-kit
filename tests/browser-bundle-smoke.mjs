@@ -3,8 +3,9 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { TextDecoder, TextEncoder } from "node:util";
 import vm from "node:vm";
+import { Wallet } from "xrpl";
 
-const bundlePath = resolve("packages/browser/dist/xrpl-wallet-kit.iife.js");
+const bundlePath = resolve(process.argv[2] ?? "packages/browser/dist/xrpl-wallet-kit.iife.js");
 const code = await readFile(bundlePath, "utf8");
 
 for (const expectedText of ["Connect Wallet", "Copy address", "Disconnect", "Recent transactions"]) {
@@ -30,6 +31,7 @@ class SmokeCSSStyleSheet {
 }
 
 const context = {
+  structuredClone,
   Event,
   console,
   setTimeout,
@@ -89,6 +91,23 @@ assert.equal(typeof context.XRPLWalletKit.createClient, "function");
 assert.equal(typeof context.XRPLWalletKit.startWalletStandardDiscovery, "function");
 assert.equal(typeof context.XRPLWalletKit.createWalletStandardWallet, "function");
 assert.equal(typeof context.XRPLWalletKit.WalletStandardAdapter, "function");
+assert.equal(typeof context.XRPLWalletKit.combineMultisignContributions, "function");
+assert.equal(typeof context.XRPLWalletKit.submitMultisignTransaction, "function");
+const multisignOwner = Wallet.generate();
+const multisignWallet = Wallet.generate();
+const preparedMultisign = {
+  TransactionType: "Payment", Account: multisignOwner.classicAddress,
+  Destination: multisignWallet.classicAddress, Amount: "1", Fee: "20",
+  Sequence: 1, LastLedgerSequence: 100, SigningPubKey: ""
+};
+const multisignResult = await context.XRPLWalletKit.combineMultisignContributions(
+  preparedMultisign, [multisignWallet.sign(preparedMultisign, true).tx_blob],
+  { account: multisignOwner.classicAddress, quorum: 1, baseFeeDrops: "10",
+    signers: [{ account: multisignWallet.classicAddress, weight: 1, publicKeys: [multisignWallet.publicKey] }] }
+);
+assert.equal(multisignResult.quorumMet, true);
+assert.equal(multisignResult.feeSufficient, true);
+assert.equal(multisignResult.signerAccounts[0], multisignWallet.classicAddress);
 vm.runInContext(`{
   const kit = new XRPLWalletKit.WalletManager({ logger: { level: "silent" } });
   const network = { id: "testnet", name: "Testnet", networkType: "TESTNET", rpcUrl: "wss://example.invalid", walletConnectChainId: "xrpl:1" };

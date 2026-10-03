@@ -4,6 +4,7 @@ export * from "./discovery";
 export * from "./events";
 export * from "./logger";
 export * from "./manager";
+export * from "./multisign";
 export * from "./networks";
 export { validateTransactionPreflight } from "./preflight";
 export { assertWalletRequestActive, waitForWalletRequest } from "./request";

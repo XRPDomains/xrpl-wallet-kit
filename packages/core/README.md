@@ -170,7 +170,15 @@ Capability rules:
 
 `WalletManager` stores session state through `WalletStorage`. Auto reconnect is passive: adapters should restore only from wallet state they can read without opening popups, QR panels, deep links, or approval prompts.
 
-## Related
+## Multisign
+
+Opt-in [multisign coordination helpers](../../docs/multisign.md) verify signer
+contributions, immutable transaction intent and trusted-policy quorum before
+combination/submission. Install the optional `xrpl` peer dependency. Signing
+keys, signer collection, live authorization checks and connections stay with
+the application. Existing single-sign behavior is unchanged.
+
+## Related Packages
 
 - `@xrpl-wallet-kit/client` - all-in-one app integration
 - `@xrpl-wallet-kit/ui` - framework-agnostic modal, button, inline picker, and toast
