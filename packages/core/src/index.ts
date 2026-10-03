@@ -1,5 +1,6 @@
 export * from "./adapter";
 export * from "./errors";
+export * from "./discovery";
 export * from "./events";
 export * from "./logger";
 export * from "./manager";
@@ -8,6 +9,7 @@ export { validateTransactionPreflight } from "./preflight";
 export { assertWalletRequestActive, waitForWalletRequest } from "./request";
 export * from "./result";
 export * from "./storage";
+export * from "./standard-wallet";
 export * from "./types";
 export * from "./tx-store";
 export * from "./utils";

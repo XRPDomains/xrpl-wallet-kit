@@ -30,6 +30,7 @@ class SmokeCSSStyleSheet {
 }
 
 const context = {
+  Event,
   console,
   setTimeout,
   clearTimeout,
@@ -85,5 +86,24 @@ assert.equal(typeof context.Buffer, "function");
 assert.equal(typeof context.XRPLWalletKit, "object");
 assert.equal(typeof context.XRPLWalletKit.create, "function");
 assert.equal(typeof context.XRPLWalletKit.createClient, "function");
+assert.equal(typeof context.XRPLWalletKit.startWalletStandardDiscovery, "function");
+assert.equal(typeof context.XRPLWalletKit.createWalletStandardWallet, "function");
+assert.equal(typeof context.XRPLWalletKit.WalletStandardAdapter, "function");
+vm.runInContext(`{
+  const kit = new XRPLWalletKit.WalletManager({ logger: { level: "silent" } });
+  const network = { id: "testnet", name: "Testnet", networkType: "TESTNET", rpcUrl: "wss://example.invalid", walletConnectChainId: "xrpl:1" };
+  const wallet = XRPLWalletKit.createWalletStandardWallet({
+    metadata: { id: "smoke-standard", name: "Smoke Standard", type: "extension" },
+    capabilities: { connect: true },
+    connect: async () => { throw new Error("Discovery must not prompt"); }
+  }, { networks: [network], icon: "data:image/png;base64,YQ==" });
+  const discovery = XRPLWalletKit.startWalletStandardDiscovery(kit, {
+    registry: { get: () => [wallet], on: () => () => {} }
+  });
+  if (kit.getWallets().length !== 1) throw new Error("Browser discovery failed");
+  discovery.dispose();
+  if (kit.getWallets().length !== 0) throw new Error("Browser discovery cleanup failed");
+  kit.destroy();
+}`, context);
 assert.equal(context.XRPLWalletKit.WalletButton, context.XRPLWalletKit.WalletButtonController);
 assert.equal(typeof context.XRPLWalletKit.WalletButton, "function");

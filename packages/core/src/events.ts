@@ -33,4 +33,10 @@ export class WalletEventEmitter {
   emit<T extends WalletEventName>(eventName: T, event: WalletEvents[T]): void {
     this.listeners.get(eventName)?.forEach((handler) => handler(event));
   }
+
+  protected emitSafely<T extends WalletEventName>(eventName: T, event: WalletEvents[T], onError: (error: unknown) => void): void {
+    this.listeners.get(eventName)?.forEach(handler => {
+      try { handler(event); } catch (error) { onError(error); }
+    });
+  }
 }

@@ -304,6 +304,8 @@ export interface WalletAdapter {
 }
 
 export type WalletEventName =
+  | "walletsChanged"
+  | "destroyed"
   | "connecting"
   | "connected"
   | "disconnected"
@@ -324,6 +326,8 @@ export type WalletEventName =
   | "request_changed";
 
 export interface WalletEvents {
+  walletsChanged: { wallets: WalletMetadata[] };
+  destroyed: Record<string, never>;
   request_changed: { request: WalletRequest };
   connecting: { adapterId: string; recovering?: boolean };
   connected: { adapterId: string; account: WalletAccount; session?: WalletSession };

@@ -53,5 +53,10 @@
     "wallet-kit",
     "xrp-ledger",
     "web3"
-  ]
+  ],
+  "dependencies": {
+    "@wallet-standard/app": "^1.1.1",
+    "@wallet-standard/base": "^1.1.1",
+    "@wallet-standard/features": "^1.1.1"
+  }
 }

@@ -41,3 +41,23 @@ test("React manager replacement synchronizes session and ignores the previous ma
     delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
   }
 });
+
+test("React wallet lists react to late registration and unregistration", async () => {
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const manager = new WalletManager({ accountStatus: { enabled: false } });
+  let current!: ReturnType<typeof useWalletKit>;
+  function Consumer() { current = useWalletKit(); return null; }
+  let renderer!: ReturnType<typeof create>;
+  try {
+    await act(async () => { renderer = create(React.createElement(WalletKitProvider, { manager }, React.createElement(Consumer))); });
+    assert.equal(current.wallets.length, 0);
+    await act(async () => { manager.register({ metadata: { id: "late", name: "Late", type: "extension" }, capabilities: { connect: true },
+      isAvailable: () => true, connect: async () => ({ account: { address: "rLate" } }) }); });
+    assert.equal(current.wallets[0].id, "late"); assert.equal(current.availability.late, true);
+    await act(async () => { manager.unregister("late"); });
+    assert.equal(current.wallets.length, 0); assert.deepEqual(current.availability, {});
+  } finally {
+    if (renderer) await act(async () => renderer.unmount());
+    manager.destroy(); delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+  }
+});

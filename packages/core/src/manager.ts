@@ -63,9 +63,41 @@ export class WalletManager extends WalletEventEmitter {
   }
 
   register(adapter: WalletAdapter): this {
+    if (this.destroyed) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Wallet manager was destroyed.");
     this.adapters.set(adapter.metadata.id, adapter);
     this.logger.debug(`Registered adapter ${adapter.metadata.id}`);
+    this.emitSafely("walletsChanged", { wallets: this.getWallets() }, error => this.logger.warn("Wallet list observer failed", error));
     return this;
+  }
+
+  get isDestroyed(): boolean { return this.destroyed; }
+
+  unregister(adapterId: string, expectedAdapter?: WalletAdapter): boolean {
+    const adapter = this.adapters.get(adapterId);
+    if (!adapter || (expectedAdapter && adapter !== expectedAdapter)) return false;
+    this.adapters.delete(adapterId);
+    if (!this.destroyed) {
+      this.invalidateRestoration();
+      this.emitDisconnected(adapterId);
+      this.emitSafely("walletsChanged", { wallets: this.getWallets() }, error => this.logger.warn("Wallet list observer failed", error));
+    }
+    return true;
+  }
+
+  /** Provider-side revocation: invalidate local state without calling a wallet logout. */
+  emitDisconnected(adapterId: string): void {
+    if (this.destroyed) return;
+    if (this.pendingAdapterId === adapterId) void this.cancelPendingConnection();
+    this.invalidateRestoration();
+    if (this.activeAdapterId !== adapterId) return;
+    this.requestTracker.cancelSigning();
+    this.cancelTransactionConfirmations();
+    this.activeAdapterId = null;
+    this.activeSession = null;
+    this.transactions.clear();
+    void this.mutateStoredSession(() => this.activeSession ? Promise.resolve() : this.storage.removeItem(SESSION_KEY))
+      .catch(error => this.logger.warn("Revoked session cleanup failed", error));
+    this.emitSafely("disconnected", { adapterId }, error => this.logger.warn("Revocation observer failed", error));
   }
 
   getWallets() {
@@ -375,7 +407,7 @@ export class WalletManager extends WalletEventEmitter {
     options.signal?.addEventListener("abort", abortFromCaller, { once: true });
     if (options.signal?.aborted) controller.abort();
     const assertPending = () => {
-      if (controller.signal.aborted || this.pendingAbortController !== controller) {
+      if (controller.signal.aborted || this.pendingAbortController !== controller || this.adapters.get(adapterId) !== adapter || this.destroyed) {
         throw new Error("Wallet connection was cancelled");
       }
     };
@@ -785,11 +817,13 @@ export class WalletManager extends WalletEventEmitter {
   }
 
   destroy(): void {
+    if (this.destroyed) return;
     this.destroyed = true;
     this.requestTracker.cancelAll();
     this.invalidateRestoration();
     this.cancelTransactionConfirmations();
     void this.cancelPendingConnection();
+    this.emitSafely("destroyed", {}, error => this.logger.warn("Destroy observer failed", error));
     this.removeAllListeners();
   }
 

@@ -103,6 +103,10 @@ export function WalletKitProvider(props: WalletKitProviderProps) {
     });
     const offAccountChanged = props.manager.on("accountChanged", syncSession);
     const offNetworkChanged = props.manager.on("networkChanged", syncSession);
+    const offWalletsChanged = props.manager.on("walletsChanged", () => {
+      setAvailability(createUnknownAvailability(props.manager));
+      void refreshAvailability();
+    });
     const offStale = props.manager.on("session_stale", () => {
       if (!props.manager.getSession()) setStatus("disconnected");
       syncSession();
@@ -122,6 +126,7 @@ export function WalletKitProvider(props: WalletKitProviderProps) {
       offRestored();
       offAccountChanged();
       offNetworkChanged();
+      offWalletsChanged();
       offStale();
       offExpired();
       offError();

@@ -45,6 +45,7 @@ class WalletPickerView {
     private pendingQr?: { adapterId: string; uri: string; deeplink?: string };
     private availability: Record<string, boolean>;
     private availabilityLoading: boolean;
+    private availabilityRequest = 0;
     private offEvents: Array<() => void>;
     private openHandlers: Set<() => void>;
     private closeHandlers: Set<() => void>;
@@ -79,6 +80,9 @@ class WalletPickerView {
             if (!recovering)
                 this.setLoading(adapterId);
         }), options.manager.on("connected", ({ adapterId, session }) => this.handleConnected(adapterId, session ?? options.manager.getSession())), options.manager.on("error", ({ adapterId, error }) => this.setError(error, adapterId)));
+        this.offEvents.push(options.manager.on("walletsChanged", () => {
+            if (this.root?.dataset.xwkView === "list") void this.refreshAvailability();
+        }));
     }
     autoOpen() {
         this.open();
@@ -158,6 +162,7 @@ class WalletPickerView {
         this.closeTimer = window.setTimeout(finishClose, 190);
     }
     destroy() {
+        this.availabilityRequest++;
         void this.options.manager.cancelPendingConnection();
         this.rejectOpenWait("Wallet picker was destroyed before a wallet connected.");
         this.close(false, false, false);
@@ -553,11 +558,14 @@ class WalletPickerView {
         return this.getWallets().filter((wallet) => !groupedIds.has(wallet.id));
     }
     private async refreshAvailability() {
+        const request = ++this.availabilityRequest;
         try {
-            this.availability = await this.options.manager.getWalletAvailability();
+            const availability = await this.options.manager.getWalletAvailability();
+            if (request !== this.availabilityRequest) return;
+            this.availability = availability;
         }
         finally {
-            this.availabilityLoading = false;
+            if (request === this.availabilityRequest) this.availabilityLoading = false;
         }
         if (this.root?.dataset.xwkView !== "list")
             return;

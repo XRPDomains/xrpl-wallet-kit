@@ -42,6 +42,9 @@ Use the template in `docs/adapters/templates/adapter-package` as a starting poin
 
 ## Stable contract
 
+For injected wallet discovery and legacy wrappers, see
+[XRPL Wallet Discovery](../wallet-discovery.md).
+
 Follow [Request Lifecycle and Cancellation](../request-lifecycle.md) for local
 abort/timeout handling, provider progress, and background/reload behavior.
 

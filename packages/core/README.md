@@ -144,6 +144,10 @@ Network mismatches are rejected before a session is persisted. If a wallet repor
 
 ## Adapter Contract
 
+Opt-in [Wallet Standard discovery](../../docs/wallet-discovery.md) supports
+compatible injected XRPL wallets alongside configured legacy adapters, including
+late registration, account changes, and wallet-side registration wrappers.
+
 Adapters implement the `WalletAdapter` interface and declare capabilities for the methods they truly support.
 
 ```ts
