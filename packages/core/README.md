@@ -60,6 +60,15 @@ const request: SignAndSubmitRequest<Payment> = {
 };
 ```
 
+## Transaction Preflight
+
+Opt into shared checks before sign-only or sign-and-submit requests with
+`WalletManagerConfig.preflight` or per-request `preflight`. Account/network,
+transaction types, fee ceilings, ledger windows, and application hooks produce
+structured warnings/errors without silently rewriting transaction intent.
+Default behavior is unchanged. See [Transaction Preflight](../../docs/transaction-preflight.md)
+for policy overrides, diagnostics, and limitations.
+
 ## Networks
 
 Adapters can advertise supported networks and network-switching support through granular capability metadata. Switching is rejected before invoking the wallet when the target is not supported.

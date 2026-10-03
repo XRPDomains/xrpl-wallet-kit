@@ -147,12 +147,52 @@ export interface SignAndSubmitRequest<TTransaction extends TransactionPayload = 
   methodHint?: "payment" | "createNFTOffer" | "acceptNFTOffer" | "cancelNFTOffer" | "burnNFT" | "trustSet" | "setTrustline" | "generic";
   walletPayload?: unknown;
   submit?: boolean;
+  preflight?: TransactionPreflightPolicy | false;
 }
 
 export interface SignTransactionRequest<TTransaction extends TransactionPayload = TransactionPayload> {
   txJson: TTransaction;
   methodHint?: SignAndSubmitRequest["methodHint"];
   walletPayload?: unknown;
+  preflight?: TransactionPreflightPolicy | false;
+}
+
+export interface TransactionPreflightIssue {
+  code: string;
+  severity: "error" | "warning";
+  message: string;
+  field?: string;
+}
+
+export interface TransactionPreflightContext {
+  readonly txJson: Readonly<CustomTransactionPayload>;
+  readonly account: Readonly<WalletAccount>;
+  readonly network: Readonly<WalletNetwork>;
+  readonly mode: "sign-only" | "sign-and-submit";
+}
+
+export type TransactionPreflightCheck = (context: TransactionPreflightContext) =>
+  void | TransactionPreflightIssue | readonly TransactionPreflightIssue[] |
+  Promise<void | TransactionPreflightIssue | readonly TransactionPreflightIssue[]>;
+
+export interface TransactionPreflightPolicy {
+  networkId?: WalletNetworkId;
+  allowedTransactionTypes?: readonly string[];
+  deniedTransactionTypes?: readonly string[];
+  /** Integer drops. When configured, Fee must be present for a verifiable ceiling. */
+  maxFeeDrops?: string;
+  /** A validated ledger index supplied by the application, not fetched implicitly. */
+  validatedLedgerIndex?: number;
+  maxLedgerOffset?: number;
+  requireLastLedgerSequence?: boolean;
+  /** Application-owned checks, e.g. trust lines or destination tags. */
+  checks?: readonly TransactionPreflightCheck[];
+}
+
+export interface TransactionPreflightReport {
+  enabled: boolean;
+  allowed: boolean;
+  issues: readonly TransactionPreflightIssue[];
 }
 
 export interface SignTransactionResult {
@@ -250,7 +290,8 @@ export type WalletEventName =
   | "tx_failed"
   | "session_restored"
   | "session_stale"
-  | "session_expired";
+  | "session_expired"
+  | "transaction_preflight";
 
 export interface WalletEvents {
   connecting: { adapterId: string; recovering?: boolean };
@@ -269,6 +310,7 @@ export interface WalletEvents {
   session_restored: { adapterId: string; account: WalletAccount; session: WalletSession; stale?: boolean };
   session_stale: { adapterId: string; account?: WalletAccount; session?: WalletSession; reason?: string; attempts?: number };
   session_expired: { adapterId?: string };
+  transaction_preflight: { adapterId: string; mode: "sign-only" | "sign-and-submit"; report: TransactionPreflightReport };
 }
 
 export type WalletEventHandler<T extends WalletEventName> = (event: WalletEvents[T]) => void;
@@ -291,6 +333,7 @@ export interface StoredWalletSessionEnvelope {
 }
 
 export interface WalletManagerConfig {
+  preflight?: TransactionPreflightPolicy;
   metadata?: WalletAppMetadata;
   appName?: string;
   appDescription?: string;

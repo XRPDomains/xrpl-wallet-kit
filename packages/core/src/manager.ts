@@ -1,4 +1,6 @@
-import { createWalletError, isWalletKitError, normalizeWalletError } from "./errors";
+import { createWalletError, isWalletKitError, normalizeWalletError, WalletKitError, WalletKitErrorCode } from "./errors";
+import { snapshotPreflightValue, validateTransactionPreflight } from "./preflight";
+import type { TransactionPreflightContext, TransactionPreflightReport } from "./types";
 import { WalletEventEmitter } from "./events";
 import { createWalletKitLogger } from "./logger";
 import type { WalletKitLogger } from "./logger";
@@ -510,6 +512,75 @@ export class WalletManager extends WalletEventEmitter {
     return typeof value === "string" && value.trim().length > 0;
   }
 
+  async preflightTransaction(
+    request: SignTransactionRequest | SignAndSubmitRequest,
+    mode: TransactionPreflightContext["mode"] = "sign-only"
+  ): Promise<TransactionPreflightReport> {
+    return (await this.evaluatePreflight(request, mode)).report;
+  }
+
+  private async evaluatePreflight(request: SignTransactionRequest | SignAndSubmitRequest, mode: TransactionPreflightContext["mode"]) {
+    const override = request.preflight;
+    const enabled = override !== false && (override !== undefined || this.config.preflight !== undefined);
+    const session = this.activeSession;
+    const version = this.lifecycleVersion;
+    const address = session?.account.address;
+    const networkId = session?.account.network?.id;
+    const assertCurrent = () => {
+      if (enabled && (this.activeSession !== session || version !== this.lifecycleVersion
+        || this.getAccount()?.address !== address || this.getAccount()?.network?.id !== networkId)) {
+        throw new WalletKitError(WalletKitErrorCode.PREFLIGHT_FAILED, "Wallet session changed during preflight.", {
+          details: { issues: [{ code: "SESSION_CHANGED", severity: "error", message: "Repeat preflight for the current account and network." }] }
+        });
+      }
+    };
+    if (!enabled) return { report: { enabled: false, allowed: true, issues: [] } as TransactionPreflightReport, txJson: request.txJson, assertCurrent };
+    if (!session) throw createWalletError.notConnected();
+    const policy = { ...this.config.preflight, ...(override || {}) };
+    let context: TransactionPreflightContext;
+    try {
+      context = snapshotPreflightValue({ txJson: request.txJson as Record<string, unknown>, account: session.account, network: session.account.network ?? this.getNetwork(), mode });
+    } catch (cause) {
+      throw new WalletKitError(WalletKitErrorCode.PREFLIGHT_FAILED, "Transaction preflight input could not be copied.", { cause });
+    }
+    const report = await validateTransactionPreflight(context, policy);
+    if (request.walletPayload !== undefined) {
+      report.issues = [...report.issues, { code: "WALLET_PAYLOAD_NOT_VALIDATED", severity: "error", message: "Use txJson without walletPayload when preflight is enabled." }];
+      report.allowed = false;
+    }
+    assertCurrent();
+    return { report: snapshotPreflightValue(report), txJson: context.txJson as TransactionPayload, assertCurrent };
+  }
+
+  private async prepareTransaction<T extends SignTransactionRequest | SignAndSubmitRequest>(request: T, mode: TransactionPreflightContext["mode"]) {
+    const { preflight, ...input } = request;
+    const enabled = preflight !== false && (preflight !== undefined || this.config.preflight !== undefined);
+    // Capture every provider field before awaiting application checks.
+    let providerRequest = input;
+    if (enabled) {
+      try { providerRequest = structuredClone(input); }
+      catch (cause) { throw new WalletKitError(WalletKitErrorCode.PREFLIGHT_FAILED, "Transaction input could not be copied.", { cause }); }
+    }
+    const result = await this.evaluatePreflight({ ...providerRequest, preflight }, mode);
+    if (result.report.enabled) {
+      this.emit("transaction_preflight", { adapterId: this.activeAdapterId!, mode, report: result.report });
+      result.assertCurrent();
+      if (!result.report.allowed) {
+        throw new WalletKitError(WalletKitErrorCode.PREFLIGHT_FAILED, "Transaction was blocked by preflight policy.", {
+          details: { issues: result.report.issues }
+        });
+      }
+    }
+    return {
+      request: { ...providerRequest, txJson: result.report.enabled ? structuredClone(result.txJson) : result.txJson } as T,
+      assertCurrent: result.assertCurrent
+    };
+  }
+
+  private needsPreflight(request: SignTransactionRequest | SignAndSubmitRequest): boolean {
+    return request.preflight !== false && (request.preflight !== undefined || this.config.preflight !== undefined);
+  }
+
   async signAndSubmit<TTransaction extends TransactionPayload = TransactionPayload>(request: SignAndSubmitRequest<TTransaction>) {
     const adapter = this.requireActiveAdapter("signAndSubmit");
     if (request.submit === false && typeof adapter.signTransaction !== "function"
@@ -517,8 +588,12 @@ export class WalletManager extends WalletEventEmitter {
       throw createWalletError.unsupportedMethod("signTransaction", adapter.metadata.name);
     }
     try {
+      const prepared = this.needsPreflight(request)
+        ? await this.prepareTransaction(request, request.submit === false ? "sign-only" : "sign-and-submit")
+        : { request, assertCurrent: () => undefined };
       this.emit("signing", { adapterId: adapter.metadata.id, kind: "transaction" });
-      const result = normalizeTxResult(await adapter.signAndSubmit!(request));
+      prepared.assertCurrent();
+      const result = normalizeTxResult(await adapter.signAndSubmit!(prepared.request));
       this.emit("signed", { adapterId: adapter.metadata.id, kind: "transaction", result });
       if (result.hash) {
         this.addTransaction({
@@ -585,10 +660,14 @@ export class WalletManager extends WalletEventEmitter {
     }
 
     try {
+      const prepared = this.needsPreflight(request)
+        ? await this.prepareTransaction(request, "sign-only")
+        : { request, assertCurrent: () => undefined };
       this.emit("signing", { adapterId: adapter.metadata.id, kind: "transaction" });
+      prepared.assertCurrent();
       const raw = typeof adapter.signTransaction === "function"
-        ? await adapter.signTransaction(request)
-        : await adapter.signAndSubmit!({ ...request, submit: false });
+        ? await adapter.signTransaction(prepared.request)
+        : await adapter.signAndSubmit!({ ...prepared.request, submit: false });
       const result = normalizeSignTransactionResult(raw);
       this.emit("signed", { adapterId: adapter.metadata.id, kind: "transaction", result });
       return result;
