@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- Patch development Next.js and compatible root transitive dependencies; upgrade duplicate-detection tooling without its vulnerable glob dependency chain.
+- Patch the private website's Vite/PostCSS/nanoid dependency chain and add scoped audit regression checks.
+- Keep unpatched Crossmark/legacy verifier risks visible under P1 issue #48. These changes do not resolve all root audit findings or upgrade consuming dApps' Next.js versions.
+
 ## 0.1.19
 
 ### Added

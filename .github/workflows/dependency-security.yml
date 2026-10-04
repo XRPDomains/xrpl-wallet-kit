@@ -1,0 +1,32 @@
+name: Dependency security
+
+on:
+  pull_request:
+    paths:
+      - "**/package.json"
+      - "**/package-lock.json"
+      - "scripts/*dependency*.mjs"
+      - "scripts/dependency-audit-exceptions.json"
+      - "tests/dependency-audit-policy.test.ts"
+      - ".github/workflows/dependency-security.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm --prefix website ci
+      - run: node --import tsx --test tests/dependency-audit-policy.test.ts
+      - run: npm run check:security
+      - run: npm run check:duplicates:report
+      - run: npm run build:browser
+      - run: npm --prefix website run build

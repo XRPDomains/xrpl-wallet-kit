@@ -1,0 +1,20 @@
+[
+  {
+    "scope": "root",
+    "package": "node-forge",
+    "advisory": "https://github.com/advisories/GHSA-86w9-cpqp-85rv",
+    "severity": "high",
+    "expires": "2026-11-04",
+    "issue": "https://github.com/XRPDomains/xrpl-wallet-kit/issues/48",
+    "reason": "No patched node-forge release; installed through Crossmark SDK typings. Unresolved upstream risk, not a security fix."
+  },
+  {
+    "scope": "root",
+    "package": "elliptic",
+    "advisory": "https://github.com/advisories/GHSA-848j-6mx2-7j84",
+    "severity": "low",
+    "expires": "2026-11-04",
+    "issue": "https://github.com/XRPDomains/xrpl-wallet-kit/issues/48",
+    "reason": "Legacy Crossmark and optional verify-xrpl-signature dependency chains require a reviewed compatible migration; no forced crypto override."
+  }
+]
