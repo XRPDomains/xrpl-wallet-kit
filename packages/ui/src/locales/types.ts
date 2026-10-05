@@ -48,6 +48,7 @@ export interface WalletUiMessages {
   xrplSnapWallet: string;
   hardwareWallet: string;
   embeddedWallet: string;
+  webWallet?: string;
   copyAddress: string;
   addressQr: string;
   showAddressQr: string;

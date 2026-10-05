@@ -1068,6 +1068,8 @@ class WalletPickerView {
                 return messages.hardwareWallet;
             case "embedded":
                 return messages.embeddedWallet;
+            case "web":
+                return messages.webWallet ?? "Web wallet";
             default:
                 return String(type);
         }

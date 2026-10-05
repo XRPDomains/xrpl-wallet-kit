@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Experimental opt-in GhostSig hosted popup adapter with verified signing replies, cancellation and cached session restoration. Available in workspace client/IIFE exports, not enabled by defaults or `wallets: "all"`. Live passkey/testnet acceptance and npm publication remain pending under #34.
+
 ### Security
 
 - Replace auth's default legacy signed-transaction verifier with modern XRPL codec/keypairs peers, preserving compact versus signedTx proofs and explicit injected verifiers. Reject malformed proofs and ambiguous injected validity results; remove the legacy verifier peer requirement.

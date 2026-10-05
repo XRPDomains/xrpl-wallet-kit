@@ -7,6 +7,7 @@
     { "path": "./packages/adapters/crossmark" },
     { "path": "./packages/adapters/walletconnect" },
     { "path": "./packages/adapters/dropfi" },
+    { "path": "./packages/adapters/ghostsig" },
     { "path": "./packages/adapters/xrpl-snap" },
     { "path": "./packages/adapters/ledger" },
     { "path": "./packages/adapters/otsu" },

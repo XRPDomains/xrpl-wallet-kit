@@ -38,6 +38,7 @@ export const viVNMessages: WalletUiMessages = {
   xrplSnapWallet: "XRPL Snap",
   hardwareWallet: "Ví phần cứng",
   embeddedWallet: "Ví nhúng",
+  webWallet: "Ví web",
   copyAddress: "Sao chép địa chỉ",
   addressQr: "Mã QR địa chỉ",
   showAddressQr: "Hiển thị mã QR địa chỉ",

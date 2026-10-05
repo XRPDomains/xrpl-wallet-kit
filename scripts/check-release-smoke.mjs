@@ -56,7 +56,8 @@ for (const [packageName, { pkg, packagePath }] of workspacePackages) {
 for (const entryPath of [
   "packages/ui/dist/index.js",
   "packages/react/dist/index.js",
-  "packages/next/dist/index.js"
+  "packages/next/dist/index.js",
+  "packages/adapters/ghostsig/dist/index.js"
 ]) {
   await import(pathToFileURL(resolve(root, entryPath)).href);
 }

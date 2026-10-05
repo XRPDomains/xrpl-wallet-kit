@@ -20,7 +20,7 @@ export interface WalletNetwork {
   explorerAccountUrl?: string;
 }
 
-export type WalletAdapterType = "mobile" | "extension" | "walletconnect" | "snap" | "hardware" | "embedded";
+export type WalletAdapterType = "mobile" | "extension" | "walletconnect" | "snap" | "hardware" | "embedded" | "web";
 export type WalletAdapterApiVersion = "1.0" | "1.1" | (string & {});
 
 export interface WalletCapabilities {

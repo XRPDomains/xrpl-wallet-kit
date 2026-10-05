@@ -53,6 +53,9 @@ All available adapters:
 | `@xrpl-wallet-kit/adapter-xrpl-snap` | XRPL Snap (MetaMask) |
 | `@xrpl-wallet-kit/adapter-otsu` | Otsu Wallet |
 
+The [GhostSig adapter](/docs/adapters/ghostsig) is an experimental opt-in
+workspace implementation, not published in npm 0.1.19 yet.
+
 ## All-in-One Client Package
 
 If you want everything in one install:

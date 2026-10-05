@@ -1,5 +1,24 @@
 # GhostSig integration plan
 
+## Implementation Update - 2026-10-05
+
+The workspace now implements an experimental opt-in package, client/IIFE
+exports, `web` metadata type, locale label, verified transaction replies and
+popup lifecycle tests. Default wallet lists and CDN latest stay unchanged.
+Popup reuse is deferred; each request is closed deterministically and a fresh
+gesture is required for the next popup. No npm release or live passkey/testnet
+acceptance is claimed. Issue #34 remains open for those acceptance checks.
+See `packages/adapters/ghostsig/README.md` and the website adapter guide.
+
+Live source inspection found that the raw signer adds SourceTag when omitted
+and may correct a supplied Sequence. The adapter requires an explicit uint32
+SourceTag (0 allowed) and rejects changes to supplied Sequence, rather than
+relaxing the three-field autofill allowlist. This is a GhostSig-only requirement.
+
+Protocol source checked: XRPL Commons develop commit
+`d43330a2003977399cd7349eff84c318c87637eb` and live
+`https://ghostsig.dev/src/connect.js` on 2026-10-05.
+
 **Status:** Proposed, not implemented  
 **Tracking issue:** [#34](https://github.com/XRPDomains/xrpl-wallet-kit/issues/34)  
 **Priority:** P2  
@@ -259,6 +278,17 @@ Record the browser version, passkey provider, wallet revision, account, network,
 transaction hashes, package tarball integrity, and observed result.
 
 ## Rollout
+
+### Local validation, 2026-10-05
+
+- Full suite: 357 tests passed, including the GhostSig protocol and adapter contract tests.
+- Readable and minified browser bundles exercise connect and sign-only replies with
+  locally generated Ed25519 proofs; these are mocked protocol tests, not live wallet signing.
+- Website build and the opt-in React preview render the official GhostSig icon.
+- React preview: `http://127.0.0.1:5175/?ghostsig=1` selects testnet; the normal
+  preview retains its existing wallets and mainnet configuration.
+- No npm publication or real passkey/ledger transaction was performed. Issue #34
+  remains open until the live testnet matrix is completed.
 
 1. **Protocol spike:** implement and test the popup client in isolation.
 2. **Opt-in adapter:** publish the standalone package and selective client ID.

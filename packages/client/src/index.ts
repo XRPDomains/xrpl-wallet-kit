@@ -1,6 +1,7 @@
 export * from "@xrpl-wallet-kit/core";
 export * from "@xrpl-wallet-kit/adapter-crossmark";
 export * from "@xrpl-wallet-kit/adapter-dropfi";
+export * from "@xrpl-wallet-kit/adapter-ghostsig";
 export * from "@xrpl-wallet-kit/adapter-gemwallet";
 export * from "@xrpl-wallet-kit/adapter-ledger";
 export * from "@xrpl-wallet-kit/adapter-walletconnect";
@@ -12,6 +13,8 @@ import { WalletManager, createBrowserWalletStorage } from "@xrpl-wallet-kit/core
 import type { WalletAdapter, WalletAppMetadata, WalletEventHandler, WalletEventName, WalletEvents, WalletManagerConfig } from "@xrpl-wallet-kit/core";
 import { createCrossmarkAdapter } from "@xrpl-wallet-kit/adapter-crossmark";
 import { createDropFiAdapter } from "@xrpl-wallet-kit/adapter-dropfi";
+import { createGhostsigAdapter } from "@xrpl-wallet-kit/adapter-ghostsig";
+import type { GhostsigAdapterOptions } from "@xrpl-wallet-kit/adapter-ghostsig";
 import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
 import { createLedgerAdapter } from "@xrpl-wallet-kit/adapter-ledger";
 import { createWalletConnectAdapters, createWalletConnectMetadata } from "@xrpl-wallet-kit/adapter-walletconnect";
@@ -32,6 +35,7 @@ export type WalletKitAdapterId =
   | "gemwallet"
   | "crossmark"
   | "dropfi"
+  | "ghostsig"
   | "xrplsnap"
   | "xrpl-snap"
   | "ledger"
@@ -68,6 +72,7 @@ export interface CreateWalletClientOptions extends Omit<WalletManagerConfig, "ad
   walletConnectProjectId?: string;
   walletConnectSignMessageDestination?: string;
   xamanClientId?: string;
+  ghostsig?: GhostsigAdapterOptions;
   wallets?: "all" | WalletKitAdapterId[];
   ui?: WalletKitUiConfig;
 }
@@ -247,6 +252,7 @@ function createDefaultAdapters(options: CreateWalletClientOptions, onQr: (event:
   if (shouldInclude(ids, "gemwallet")) adapters.push(createGemWalletAdapter());
   if (shouldInclude(ids, "crossmark")) adapters.push(createCrossmarkAdapter());
   if (shouldInclude(ids, "dropfi")) adapters.push(createDropFiAdapter());
+  if (ids?.has("ghostsig")) adapters.push(createGhostsigAdapter(options.ghostsig));
   if (shouldInclude(ids, "xrplsnap")) adapters.push(createXrplSnapAdapter());
 
   if (options.walletConnectProjectId && shouldIncludeWalletConnect(ids)) {
@@ -417,6 +423,7 @@ function withoutKitOnlyOptions(options: CreateWalletClientOptions): WalletManage
     walletConnectProjectId: _walletConnectProjectId,
     walletConnectSignMessageDestination: _walletConnectSignMessageDestination,
     xamanClientId: _xamanClientId,
+    ghostsig: _ghostsig,
     wallets: _wallets,
     ui: _ui,
     ...managerConfig

@@ -43,6 +43,7 @@ Adapters:
 - `@xrpl-wallet-kit/adapter-walletconnect`
 - `@xrpl-wallet-kit/adapter-xrpl-snap`
 - `@xrpl-wallet-kit/adapter-ledger`
+- `@xrpl-wallet-kit/adapter-ghostsig` (experimental opt-in workspace implementation; not yet published)
 
 ## Architecture
 

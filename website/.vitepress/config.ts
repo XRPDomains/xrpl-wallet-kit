@@ -122,6 +122,7 @@ export default defineConfig({
           { text: "DropFi", link: "/docs/adapters/dropfi" },
           { text: "XRPL Snap (MetaMask)", link: "/docs/adapters/xrpl-snap" },
           { text: "Otsu Wallet", link: "/docs/adapters/otsu" },
+          { text: "GhostSig (Experimental)", link: "/docs/adapters/ghostsig" },
         ],
       },
       {

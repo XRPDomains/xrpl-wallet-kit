@@ -36,6 +36,7 @@ export const enUSMessages: WalletUiMessages = {
   xrplSnapWallet: "XRPL Snap",
   hardwareWallet: "Hardware",
   embeddedWallet: "Embedded wallet",
+  webWallet: "Web wallet",
   copyAddress: "Copy address",
   addressQr: "Address QR",
   showAddressQr: "Show address QR code",

@@ -28,6 +28,7 @@
     "@xrpl-wallet-kit/core": "0.1.19",
     "@xrpl-wallet-kit/adapter-crossmark": "0.1.19",
     "@xrpl-wallet-kit/adapter-dropfi": "0.1.19",
+    "@xrpl-wallet-kit/adapter-ghostsig": "0.1.19",
     "@xrpl-wallet-kit/adapter-gemwallet": "0.1.19",
     "@xrpl-wallet-kit/adapter-ledger": "0.1.19",
     "@xrpl-wallet-kit/adapter-walletconnect": "0.1.19",

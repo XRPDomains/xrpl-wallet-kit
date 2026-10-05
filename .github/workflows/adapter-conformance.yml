@@ -16,4 +16,4 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: node --import tsx --test tests/adapter-conformance.test.ts
+      - run: node --import tsx --test tests/adapter-conformance.test.ts tests/ghostsig.test.ts

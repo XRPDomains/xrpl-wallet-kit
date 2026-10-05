@@ -33,6 +33,7 @@ jobs:
           npm publish --workspace @xrpl-wallet-kit/core --access public
           npm publish --workspace @xrpl-wallet-kit/adapter-crossmark --access public
           npm publish --workspace @xrpl-wallet-kit/adapter-dropfi --access public
+          npm publish --workspace @xrpl-wallet-kit/adapter-ghostsig --access public
           npm publish --workspace @xrpl-wallet-kit/adapter-gemwallet --access public
           npm publish --workspace @xrpl-wallet-kit/adapter-ledger --access public
           npm publish --workspace @xrpl-wallet-kit/adapter-otsu --access public

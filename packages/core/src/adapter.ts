@@ -17,7 +17,7 @@ export interface AdapterValidationResult {
   issues: AdapterValidationIssue[];
 }
 
-const adapterTypes: WalletAdapterType[] = ["mobile", "extension", "walletconnect", "snap", "hardware", "embedded"];
+const adapterTypes: WalletAdapterType[] = ["mobile", "extension", "walletconnect", "snap", "hardware", "embedded", "web"];
 
 function isFunction(value: unknown): value is (...args: unknown[]) => unknown {
   return typeof value === "function";

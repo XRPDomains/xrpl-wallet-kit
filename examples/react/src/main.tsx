@@ -4,6 +4,7 @@ import { Buffer } from "buffer";
 import { WalletManager, createBrowserWalletStorage } from "../../../packages/core/src";
 import { createCrossmarkAdapter } from "../../../packages/adapters/crossmark/src";
 import { createDropFiAdapter } from "../../../packages/adapters/dropfi/src";
+import { createGhostsigAdapter } from "../../../packages/adapters/ghostsig/src";
 import { createGemWalletAdapter } from "../../../packages/adapters/gemwallet/src";
 import { createWalletConnectAdapters, createWalletConnectMetadata } from "../../../packages/adapters/walletconnect/src";
 import { createXamanAdapter } from "../../../packages/adapters/xaman/src";
@@ -29,12 +30,14 @@ const PREVIEW_CONFIG = {
 };
 
 function createPreviewManager() {
+  const ghostsigDemo = new URLSearchParams(window.location.search).get("ghostsig") === "1";
   const adapters: WalletAdapter[] = [
     createGemWalletAdapter(),
     createCrossmarkAdapter(),
     createDropFiAdapter(),
     createXrplSnapAdapter()
   ];
+  if (ghostsigDemo) adapters.push(createGhostsigAdapter());
 
   let manager: WalletManager;
   if (PREVIEW_CONFIG.xamanClientId) {
@@ -46,9 +49,9 @@ function createPreviewManager() {
 
   manager = new WalletManager({
     metadata: PREVIEW_CONFIG.metadata,
-    network: "mainnet",
+    network: ghostsigDemo ? "testnet" : "mainnet",
     autoReconnect: true,
-    storage: createBrowserWalletStorage("xwk.react.preview."),
+    storage: createBrowserWalletStorage(ghostsigDemo ? "xwk.react.ghostsig." : "xwk.react.preview."),
     adapters
   });
 

@@ -32,6 +32,15 @@ An adapter is the only layer in XRPL Wallet Kit that talks directly to a wallet 
 
 ## Recommended Setup
 
+### Experimental Workspace Adapter
+
+[GhostSig](/docs/adapters/ghostsig) is implemented as an opt-in web/popup wallet
+in the current workspace, but is not published in npm 0.1.19 or the CDN `latest`
+bundle. It supports connect/disconnect, cached restore, sign-only and
+sign-and-submit; it does not advertise signMessage, payments or nftOffers.
+Live passkey/testnet acceptance is still pending. Default wallet lists and
+`wallets: "all"` do not include it.
+
 Most apps should use `createWalletKit()` or `WalletManager` directly:
 
 ```ts
