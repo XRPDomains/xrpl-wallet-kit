@@ -36,7 +36,7 @@ npm install @xrpl-wallet-kit/auth
 Server-side verifier (optional — install on your backend only):
 
 ```bash
-npm install @xrpl-wallet-kit/auth ripple-keypairs verify-xrpl-signature xrpl
+npm install @xrpl-wallet-kit/auth ripple-keypairs@^3 verify-xrpl-signature xrpl@^4
 ```
 
 ## Quick Start
@@ -275,7 +275,25 @@ interface SignatureVerifier {
 Supports both signature kinds:
 
 - **`"signature"`** — compact hex signature from `signMessage`. Uses `ripple-keypairs` to verify.
-- **`"signedTx"`** — a signed XRPL transaction blob with the message in `Memos[0]`. Uses `verify-xrpl-signature` + `xrpl`.
+- **`"signedTx"`** — a signed XRPL transaction blob with the message in `Memos[0]`. The upcoming release uses modern `xrpl` encoding and `ripple-keypairs`, binding the signature's derived address, transaction Account and first memo. The published 0.1.19 default still uses `verify-xrpl-signature`.
+
+### Verifier Migration (Unreleased)
+
+The next release removes the `verify-xrpl-signature` peer requirement. Normal
+`createXrplSignatureVerifier()` calls and the two proof formats are unchanged.
+Custom `loadPeer` implementations only need `xrpl` and `ripple-keypairs`.
+Explicit `dependencies.verifyXrplSignature` injection remains supported; its
+result must affirm validity with `true` or `signatureValid: true`. Empty or
+ambiguous results and malformed transaction/memo proofs are rejected.
+
+Default signedTx verification binds the signing key to the authenticated
+account; it does not resolve RegularKey/delegated authorization or ledger
+multisign quorum. A multisign proof uses the first signer's identity, as before.
+Use a reviewed injected verifier for custom network definitions or authorization.
+Remove the legacy package from your server only if nothing else uses it.
+Until that release is published, the install command above includes the legacy
+peer required by npm 0.1.19. For an updated workspace or the next release, install
+only `ripple-keypairs@^3` and `xrpl@^4` alongside auth.
 
 ## Security Notes
 

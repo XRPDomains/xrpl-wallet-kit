@@ -269,6 +269,6 @@ test("createXrplSignatureVerifier reports a clear peer dependency error", async 
       proof: "SIG",
       publicKey: "EDAUTH"
     }),
-    /Install ripple-keypairs, verify-xrpl-signature, and xrpl/
+    /Install ripple-keypairs and xrpl/
   );
 });

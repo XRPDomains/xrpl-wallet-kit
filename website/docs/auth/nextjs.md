@@ -9,7 +9,7 @@ npm install @xrpl-wallet-kit/next @xrpl-wallet-kit/client @xrpl-wallet-kit/auth
 npm install iron-session
 
 # Server-only peer deps — required on the backend
-npm install ripple-keypairs verify-xrpl-signature xrpl
+npm install ripple-keypairs@^3 verify-xrpl-signature xrpl@^4
 ```
 
 ## 1. Session configuration

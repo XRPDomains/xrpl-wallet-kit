@@ -55,3 +55,18 @@ test("dependency audit accepts clean report without masking raw results", () => 
   const input = { auditReportVersion: 2, metadata: { vulnerabilities: { total: 0 } }, vulnerabilities: {} };
   assert.deepEqual(evaluateDependencyAudit(input, [], "website", now), { counts: { total: 0 }, known: [] });
 });
+
+test("dependency audit permits only an explicitly reviewed no-effective-fix report", () => {
+  const input = report([{ ...advisory, range: "<=6.6.1" }]);
+  input.vulnerabilities.upstream.fixAvailable = true;
+  const reviewed = { ...exception, reviewedFixAvailable: {
+    value: true, advisoryRange: "<=6.6.1", reason: "Suggested compatible update applied; vulnerable primitive remains" } };
+  assert.equal(evaluateDependencyAudit(input, [reviewed], "root", now).known.length, 1);
+  assert.throws(() => evaluateDependencyAudit(input, [{ ...reviewed, reviewedFixAvailable: {
+    ...reviewed.reviewedFixAvailable, advisoryRange: "<=6.6.0" } }], "root", now), /fix may now/);
+  const concreteFix = structuredClone(input);
+  (concreteFix.vulnerabilities.upstream as { fixAvailable: unknown }).fixAvailable = { name: "upstream", version: "2.0.0", isSemVerMajor: true };
+  assert.throws(() => evaluateDependencyAudit(concreteFix, [reviewed], "root", now), /fix may now/);
+  assert.throws(() => evaluateDependencyAudit(input, [{ ...reviewed, reviewedFixAvailable: {
+    ...reviewed.reviewedFixAvailable, reason: "" } }], "root", now), /Invalid/);
+});

@@ -1,4 +1,5 @@
 import type { SignatureVerifier, WalletAuthVerifyParams } from "../types";
+import type { Transaction } from "xrpl";
 
 interface RippleKeypairsModule {
   verify(messageHex: string, signature: string, publicKey: string): boolean;
@@ -11,6 +12,8 @@ interface VerifyXrplSignatureModule {
 
 interface XrplModule {
   decode(txBlob: string): XrplDecodedTransaction;
+  encodeForSigning?: (tx: Transaction) => string;
+  encodeForMultiSigning?: (tx: Transaction, signer: string) => string;
   Client?: new (url: string) => XrplClient;
 }
 
@@ -22,6 +25,9 @@ interface XrplClient {
 
 interface XrplDecodedTransaction {
   Account?: string;
+  SigningPubKey?: string;
+  TxnSignature?: string;
+  Signers?: Array<{ Signer: { Account: string; SigningPubKey: string; TxnSignature: string } }>;
   Memos?: Array<{ Memo?: { MemoData?: string } }>;
 }
 
@@ -37,7 +43,7 @@ export interface XrplSignatureVerifierOptions {
   };
 }
 
-const PEER_ERROR = "Install ripple-keypairs, verify-xrpl-signature, and xrpl to use @xrpl-wallet-kit/auth/verifiers.";
+const PEER_ERROR = "Install ripple-keypairs and xrpl to use @xrpl-wallet-kit/auth/verifiers.";
 
 export function createXrplSignatureVerifier(options: XrplSignatureVerifierOptions = {}): SignatureVerifier {
   return {
@@ -68,19 +74,32 @@ async function verifySignedTransaction(params: WalletAuthVerifyParams, options: 
   const txBlob = params.txBlob ?? params.proof;
   if (!txBlob) return false;
 
-  const verifyModule = options.dependencies?.verifyXrplSignature ?? await loadPeer<VerifyXrplSignatureModule>("verify-xrpl-signature", options);
   const xrpl = options.dependencies?.xrpl ?? await loadPeer<XrplModule>("xrpl", options);
-  const verifyResult = verifyModule.verifySignature(txBlob);
-  if (typeof verifyResult === "boolean") {
-    if (!verifyResult) return false;
-  } else {
-    if (verifyResult.signatureValid === false) return false;
-    if (verifyResult.signedBy && verifyResult.signedBy !== params.address) return false;
-  }
+  const legacyVerifier = options.dependencies?.verifyXrplSignature;
+  const keypairs = legacyVerifier ? undefined : options.dependencies?.rippleKeypairs ?? await loadPeer<RippleKeypairsModule>("ripple-keypairs", options);
+  if (!legacyVerifier && (!xrpl.encodeForSigning || !xrpl.encodeForMultiSigning)) throw new Error(PEER_ERROR);
 
-  const tx = xrpl.decode(txBlob);
-  if (tx.Account !== params.address) return false;
-  return extractFirstMemoText(tx) === params.message;
+  try {
+    const tx = xrpl.decode(txBlob);
+    if (tx.Account !== params.address || extractFirstMemoText(tx) !== params.message) return false;
+    if (legacyVerifier) {
+      const result = legacyVerifier.verifySignature(txBlob);
+      return typeof result === "boolean" ? result === true : result?.signatureValid === true &&
+        (!result.signedBy || result.signedBy === params.address);
+    }
+
+    // Match the legacy verifier's first-signer identity binding, not ledger quorum authorization.
+    if (tx.SigningPubKey === "" && tx.Signers?.length) {
+      const signer = tx.Signers[0].Signer;
+      if (keypairs!.deriveAddress(signer.SigningPubKey) !== params.address || signer.Account !== params.address) return false;
+      return keypairs!.verify(xrpl.encodeForMultiSigning!(tx as Transaction, signer.Account), signer.TxnSignature, signer.SigningPubKey);
+    }
+    if (tx.Signers !== undefined || !tx.SigningPubKey || !tx.TxnSignature) return false;
+    if (keypairs!.deriveAddress(tx.SigningPubKey) !== params.address) return false;
+    return keypairs!.verify(xrpl.encodeForSigning!(tx as Transaction), tx.TxnSignature, tx.SigningPubKey);
+  } catch {
+    return false;
+  }
 }
 
 async function resolveLedgerPublicKey(address: string, options: XrplSignatureVerifierOptions): Promise<string | undefined> {
@@ -105,9 +124,6 @@ async function loadPeer<T>(name: string, options: XrplSignatureVerifierOptions):
       case "ripple-keypairs":
         mod = await import("ripple-keypairs");
         break;
-      case "verify-xrpl-signature":
-        mod = await import("verify-xrpl-signature");
-        break;
       case "xrpl":
         mod = await import("xrpl");
         break;
@@ -129,12 +145,12 @@ function utf8ToHex(value: string): string {
 }
 
 function hexToUtf8(value: string): string {
-  const normalized = value.length % 2 === 0 ? value : `0${value}`;
-  const bytes = new Uint8Array(normalized.length / 2);
+  if (!/^(?:[0-9a-fA-F]{2})+$/.test(value)) throw new Error("Invalid memo hex.");
+  const bytes = new Uint8Array(value.length / 2);
   for (let index = 0; index < bytes.length; index += 1) {
-    bytes[index] = Number.parseInt(normalized.slice(index * 2, index * 2 + 2), 16);
+    bytes[index] = Number.parseInt(value.slice(index * 2, index * 2 + 2), 16);
   }
-  return new TextDecoder().decode(bytes);
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
 
 function extractFirstMemoText(tx: XrplDecodedTransaction): string | undefined {

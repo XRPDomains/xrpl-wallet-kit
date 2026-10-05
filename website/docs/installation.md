@@ -101,7 +101,7 @@ pnpm add @xrpl-wallet-kit/auth
 Server-side peer dependencies (install on your backend only):
 
 ```sh
-npm install ripple-keypairs verify-xrpl-signature xrpl
+npm install ripple-keypairs@^3 verify-xrpl-signature xrpl@^4
 ```
 
 ## HTML (Legacy / CDN)

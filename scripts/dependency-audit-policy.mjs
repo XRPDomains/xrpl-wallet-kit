@@ -15,6 +15,10 @@ export function evaluateDependencyAudit(report, exceptions, scope, now = new Dat
       !Number.isFinite(Date.parse(`${entry.expires}T23:59:59Z`)) || now.getTime() > Date.parse(`${entry.expires}T23:59:59Z`)) {
       throw new Error(`Invalid or expired dependency audit exception: ${entry.package}`);
     }
+    if (entry.reviewedFixAvailable && (entry.reviewedFixAvailable.value !== true ||
+      !entry.reviewedFixAvailable.advisoryRange || !entry.reviewedFixAvailable.reason)) {
+      throw new Error(`Invalid fix-availability review: ${entry.package}`);
+    }
   }
   const findings = new Map();
   const visit = (name, path = new Set()) => {
@@ -36,7 +40,14 @@ export function evaluateDependencyAudit(report, exceptions, scope, now = new Dat
   for (const finding of findings.values()) {
     const exception = allowed.find(entry => entry.package === finding.name && entry.advisory === finding.url && entry.severity === finding.severity);
     if (!exception) throw new Error(`Unreviewed ${finding.severity} advisory: ${finding.name} ${finding.url}`);
-    if (finding.fixAvailable !== false) throw new Error(`A fix may now be available; review exception: ${finding.name}`);
+    if (exception.reviewedFixAvailable && exception.reviewedFixAvailable.advisoryRange !== finding.range) {
+      throw new Error(`A fix may now be available or the affected range changed; review exception: ${finding.name}`);
+    }
+    if (finding.fixAvailable !== false && !(finding.fixAvailable === true &&
+      exception.reviewedFixAvailable?.value === true &&
+      exception.reviewedFixAvailable.advisoryRange === finding.range)) {
+      throw new Error(`A fix may now be available; review exception: ${finding.name}`);
+    }
     known.push({ ...finding, exception });
   }
   return { counts: report.metadata.vulnerabilities, known };

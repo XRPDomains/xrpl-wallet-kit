@@ -2,6 +2,9 @@
 
 ## Scope and Results
 
+Historical snapshot. See the [2026-10-05 auth migration](./auth-verifier-migration-2026-10-05.md)
+for the next reduction and the reviewed npm fix-availability metadata change.
+
 The root workspace and the separately installed website have independent
 lockfiles. Both were audited with development dependencies included.
 

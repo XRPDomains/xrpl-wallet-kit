@@ -15,6 +15,11 @@
     "severity": "low",
     "expires": "2026-11-04",
     "issue": "https://github.com/XRPDomains/xrpl-wallet-kit/issues/48",
-    "reason": "Legacy Crossmark and optional verify-xrpl-signature dependency chains require a reviewed compatible migration; no forced crypto override."
+    "reason": "Legacy Crossmark dependency chains still use elliptic; auth now uses modern peers by default. No forced crypto override.",
+    "reviewedFixAvailable": {
+      "value": true,
+      "advisoryRange": "<=6.6.1",
+      "reason": "Reviewed 2026-10-05: npm suggests compatible ripple-keypairs 1.4.0, now applied, but it still depends on elliptic ^6.5.4. Latest elliptic is 6.6.1 and remains affected; dry-run does not eliminate this advisory. A concrete fix object or changed advisory range requires another review."
+    }
   }
 ]

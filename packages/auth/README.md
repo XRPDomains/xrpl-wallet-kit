@@ -13,8 +13,27 @@ npm install @xrpl-wallet-kit/auth @xrpl-wallet-kit/core
 For server-side XRPL verification, install the optional peers in your server package:
 
 ```bash
-npm install ripple-keypairs verify-xrpl-signature xrpl
+npm install ripple-keypairs@^3 xrpl@^4
 ```
+
+## Verifier Migration (Unreleased)
+
+The upcoming release no longer loads `verify-xrpl-signature` by default. Compact
+signatures and signed-transaction proofs remain separate. Signed transactions
+use modern XRPL encoding and keypair verification with signer, Account and first
+memo binding. Existing `dependencies.verifyXrplSignature` injection remains
+supported, but must explicitly return `true` or `signatureValid: true`.
+Custom `loadPeer` implementations now only need `xrpl` and `ripple-keypairs`.
+Remove the old verifier from your server dependencies only if nothing else uses it.
+These unreleased changes do not alter already published 0.1.19 installations.
+
+Default verification proves the signer's identity, not ledger authorization:
+RegularKey/delegated identities and multisign quorum are not resolved from the
+ledger. The first multisigner must derive to the authenticated account, matching
+the previous default behavior. Use a separately reviewed injected verifier for
+other authorization policies or network-specific transaction definitions.
+
+For published 0.1.19, keep `verify-xrpl-signature` installed until you upgrade.
 
 ## Client Usage
 

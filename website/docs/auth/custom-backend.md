@@ -7,7 +7,7 @@ Integrate **Sign In with XRPL Wallet** into an existing Express server. This gui
 ```sh
 # On your server — NOT the browser bundle
 npm install @xrpl-wallet-kit/auth
-npm install ripple-keypairs verify-xrpl-signature xrpl
+npm install ripple-keypairs@^3 verify-xrpl-signature xrpl@^4
 npm install express express-session
 ```
 

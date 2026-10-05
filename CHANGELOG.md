@@ -4,9 +4,10 @@
 
 ### Security
 
+- Replace auth's default legacy signed-transaction verifier with modern XRPL codec/keypairs peers, preserving compact versus signedTx proofs and explicit injected verifiers. Reject malformed proofs and ambiguous injected validity results; remove the legacy verifier peer requirement.
 - Patch development Next.js and compatible root transitive dependencies; upgrade duplicate-detection tooling without its vulnerable glob dependency chain.
 - Patch the private website's Vite/PostCSS/nanoid dependency chain and add scoped audit regression checks.
-- Keep unpatched Crossmark/legacy verifier risks visible under P1 issue #48. These changes do not resolve all root audit findings or upgrade consuming dApps' Next.js versions.
+- Keep remaining unpatched Crossmark dependency risks visible under P1 issue #48. These changes do not resolve all root audit findings or upgrade consuming dApps' Next.js versions.
 
 ## 0.1.19
 
