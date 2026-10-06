@@ -1,5 +1,6 @@
 import { createServer, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { resolve } from "node:path";
 
 const env = loadEnv("development", process.cwd(), "VITE_");
 const defineEnv = Object.fromEntries(
@@ -11,9 +12,15 @@ const server = await createServer({
   envDir: process.cwd(),
   define: defineEnv,
   plugins: [react()],
+  resolve: {
+    alias: [
+      { find: /^@xrpl-wallet-kit\/core$/, replacement: resolve("packages/core/src/index.ts") },
+      { find: /^@xrpl-wallet-kit\/ui$/, replacement: resolve("packages/ui/src/index.ts") }
+    ]
+  },
   server: {
     host: "0.0.0.0",
-    port: 5174,
+    port: Number(process.env.PORT ?? 5174),
     strictPort: true
   },
   clearScreen: false

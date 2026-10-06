@@ -1,5 +1,6 @@
 import { createServer, loadEnv, normalizePath } from "vite";
 import { randomBytes } from "node:crypto";
+import { resolve } from "node:path";
 
 const env = loadEnv("development", process.cwd(), "VITE_");
 const defineEnv = Object.fromEntries(
@@ -108,6 +109,12 @@ const server = await createServer({
   root: "examples/vanilla",
   envDir: process.cwd(),
   define: defineEnv,
+  resolve: {
+    alias: [
+      { find: /^@xrpl-wallet-kit\/core$/, replacement: resolve("packages/core/src/index.ts") },
+      { find: /^@xrpl-wallet-kit\/ui$/, replacement: resolve("packages/ui/src/index.ts") }
+    ]
+  },
   server: {
     host: "0.0.0.0",
     port: 5173,

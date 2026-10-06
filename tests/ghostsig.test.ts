@@ -13,6 +13,15 @@ const tx = { TransactionType: "AccountSet" as const, Account: wallet.address, So
 const signed = wallet.sign(tx);
 const reply = { ...shared, blob: signed.tx_blob, hash: signed.hash, signature: decode(signed.tx_blob).TxnSignature };
 
+test("GhostSig advertises tested transaction families without message signing", () => {
+  const { capabilities } = createGhostsigAdapter();
+  assert.equal(capabilities.payments, true);
+  assert.equal(capabilities.nftOffers, true);
+  assert.equal(capabilities.signTransaction, true);
+  assert.equal(capabilities.signAndSubmit, true);
+  assert.equal(capabilities.signMessage, false);
+});
+
 function browser(t: TestContext) {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
   const listeners = new Set<(event: MessageEvent) => void>();

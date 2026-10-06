@@ -4,7 +4,7 @@ import { deriveAddress } from "ripple-keypairs";
 import { decode, encode, hashes, validate, verifySignature, type Transaction } from "xrpl";
 import { GhostsigPopup, resolveGhostsigUrl } from "./popup";
 
-export const GHOSTSIG_ICON = "https://ghostsig.dev/assets/icon-180.png";
+export const GHOSTSIG_ICON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0NCIgaGVpZ2h0PSI0NCIgdmlld0JveD0iMCAwIDQ0IDQ0IiBmaWxsPSJub25lIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IkdIT1NUU0lHIj4KICA8dGl0bGU+R0hPU1RTSUc8L3RpdGxlPgogIDwhLS0KICAgIDExeDExIHBpeGVsIGdyaWQsIDQgdW5pdHMgcGVyIGNlbGwuIE9uZSByZWN0IHBlciBob3Jpem9udGFsIHJ1biByYXRoZXIgdGhhbgogICAgcGVyIGNlbGw6IHNhbWUgcmFzdGVyIHVuZGVyIGNyaXNwRWRnZXMsIGEgZnJhY3Rpb24gb2YgdGhlIG5vZGVzLgoKICAgICAgcm93cyAwLTMgICBkb21lCiAgICAgIHJvdyAgNCAgICAgdmlzb3IKICAgICAgcm93cyA1LTggICBib2R5CiAgICAgIHJvd3MgOS0xMCAgdGFpbCwgdHdvIHJvd3MgZGVlcCBzbyB0aGUgdGVldGggcmVhZCBhcyBhIGhlbSBhbmQgbm90IGFzCiAgICAgICAgICAgICAgICAgbm90Y2hlcyBjbGlwcGVkIGJ5IHRoZSBib3R0b20gZWRnZQoKICAgIENvbG91cnMgYXJlIGJha2VkIGluIHJhdGhlciB0aGFuIHRoZW1lZC4gQSBmYXZpY29uIGlzIGxvYWRlZCBvdXRzaWRlIHRoZQogICAgZG9jdW1lbnQgYW5kIGNhbm5vdCBpbmhlcml0IENTUywgc28gdGhpcyBmaWxlIGhhcyB0byBzdGFuZCBhbG9uZS4gSXQgaXMgdGhlCiAgICBvbmUgcGxhY2UgaW4gdGhlIHByb2plY3Qgd2hlcmUgYSBjb2xvdXIgbGl2ZXMgb3V0c2lkZSB0aGVtZS5jc3MuCgogICAgICBib2R5ICNGRjJFODggICB2aXNvciAjQzhGRjAwCiAgLS0+CiAgPGcgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIiBmaWxsPSIjRkYyRTg4Ij4KICAgIDxyZWN0IHg9IjEyIiB5PSIwIiAgd2lkdGg9IjIwIiBoZWlnaHQ9IjQiLz4KICAgIDxyZWN0IHg9IjgiICB5PSI0IiAgd2lkdGg9IjI4IiBoZWlnaHQ9IjQiLz4KICAgIDxyZWN0IHg9IjQiICB5PSI4IiAgd2lkdGg9IjM2IiBoZWlnaHQ9IjQiLz4KICAgIDxyZWN0IHg9IjAiICB5PSIxMiIgd2lkdGg9IjQ0IiBoZWlnaHQ9IjQiLz4KCiAgICA8IS0tIHZpc29yIHJvdzogYm9keSBzaG91bGRlcnMgZWl0aGVyIHNpZGUgb2YgdGhlIG9wdGljIC0tPgogICAgPHJlY3QgeD0iMCIgIHk9IjE2IiB3aWR0aD0iOCIgIGhlaWdodD0iNCIvPgogICAgPHJlY3QgeD0iMzYiIHk9IjE2IiB3aWR0aD0iOCIgIGhlaWdodD0iNCIvPgoKICAgIDxyZWN0IHg9IjAiICB5PSIyMCIgd2lkdGg9IjQ0IiBoZWlnaHQ9IjE2Ii8+CgogICAgPCEtLSB0YWlsOiBmb3VyIHRlZXRoLCB0aHJlZSBnYXBzLCBlaWdodCB1bml0cyBkZWVwIC0tPgogICAgPHJlY3QgeD0iMCIgIHk9IjM2IiB3aWR0aD0iOCIgIGhlaWdodD0iOCIvPgogICAgPHJlY3QgeD0iMTIiIHk9IjM2IiB3aWR0aD0iOCIgIGhlaWdodD0iOCIvPgogICAgPHJlY3QgeD0iMjQiIHk9IjM2IiB3aWR0aD0iOCIgIGhlaWdodD0iOCIvPgogICAgPHJlY3QgeD0iMzYiIHk9IjM2IiB3aWR0aD0iOCIgIGhlaWdodD0iOCIvPgogIDwvZz4KICA8cmVjdCB4PSI4IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjQiIGZpbGw9IiNDOEZGMDAiIHNoYXBlLXJlbmRlcmluZz0iY3Jpc3BFZGdlcyIvPgo8L3N2Zz4K";
 
 export interface GhostsigAdapterOptions { url?: string; timeoutMs?: number; }
 
@@ -32,7 +32,7 @@ function networkFor(network?: WalletNetwork): WalletNetwork {
 export class GhostsigAdapter extends BaseWalletAdapter {
   metadata: WalletMetadata = { id: "ghostsig", name: "GhostSig", type: "web", group: "Web wallets", homepage: "https://ghostsig.dev/", icon: GHOSTSIG_ICON };
   capabilities: WalletCapabilities = { connect: true, disconnect: true, signMessage: false, signTransaction: true, signAndSubmit: true,
-    payments: false, nftOffers: false, details: { supportedNetworks: ["mainnet", "testnet", "devnet"], transactionModes: ["sign-only", "sign-and-submit"] } };
+    payments: true, nftOffers: true, details: { supportedNetworks: ["mainnet", "testnet", "devnet"], transactionModes: ["sign-only", "sign-and-submit"] } };
   private readonly popup = new GhostsigPopup();
   private readonly url: URL;
   private account?: WalletAccount;

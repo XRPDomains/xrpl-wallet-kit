@@ -504,7 +504,7 @@ class WalletPickerView {
     private getWallets(): WalletMetadata[] {
         const wallets = this.options.manager.getWallets();
         const walletOrder = this.options.wallets;
-        const orderedWallets = walletOrder?.length
+        const orderedWallets = walletOrder !== undefined
             ? (() => {
                 const byId = new Map(wallets.map((wallet) => [wallet.id, wallet]));
                 return walletOrder

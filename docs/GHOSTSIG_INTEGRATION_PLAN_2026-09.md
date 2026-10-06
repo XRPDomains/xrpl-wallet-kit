@@ -2,6 +2,23 @@
 
 ## Implementation Update - 2026-10-05
 
+### Live Test Report - 2026-10-06
+
+The maintainer reports that Payment and all NFT actions in the vanilla preview
+passed against the live GhostSig wallet: NFTokenCreateOffer, NFTokenAcceptOffer
+and NFTokenBurn. The preview supplies explicit SourceTag: 0 for GhostSig in all
+four forms. This report enables the payments and nftOffers capability flags.
+Network, transaction hashes and individual buy/broker variants were not supplied.
+Sign-only, cancellation/recovery and the complete cross-network acceptance matrix
+remain unverified live; issue #34 stays open. No release or default-list change
+is implied by this report.
+
+The vanilla preview now defaults its four transaction forms to sign-only,
+with an explicit sign-and-submit option. Sign-only calls manager.signTransaction
+and displays the returned txBlob; submit calls manager.signAndSubmit. Focused
+mock routing checks passed for both modes, including GhostSig SourceTag: 0.
+This is preview coverage, not a live sign-only acceptance report.
+
 The workspace now implements an experimental opt-in package, client/IIFE
 exports, `web` metadata type, locale label, verified transaction replies and
 popup lifecycle tests. Default wallet lists and CDN latest stay unchanged.
@@ -19,7 +36,7 @@ Protocol source checked: XRPL Commons develop commit
 `d43330a2003977399cd7349eff84c318c87637eb` and live
 `https://ghostsig.dev/src/connect.js` on 2026-10-05.
 
-**Status:** Proposed, not implemented  
+**Status:** Implemented, experimental opt-in
 **Tracking issue:** [#34](https://github.com/XRPDomains/xrpl-wallet-kit/issues/34)  
 **Priority:** P2  
 **Reviewed:** 2026-09-30
@@ -133,10 +150,9 @@ Initial capabilities:
 }
 ```
 
-Do not enable `payments` or `nftOffers` until those transaction families have
-been exercised against the live wallet. GhostSig accepts raw XRPL transactions,
-but a broad signing surface is not evidence that every product capability has
-been validated.
+The initial plan kept `payments` and `nftOffers` disabled until live testing.
+They are now enabled following the 2026-10-06 maintainer report above. This
+does not claim every transaction variant or network has been validated.
 
 ## Protocol mapping
 
@@ -284,9 +300,10 @@ transaction hashes, package tarball integrity, and observed result.
 - Full suite: 357 tests passed, including the GhostSig protocol and adapter contract tests.
 - Readable and minified browser bundles exercise connect and sign-only replies with
   locally generated Ed25519 proofs; these are mocked protocol tests, not live wallet signing.
-- Website build and the opt-in React preview render the official GhostSig icon.
-- React preview: `http://127.0.0.1:5175/?ghostsig=1` selects testnet; the normal
-  preview retains its existing wallets and mainnet configuration.
+- Website build and the opt-in React preview rendered the GhostSig icon during
+  initial validation. The icon now embeds the supplied `tmp/ghostsig.svg`.
+- React preview: `http://127.0.0.1:5175/` now defaults to mainnet with all
+  configured wallets selected; checkboxes filter the connection modal.
 - No npm publication or real passkey/ledger transaction was performed. Issue #34
   remains open until the live testnet matrix is completed.
 

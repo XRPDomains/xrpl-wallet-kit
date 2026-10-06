@@ -83,6 +83,15 @@ button:hover {
   gap: 12px;
   min-width: 0;
   padding: 10px;
+  cursor: pointer;
+}
+
+.wallet-row input[type="checkbox"] {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #0284c7;
 }
 
 .wallet-icon {

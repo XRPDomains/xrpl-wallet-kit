@@ -27,7 +27,10 @@ console.log(result.txBlob);
 
 Install `xrpl` v4/v5 alongside this adapter when it is released. Compact message
 signing is unsupported; do not use this adapter for the kit's sign-in flow.
-Payments/nftOffers product capabilities stay disabled until live validation.
+`payments` and `nftOffers` are enabled after maintainer-reported live tests of
+Payment, NFT offer creation/acceptance and NFT burn on 2026-10-06.
+Network and transaction hashes were not supplied; sign-only and the remaining
+acceptance matrix are not covered by this report.
 Only the kit's standard mainnet/testnet/devnet configurations are accepted;
 custom RPC/network definitions are refused before the popup opens.
 
@@ -77,7 +80,7 @@ Use HTTPS or localhost development and allow popups. If setting COOP, use
 `Cross-Origin-Opener-Policy: same-origin-allow-popups`; `same-origin` severs the
 opener. `noopener` and `noreferrer` are incompatible. The wallet's own CSP
 governs its page; your normal script CSP must allow your application bundle.
-Allow `https://ghostsig.dev` in `img-src` for the official hosted PNG icon.
+Allow `data:` in `img-src` for the embedded SVG icon.
 Only the production origin or explicitly configured `http://localhost` URL is
 accepted. Do not deploy a wallet copy on an arbitrary production origin.
 
@@ -87,7 +90,11 @@ deferred; every signature needs a fresh user gesture to avoid popup blocking.
 
 ## Local Test
 
-React preview opts in with `?ghostsig=1`, switches that preview to testnet and
-uses a separate session storage prefix. The normal React preview is unchanged.
+React preview shows all configured wallets, including GhostSig, on mainnet by
+default. Wallet checkboxes control which entries appear in the connection modal.
+The vanilla preview includes the same wallet filtering and defaults Payment and
+NFT forms to `Sign only (no submit)`. Switch `Transaction mode` to
+`Sign and submit` for submission tests. GhostSig receives explicit SourceTag: 0
+in both modes; sign-only results display the returned txBlob.
 Record connect, reconnect, sign-only, submit, reject, timeout and wallet-switching
 results with the wallet build/date before treating the adapter as production-ready.

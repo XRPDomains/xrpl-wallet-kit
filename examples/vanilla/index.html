@@ -73,6 +73,13 @@
 
       <section class="panel">
         <div class="panel-heading">
+          <h2>Wallets</h2>
+        </div>
+        <div id="wallet-list" class="wallet-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
           <div>
             <h2>Sign Message</h2>
             <p>Uses the kit default proof transaction for compatible wallets.</p>
@@ -114,12 +121,21 @@
         <div class="panel-heading">
           <div>
             <h2>Transactions</h2>
-            <p>Payment, NFT offer, and NFT burn signing with submit enabled.</p>
+            <p>Payment, NFT offer, and NFT burn.</p>
           </div>
+        </div>
+        <div class="controls">
+          <label>
+            <span>Transaction mode</span>
+            <select id="transaction-mode">
+              <option value="sign-only">Sign only (no submit)</option>
+              <option value="sign-and-submit">Sign and submit</option>
+            </select>
+          </label>
         </div>
         <div class="lab-grid">
           <div class="lab">
-            <h3>Payment signAndSubmit</h3>
+            <h3>Payment</h3>
             <label>
               <span>Destination address</span>
               <input id="payment-destination" placeholder="r..." />
@@ -129,13 +145,13 @@
               <input id="payment-amount" inputmode="decimal" value="0.01" />
             </label>
             <div class="lab-actions">
-              <button id="payment-submit-button" type="button">Submit payment</button>
+              <button id="payment-submit-button" type="button">Sign payment</button>
             </div>
             <pre id="payment-result">Connect a wallet to test Payment signAndSubmit.</pre>
           </div>
 
           <div class="lab">
-            <h3>NFT Offer signAndSubmit</h3>
+            <h3>NFT Offer</h3>
             <label>
               <span>NFTokenID</span>
               <input id="nft-token-id" placeholder="0008..." />

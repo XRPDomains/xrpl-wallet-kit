@@ -1,4 +1,4 @@
-import { WalletManager, createBrowserWalletStorage } from "../../../packages/core/src";
+import { WalletManager, createBrowserWalletStorage, sanitizeWalletUrl } from "../../../packages/core/src";
 import { Buffer } from "buffer";
 import { createWalletAuth, formatAuthMessage } from "../../../packages/auth/src";
 import { createDefaultWalletUiConfig, resolveWalletButtonOptions } from "../../../packages/ui/src";
@@ -29,6 +29,8 @@ const walletConnectMode = document.querySelector<HTMLSelectElement>("#walletconn
 const walletLayout = document.querySelector<HTMLSelectElement>("#wallet-layout")!;
 const uiTheme = document.querySelector<HTMLSelectElement>("#ui-theme")!;
 const networkSelect = document.querySelector<HTMLSelectElement>("#network")!;
+const walletList = document.querySelector<HTMLDivElement>("#wallet-list")!;
+const transactionMode = document.querySelector<HTMLSelectElement>("#transaction-mode")!;
 const paymentDestinationInput = document.querySelector<HTMLInputElement>("#payment-destination")!;
 const paymentAmountInput = document.querySelector<HTMLInputElement>("#payment-amount")!;
 const paymentSubmitButton = document.querySelector<HTMLButtonElement>("#payment-submit-button")!;
@@ -68,6 +70,19 @@ let modal: { open(): void; updateOptions(options: Record<string, unknown>): void
 let walletButton: { updateOptions(options: Record<string, unknown>): void; destroy(): void } | undefined;
 let walletToast: { mount(): void; destroy(): void } | undefined;
 let bootstrapRun = 0;
+const hiddenWalletIds = new Set<string>();
+let transactionPending = false;
+
+transactionMode.addEventListener("change", () => renderTransactionState());
+
+walletList.addEventListener("change", (event) => {
+  const checkbox = event.target;
+  if (!(checkbox instanceof HTMLInputElement) || !checkbox.dataset.walletId) return;
+  if (checkbox.checked) hiddenWalletIds.delete(checkbox.dataset.walletId);
+  else hiddenWalletIds.add(checkbox.dataset.walletId);
+  modal?.updateOptions(getWalletUiOptions());
+  walletButton?.updateOptions(getWalletButtonOptions());
+});
 
 [uiTheme, walletLayout].forEach((control) => {
   control.addEventListener("change", () => {
@@ -162,7 +177,9 @@ async function bootstrap(run = bootstrapRun) {
     { createCrossmarkAdapter },
     { createDropFiAdapter },
     { createGemWalletAdapter },
+    { createGhostsigAdapter },
     { createLedgerAdapter },
+    { createOtsuAdapter },
     { createWalletConnectAdapters, createWalletConnectMetadata },
     { createXamanAdapter },
     { createXrplSnapAdapter }
@@ -170,7 +187,9 @@ async function bootstrap(run = bootstrapRun) {
     import("../../../packages/adapters/crossmark/src"),
     import("../../../packages/adapters/dropfi/src"),
     import("../../../packages/adapters/gemwallet/src"),
+    import("../../../packages/adapters/ghostsig/src"),
     import("../../../packages/adapters/ledger/src"),
+    import("../../../packages/adapters/otsu/src"),
     import("../../../packages/adapters/walletconnect/src"),
     import("../../../packages/adapters/xaman/src"),
     import("../../../packages/adapters/xrpl-snap/src")
@@ -193,6 +212,8 @@ async function bootstrap(run = bootstrapRun) {
   adapters.push(createGemWalletAdapter());
   adapters.push(createCrossmarkAdapter());
   adapters.push(createDropFiAdapter());
+  adapters.push(createGhostsigAdapter());
+  adapters.push(createOtsuAdapter());
   adapters.push(createXrplSnapAdapter({
     signMessageDestination: PREVIEW_CONFIG.walletConnectSignMessageDestination
   }));
@@ -223,6 +244,7 @@ async function bootstrap(run = bootstrapRun) {
 
   const { createWalletButton, createWalletModal, createWalletToast } = await import("../../../packages/ui/src");
   if (run !== bootstrapRun) return;
+  renderWalletList();
   modal = createWalletModal({
     manager,
     ...getWalletUiOptions()
@@ -295,22 +317,29 @@ function renderSession() {
 function renderTransactionState() {
   const current = manager.getSession();
   const adapter = manager.getAdapter();
-  const canSignAndSubmit = Boolean(current && adapter?.capabilities.signAndSubmit);
-  paymentSubmitButton.disabled = !canSignAndSubmit;
-  nftOfferSubmitButton.disabled = !canSignAndSubmit;
-  nftAcceptSubmitButton.disabled = !canSignAndSubmit;
-  nftBurnSubmitButton.disabled = !canSignAndSubmit;
+  const submit = transactionMode.value === "sign-and-submit";
+  const supported = supportsTransactionMode(adapter, submit);
+  const canSign = Boolean(current && supported && !transactionPending);
+  transactionMode.disabled = transactionPending;
+  paymentSubmitButton.disabled = !canSign;
+  nftOfferSubmitButton.disabled = !canSign;
+  nftAcceptSubmitButton.disabled = !canSign;
+  nftBurnSubmitButton.disabled = !canSign;
+  paymentSubmitButton.textContent = submit ? "Submit payment" : "Sign payment";
+  nftOfferSubmitButton.textContent = submit ? "Create NFT offer" : "Sign NFT offer";
+  nftAcceptSubmitButton.textContent = submit ? "Accept NFT offer" : "Sign NFT acceptance";
+  nftBurnSubmitButton.textContent = submit ? "Burn NFT" : "Sign NFT burn";
 
   if (!current) {
-    paymentResult.textContent = "Connect a wallet to test Payment signAndSubmit.";
-    nftOfferResult.textContent = "Connect a wallet to test NFT Offer signAndSubmit.";
+    paymentResult.textContent = "Connect a wallet to test Payment signing.";
+    nftOfferResult.textContent = "Connect a wallet to test NFT Offer signing.";
     nftAcceptResult.textContent = "Connect a wallet to test NFT Offer accept.";
     nftBurnResult.textContent = "Connect a wallet to test NFT Burn.";
     return;
   }
 
-  if (!adapter?.capabilities.signAndSubmit) {
-    const message = `${current.wallet?.name ?? current.adapterId} does not support signAndSubmit.`;
+  if (!supported) {
+    const message = `${current.wallet?.name ?? current.adapterId} does not support ${submit ? "signAndSubmit" : "sign-only"}.`;
     paymentResult.textContent = message;
     nftOfferResult.textContent = message;
     nftAcceptResult.textContent = message;
@@ -431,7 +460,7 @@ async function signInWithAuthServer() {
 }
 
 async function submitPayment() {
-  const current = requireActiveSignAndSubmitWallet();
+  const current = requireActiveTransactionWallet();
   const destination = paymentDestinationInput.value.trim();
   const amount = paymentAmountInput.value.trim();
   if (!destination) throw new Error("Destination address is required.");
@@ -447,15 +476,11 @@ async function submitPayment() {
     destination
   };
 
-  const requestPreview = createTransactionRequestPreview({ txJson, walletPayload, methodHint: "payment", submit: true });
-  showTransactionRequest(paymentResult, "Requesting Payment signature and submit...", requestPreview);
-  log("payment_request", requestPreview);
-  const result = await manager.signAndSubmit(requestPreview);
-  paymentResult.textContent = JSON.stringify({ requestPreview, result }, null, 2);
+  await runTransaction(paymentResult, "payment", { txJson, walletPayload, methodHint: "payment" });
 }
 
 async function submitNftOffer() {
-  const current = requireActiveSignAndSubmitWallet();
+  const current = requireActiveTransactionWallet();
   const tokenId = nftTokenIdInput.value.trim();
   const amount = nftOfferAmountInput.value.trim();
   const owner = nftOwnerInput.value.trim();
@@ -480,15 +505,11 @@ async function submitNftOffer() {
     ...(destination ? { destination } : {})
   };
 
-  const requestPreview = createTransactionRequestPreview({ txJson, walletPayload, methodHint: "createNFTOffer", submit: true });
-  showTransactionRequest(nftOfferResult, "Requesting NFT Offer signature and submit...", requestPreview);
-  log("nft_offer_request", requestPreview);
-  const result = await manager.signAndSubmit(requestPreview);
-  nftOfferResult.textContent = JSON.stringify({ requestPreview, result }, null, 2);
+  await runTransaction(nftOfferResult, "nft_offer", { txJson, walletPayload, methodHint: "createNFTOffer" });
 }
 
 async function acceptNftOffer() {
-  const current = requireActiveSignAndSubmitWallet();
+  const current = requireActiveTransactionWallet();
   const sellOffer = nftSellOfferInput.value.trim();
   const buyOffer = nftBuyOfferInput.value.trim();
   const brokerFee = nftBrokerFeeInput.value.trim();
@@ -508,15 +529,11 @@ async function acceptNftOffer() {
     ...(brokerFee ? { NFTokenBrokerFee: brokerFee } : {})
   };
 
-  const requestPreview = createTransactionRequestPreview({ txJson, walletPayload, methodHint: "acceptNFTOffer", submit: true });
-  showTransactionRequest(nftAcceptResult, "Requesting NFT Offer accept signature and submit...", requestPreview);
-  log("nft_accept_request", requestPreview);
-  const result = await manager.signAndSubmit(requestPreview);
-  nftAcceptResult.textContent = JSON.stringify({ requestPreview, result }, null, 2);
+  await runTransaction(nftAcceptResult, "nft_accept", { txJson, walletPayload, methodHint: "acceptNFTOffer" });
 }
 
 async function submitNftBurn() {
-  const current = requireActiveSignAndSubmitWallet();
+  const current = requireActiveTransactionWallet();
   const tokenId = nftBurnTokenIdInput.value.trim();
   const owner = nftBurnOwnerInput.value.trim();
   const memo = nftBurnMemoInput.value.trim();
@@ -535,19 +552,39 @@ async function submitNftBurn() {
     ...(owner ? { owner } : {})
   };
 
-  const requestPreview = createTransactionRequestPreview({ txJson, walletPayload, methodHint: "burnNFT", submit: true });
-  showTransactionRequest(nftBurnResult, "Requesting NFT Burn signature and submit...", requestPreview);
-  log("nft_burn_request", requestPreview);
-  const result = await manager.signAndSubmit(requestPreview);
-  nftBurnResult.textContent = JSON.stringify({ requestPreview, result }, null, 2);
+  await runTransaction(nftBurnResult, "nft_burn", { txJson, walletPayload, methodHint: "burnNFT" });
 }
 
-function createTransactionRequestPreview(request: {
+type PreviewTransactionRequest = {
   txJson: TransactionPayload;
   walletPayload?: unknown;
   methodHint: "payment" | "createNFTOffer" | "acceptNFTOffer" | "burnNFT";
-  submit: true;
-}) {
+  submit: boolean;
+};
+
+async function runTransaction(target: HTMLPreElement, name: string, request: Omit<PreviewTransactionRequest, "submit">) {
+  if (transactionPending) throw new Error("A transaction request is already pending.");
+  const requestPreview = createTransactionRequestPreview({ ...request, submit: transactionMode.value === "sign-and-submit" });
+  showTransactionRequest(target, requestPreview.submit ? "Requesting signature and submit..." : "Requesting signature only (no submit)...", requestPreview);
+  log(`${name}_request`, requestPreview);
+  transactionPending = true;
+  renderTransactionState();
+  try {
+    const result = requestPreview.submit
+      ? await manager.signAndSubmit(requestPreview)
+      : await manager.signTransaction(requestPreview);
+    target.textContent = JSON.stringify({ mode: requestPreview.submit ? "sign-and-submit" : "sign-only", requestPreview, result }, null, 2);
+  } finally {
+    transactionPending = false;
+    renderTransactionState();
+  }
+}
+
+function createTransactionRequestPreview(request: PreviewTransactionRequest) {
+  // Include GhostSig's source tag in the preview for every transaction form.
+  if (manager.getSession()?.adapterId === "ghostsig" && request.txJson.SourceTag === undefined) {
+    return { ...request, txJson: { ...request.txJson, SourceTag: 0 } };
+  }
   return request;
 }
 
@@ -573,11 +610,19 @@ function parsePreJson(target: HTMLPreElement): Record<string, unknown> | null {
   }
 }
 
-function requireActiveSignAndSubmitWallet() {
+function supportsTransactionMode(adapter: WalletAdapter | undefined, submit: boolean) {
+  if (!adapter) return false;
+  if (submit) return Boolean(adapter.capabilities.signAndSubmit && typeof adapter.signAndSubmit === "function");
+  return typeof adapter.signTransaction === "function" ||
+    (typeof adapter.signAndSubmit === "function" && Boolean(adapter.capabilities.details?.transactionModes?.includes("sign-only")));
+}
+
+function requireActiveTransactionWallet() {
   const current = manager.getSession();
-  if (!current) throw new Error("Connect a wallet before submitting a transaction.");
+  if (!current) throw new Error("Connect a wallet before signing a transaction.");
   const adapter = manager.getAdapter();
-  if (!adapter?.capabilities.signAndSubmit) throw new Error(`${current.wallet?.name ?? current.adapterId} does not support signAndSubmit.`);
+  const submit = transactionMode.value === "sign-and-submit";
+  if (!supportsTransactionMode(adapter, submit)) throw new Error(`${current.wallet?.name ?? current.adapterId} does not support ${submit ? "signAndSubmit" : "sign-only"}.`);
   return current;
 }
 
@@ -596,6 +641,38 @@ function xrpToDrops(value: string) {
   return drops;
 }
 
+function renderWalletList() {
+  const rows = manager.getWallets().map((wallet) => {
+    const row = document.createElement("label");
+    row.className = "wallet-row";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = !hiddenWalletIds.has(wallet.id);
+    checkbox.dataset.walletId = wallet.id;
+    checkbox.setAttribute("aria-label", wallet.name);
+    row.append(checkbox);
+
+    const iconUrl = sanitizeWalletUrl(wallet.icon, { allowDataImage: true });
+    if (iconUrl) {
+      const icon = document.createElement("img");
+      icon.className = "wallet-icon";
+      icon.src = iconUrl;
+      icon.alt = "";
+      row.append(icon);
+    }
+    const info = document.createElement("span");
+    info.className = "wallet-info";
+    const name = document.createElement("strong");
+    name.textContent = wallet.name;
+    const detail = document.createElement("span");
+    detail.textContent = `${wallet.id} | ${wallet.type}`;
+    info.append(name, detail);
+    row.append(info);
+    return row;
+  });
+  walletList.replaceChildren(...rows);
+}
+
 function getWalletUiConfig(): WalletUiConfig {
   return {
     mode: uiTheme.value as WalletUiThemeMode,
@@ -606,7 +683,7 @@ function getWalletUiConfig(): WalletUiConfig {
     },
     walletList: {
       layout: getWalletLayout(),
-      wallets: "all",
+      wallets: manager.getWallets().filter((wallet) => !hiddenWalletIds.has(wallet.id)).map((wallet) => wallet.id),
       showGroup: true,
       showInstalledBadge: true
     },

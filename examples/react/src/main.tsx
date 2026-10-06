@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Buffer } from "buffer";
 import { WalletManager, createBrowserWalletStorage } from "../../../packages/core/src";
@@ -6,6 +6,8 @@ import { createCrossmarkAdapter } from "../../../packages/adapters/crossmark/src
 import { createDropFiAdapter } from "../../../packages/adapters/dropfi/src";
 import { createGhostsigAdapter } from "../../../packages/adapters/ghostsig/src";
 import { createGemWalletAdapter } from "../../../packages/adapters/gemwallet/src";
+import { createLedgerAdapter } from "../../../packages/adapters/ledger/src";
+import { createOtsuAdapter } from "../../../packages/adapters/otsu/src";
 import { createWalletConnectAdapters, createWalletConnectMetadata } from "../../../packages/adapters/walletconnect/src";
 import { createXamanAdapter } from "../../../packages/adapters/xaman/src";
 import { createXrplSnapAdapter } from "../../../packages/adapters/xrpl-snap/src";
@@ -30,14 +32,15 @@ const PREVIEW_CONFIG = {
 };
 
 function createPreviewManager() {
-  const ghostsigDemo = new URLSearchParams(window.location.search).get("ghostsig") === "1";
   const adapters: WalletAdapter[] = [
     createGemWalletAdapter(),
     createCrossmarkAdapter(),
     createDropFiAdapter(),
-    createXrplSnapAdapter()
+    createXrplSnapAdapter(),
+    createLedgerAdapter(),
+    createOtsuAdapter(),
+    createGhostsigAdapter()
   ];
-  if (ghostsigDemo) adapters.push(createGhostsigAdapter());
 
   let manager: WalletManager;
   if (PREVIEW_CONFIG.xamanClientId) {
@@ -49,9 +52,9 @@ function createPreviewManager() {
 
   manager = new WalletManager({
     metadata: PREVIEW_CONFIG.metadata,
-    network: ghostsigDemo ? "testnet" : "mainnet",
+    network: "mainnet",
     autoReconnect: true,
-    storage: createBrowserWalletStorage(ghostsigDemo ? "xwk.react.ghostsig." : "xwk.react.preview."),
+    storage: createBrowserWalletStorage("xwk.react.preview."),
     adapters
   });
 
@@ -70,6 +73,7 @@ function createPreviewManager() {
 
 function Preview() {
   const manager = useMemo(() => createPreviewManager(), []);
+  const [visibleWallets, setVisibleWallets] = useState(() => manager.getWallets().map(wallet => wallet.id));
   const ui = useMemo(() => createDefaultWalletUiConfig({
     mode: "light",
     modal: {
@@ -79,7 +83,7 @@ function Preview() {
     },
     walletList: {
       layout: "list",
-      wallets: "all",
+      wallets: visibleWallets,
       showGroup: true
     },
     walletConnect: {
@@ -90,7 +94,7 @@ function Preview() {
         showLogo: false
       }
     }
-  }), []);
+  }), [visibleWallets]);
   const button = useMemo(() => resolveWalletButtonOptions({ mode: "light" }, { showBalance: true }), []);
 
   return (
@@ -105,13 +109,18 @@ function Preview() {
             {...button}
           />
         </section>
-        <ReactStatePanel />
+        <ReactStatePanel visibleWallets={visibleWallets} onToggleWallet={(id, visible) => {
+          setVisibleWallets(current => visible ? [...new Set([...current, id])] : current.filter(walletId => walletId !== id));
+        }} />
       </main>
     </WalletKitProvider>
   );
 }
 
-function ReactStatePanel() {
+function ReactStatePanel({ visibleWallets, onToggleWallet }: {
+  visibleWallets: string[];
+  onToggleWallet: (id: string, visible: boolean) => void;
+}) {
   const { session, wallets, openModal } = useWalletKit();
   return (
     <>
@@ -123,13 +132,19 @@ function ReactStatePanel() {
         <h2>Wallets</h2>
         <div className="wallet-list">
           {wallets.map((wallet) => (
-            <div className="wallet-row" key={wallet.id}>
+            <label className="wallet-row" key={wallet.id}>
+              <input
+                type="checkbox"
+                checked={visibleWallets.includes(wallet.id)}
+                onChange={event => onToggleWallet(wallet.id, event.target.checked)}
+                aria-label={`Show ${wallet.name}`}
+              />
               {wallet.icon ? <img className="wallet-icon" src={wallet.icon} alt="" /> : <span className="wallet-icon wallet-icon-fallback">{wallet.name.slice(0, 1)}</span>}
               <div className="wallet-info">
                 <strong>{wallet.name}</strong>
-                <span>{wallet.group ?? wallet.type} Â· {wallet.id}</span>
+                <span>{wallet.group ?? wallet.type} | {wallet.id}</span>
               </div>
-            </div>
+            </label>
           ))}
         </div>
       </section>

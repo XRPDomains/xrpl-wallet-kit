@@ -224,6 +224,7 @@ textarea {
 }
 
 .wallet-row {
+  cursor: pointer;
   align-items: center;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
@@ -232,6 +233,16 @@ textarea {
   gap: 12px;
   min-width: 0;
   padding: 10px;
+}
+
+.wallet-row input[type="checkbox"] {
+  accent-color: #0078ae;
+  appearance: auto;
+  flex: 0 0 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  width: 18px;
 }
 
 .wallet-icon {

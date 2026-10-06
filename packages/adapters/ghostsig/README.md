@@ -45,8 +45,13 @@ extra field instead of silently changing intent. It also refuses any correction
 of a caller-supplied Sequence: prepare a fresh transaction if the wallet says
 that Sequence is stale. This requirement applies only to this new adapter.
 
-`signMessage`, product-level payments/nftOffers and custom XRPL networks are
-not advertised. The three kit standard network configurations are accepted;
+`payments` and `nftOffers` are advertised following maintainer-reported live
+sign-and-submit tests on 2026-10-06: Payment, NFTokenCreateOffer,
+NFTokenAcceptOffer and NFTokenBurn passed in the vanilla preview. The report
+does not specify network, transaction hashes or NFT broker/buy-offer variants;
+it does not establish sign-only or full cross-network acceptance.
+`signMessage` and custom XRPL networks are not advertised.
+The three kit standard network configurations are accepted;
 GhostSig uses its own nodes, not caller-specified RPC endpoints.
 
 Restoration uses cached address/key and opens no popup. It is not a fresh proof
@@ -66,10 +71,10 @@ Allow popups and use HTTPS (localhost HTTP is allowed). If setting COOP, use
 `Cross-Origin-Opener-Policy: same-origin-allow-popups`; `same-origin` severs the
 opener. Do not use `noopener`/`noreferrer` for this protocol. The popup's own CSP
 controls wallet resources; normal dApp script CSP still applies to your bundle.
-Allow `https://ghostsig.dev` in `img-src` for its official hosted PNG icon.
+Allow `data:` in `img-src` for the embedded SVG icon.
 `isAvailable()` only reports browser API availability, not passkey/PRF support.
 Autoconnect/sign chains without a fresh user gesture may be popup-blocked.
 
-The icon is the wallet's hosted PNG. The protocol reference is XRPL Commons
+The icon embeds the supplied `tmp/ghostsig.svg` as a base64 data URL. The protocol reference is XRPL Commons
 xrpl-connect (MIT), develop commit `d43330a2003977399cd7349eff84c318c87637eb`.
 Runtime protocol was checked against `ghostsig.dev/src/connect.js` on 2026-10-05.
