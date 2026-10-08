@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/adapter-crossmark",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "Crossmark adapter for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
@@ -15,14 +15,20 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json && node ../../../scripts/prepare-crossmark-package.mjs",
+    "prepack": "node ../../../scripts/prepare-crossmark-package.mjs"
   },
   "dependencies": {
-    "@crossmarkio/sdk": "^0.4.0",
-    "@xrpl-wallet-kit/core": "0.1.19"
+    "@xrpl-wallet-kit/core": "0.1.20"
+  },
+  "devDependencies": {
+    "@crossmarkio/sdk": "0.4.0",
+    "esbuild": "0.25.12",
+    "typescript": "^5.5.4"
   },
   "publishConfig": {
     "access": "public"

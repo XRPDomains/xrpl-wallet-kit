@@ -2,16 +2,25 @@
 
 ## Unreleased
 
+## 0.1.20
+
 ### Added
 
-- Experimental opt-in GhostSig hosted popup adapter with verified signing replies, cancellation and cached session restoration. Available in workspace client/IIFE exports, not enabled by defaults or `wallets: "all"`. Live passkey/testnet acceptance and npm publication remain pending under #34.
+- Opt-in GhostSig hosted popup adapter with verified signing replies and cancellation. Available in client/IIFE exports, not enabled by defaults or `wallets: "all"`. Payment and NFT flows were reported working by the user; broader live acceptance is not claimed.
+- Experimental standalone Xyra adapter with verified sign-only replies, popup cancellation, and an embedded icon. Opt-in only; no default-client/CDN integration. Live acceptance and validated-submission confirmation remain pending under #49.
+
+### Fixed
+
+- Reconcile existing Xaman signing payloads after missed subscription events, bound waits, and retain payload UUID/uncertain outcome on timeout without resubmitting.
+- Add wallet visibility controls to local React/vanilla previews and keep mainnet as the default.
 
 ### Security
 
 - Replace auth's default legacy signed-transaction verifier with modern XRPL codec/keypairs peers, preserving compact versus signedTx proofs and explicit injected verifiers. Reject malformed proofs and ambiguous injected validity results; remove the legacy verifier peer requirement.
 - Patch development Next.js and compatible root transitive dependencies; upgrade duplicate-detection tooling without its vulnerable glob dependency chain.
 - Patch the private website's Vite/PostCSS/nanoid dependency chain and add scoped audit regression checks.
-- Keep remaining unpatched Crossmark dependency risks visible under P1 issue #48. These changes do not resolve all root audit findings or upgrade consuming dApps' Next.js versions.
+- Bundle the pinned Crossmark SDK runtime in the adapter artifact instead of installing its legacy typings tree in consumers. Preserve upstream license text and document its manifest/license discrepancy. Upstream crypto findings remain in development dependencies; this is not an upstream crypto patch.
+- Patch source-map-js and the private website's Vue dependency family. These changes do not upgrade consuming dApps' Next.js versions.
 
 ## 0.1.19
 

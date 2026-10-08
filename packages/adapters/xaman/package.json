@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/adapter-xaman",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "Xaman adapter for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
@@ -21,7 +21,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@xrpl-wallet-kit/core": "0.1.19",
+    "@xrpl-wallet-kit/core": "0.1.20",
     "xumm": "^1.8.0"
   },
   "publishConfig": {

@@ -16,16 +16,16 @@ For server-side XRPL verification, install the optional peers in your server pac
 npm install ripple-keypairs@^3 xrpl@^4
 ```
 
-## Verifier Migration (Unreleased)
+## Verifier Migration (0.1.20)
 
-The upcoming release no longer loads `verify-xrpl-signature` by default. Compact
+Version 0.1.20 no longer loads `verify-xrpl-signature` by default. Compact
 signatures and signed-transaction proofs remain separate. Signed transactions
 use modern XRPL encoding and keypair verification with signer, Account and first
 memo binding. Existing `dependencies.verifyXrplSignature` injection remains
 supported, but must explicitly return `true` or `signatureValid: true`.
 Custom `loadPeer` implementations now only need `xrpl` and `ripple-keypairs`.
 Remove the old verifier from your server dependencies only if nothing else uses it.
-These unreleased changes do not alter already published 0.1.19 installations.
+Upgrading to 0.1.20 is required; existing 0.1.19 installations are unchanged.
 
 Default verification proves the signer's identity, not ledger authorization:
 RegularKey/delegated identities and multisign quorum are not resolved from the

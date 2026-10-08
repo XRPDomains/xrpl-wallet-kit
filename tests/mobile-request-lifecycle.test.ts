@@ -23,7 +23,10 @@ test("Xaman closes a subscription created after cancellation and does not emit a
   } });
   const controller = new AbortController();
   const pending = adapter.signMessage({ message: "hello", account, signal: controller.signal });
-  const rejection = assert.rejects(pending, { code: WalletKitErrorCode.REQUEST_CANCELLED });
+  const rejection = assert.rejects(pending, error => {
+    assert.equal((error as { details?: { outcomeUnknown?: boolean } }).details?.outcomeUnknown, true);
+    return (error as { code: string }).code === WalletKitErrorCode.REQUEST_CANCELLED;
+  });
   controller.abort(); await rejection;
   created.resolve({ created: { uuid: "late" }, resolve: () => resolved++, websocket: { close: () => closed++ }, resolved: Promise.resolve({ signed: true }) });
   await tick();
@@ -65,6 +68,39 @@ test("Xaman normalizes opened/signed/expired provider progress and expiry errors
   await assert.rejects(adapter.signMessage({ message: "hello", account, onRequestProgress: event => progress.push(event) }), { code: WalletKitErrorCode.REQUEST_EXPIRED });
   assert.ok(progress.some(event => event.state === "signed"));
   assert.ok(progress.some(event => event.state === "expired" && event.providerRequestId === "uuid"));
+});
+
+test("Xaman reconciles an existing payload when subscription events are lost", async () => {
+  const done = deferred<unknown>();
+  let created = 0; let fetched = 0; let closed = 0;
+  const adapter = new XamanAdapter({ sdk: { payload: {
+    createAndSubscribe: async () => {
+      created++;
+      return { created: { uuid: "missed-event" }, resolved: done.promise, resolve: done.resolve, websocket: { close: () => closed++ } };
+    },
+    get: async uuid => {
+      assert.equal(uuid, "missed-event"); fetched++;
+      return { meta: { signed: true, resolved: true }, response: { hex: "proof" } };
+    }
+  } } });
+  const result = await adapter.signMessage({ message: "hello", account, timeoutMs: 3500 });
+  assert.equal(result.txBlob, "proof");
+  assert.equal(created, 1, "recovery must never create another payload");
+  assert.equal(fetched, 1); assert.equal(closed, 1);
+});
+
+test("Xaman timeout preserves the existing payload UUID and uncertain outcome", async () => {
+  const done = deferred<unknown>();
+  const adapter = new XamanAdapter({ sdk: { payload: {
+    createAndSubscribe: async () => ({ created: { uuid: "uncertain-payload" }, resolved: done.promise, resolve: done.resolve }),
+    get: async () => null
+  } } });
+  await assert.rejects(adapter.signMessage({ message: "hello", account, timeoutMs: 10 }), error => {
+    const details = (error as { details?: { providerRequestId?: string; outcomeUnknown?: boolean } }).details;
+    assert.equal(details?.providerRequestId, "uncertain-payload");
+    assert.equal(details?.outcomeUnknown, true);
+    return (error as { code: string }).code === WalletKitErrorCode.REQUEST_TIMEOUT;
+  });
 });
 
 function walletConnectFixture() {

@@ -178,6 +178,7 @@ async function bootstrap(run = bootstrapRun) {
     { createDropFiAdapter },
     { createGemWalletAdapter },
     { createGhostsigAdapter },
+    { createXyraAdapter },
     { createLedgerAdapter },
     { createOtsuAdapter },
     { createWalletConnectAdapters, createWalletConnectMetadata },
@@ -188,6 +189,7 @@ async function bootstrap(run = bootstrapRun) {
     import("../../../packages/adapters/dropfi/src"),
     import("../../../packages/adapters/gemwallet/src"),
     import("../../../packages/adapters/ghostsig/src"),
+    import("../../../packages/adapters/xyra/src"),
     import("../../../packages/adapters/ledger/src"),
     import("../../../packages/adapters/otsu/src"),
     import("../../../packages/adapters/walletconnect/src"),
@@ -213,6 +215,7 @@ async function bootstrap(run = bootstrapRun) {
   adapters.push(createCrossmarkAdapter());
   adapters.push(createDropFiAdapter());
   adapters.push(createGhostsigAdapter());
+  adapters.push(createXyraAdapter());
   adapters.push(createOtsuAdapter());
   adapters.push(createXrplSnapAdapter({
     signMessageDestination: PREVIEW_CONFIG.walletConnectSignMessageDestination

@@ -15,6 +15,7 @@
       "@xrpl-wallet-kit/adapter-crossmark": ["packages/adapters/crossmark/src/index.ts"],
       "@xrpl-wallet-kit/adapter-dropfi": ["packages/adapters/dropfi/src/index.ts"],
       "@xrpl-wallet-kit/adapter-ghostsig": ["packages/adapters/ghostsig/src/index.ts"],
+      "@xrpl-wallet-kit/adapter-xyra": ["packages/adapters/xyra/src/index.ts"],
       "@xrpl-wallet-kit/adapter-ledger": ["packages/adapters/ledger/src/index.ts"],
       "@xrpl-wallet-kit/adapter-walletconnect": ["packages/adapters/walletconnect/src/index.ts"],
       "@xrpl-wallet-kit/adapter-xrpl-snap": ["packages/adapters/xrpl-snap/src/index.ts"],

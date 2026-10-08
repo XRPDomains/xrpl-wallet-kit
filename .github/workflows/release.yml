@@ -40,6 +40,7 @@ jobs:
           npm publish --workspace @xrpl-wallet-kit/adapter-walletconnect --access public
           npm publish --workspace @xrpl-wallet-kit/adapter-xaman --access public
           npm publish --workspace @xrpl-wallet-kit/adapter-xrpl-snap --access public
+          npm publish --workspace @xrpl-wallet-kit/adapter-xyra --access public
           npm publish --workspace @xrpl-wallet-kit/auth --access public
           npm publish --workspace @xrpl-wallet-kit/ui --access public
           npm publish --workspace @xrpl-wallet-kit/react --access public

@@ -47,6 +47,7 @@ When using `@xrpl-wallet-kit/client` defaults, Xaman is already included when co
 - `restoreSession()` verifies account ownership only. It preserves the stored manager network context instead of treating Xaman refresh metadata as proof that the mobile app switched networks.
 - `restoreSession()` and `recoverSession()` are best-effort and return `null` for normal stale or unavailable sessions.
 - Sign-only transaction requests (`submit: false`) allow Xaman to extend `LastLedgerSequence` by at most `maxLastLedgerSequenceExtension` ledgers. The default is `50`; set `0` to require exact preservation.
+- Signing waits are bounded to five minutes unless `timeoutMs` is supplied. While waiting, the adapter reads the existing payload every two seconds to recover missed subscription events; it never creates another payload or resubmits. Timeout/cancellation errors preserve `details.providerRequestId` when known and mark an uncertain outcome. Check that payload before retrying; local cleanup does not cancel a remote transaction.
 
 ## Testing
 

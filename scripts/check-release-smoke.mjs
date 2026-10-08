@@ -3,6 +3,7 @@ import { access, readFile, readdir } from "node:fs/promises";
 import { constants } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { checkCrossmarkArtifact, checkCrossmarkRuntime } from "./prepare-crossmark-package.mjs";
 
 const root = process.cwd();
 const rootPackage = await readJson("package.json");
@@ -53,7 +54,19 @@ for (const [packageName, { pkg, packagePath }] of workspacePackages) {
   }
 }
 
+const crossmarkRoot = "packages/adapters/crossmark";
+const crossmarkPackage = await readJson(`${crossmarkRoot}/package.json`);
+assert.deepEqual(Object.keys(crossmarkPackage.dependencies), ["@xrpl-wallet-kit/core"], "Crossmark must not install its SDK/typings chain at runtime");
+checkCrossmarkRuntime(await readFile(resolve(root, `${crossmarkRoot}/dist/index.js`), "utf8"));
+checkCrossmarkArtifact(await readFile(resolve(root, `${crossmarkRoot}/dist/index.d.ts`), "utf8"), { inputs: {}, outputs: {} });
+assert.equal(
+  await readFile(resolve(root, `${crossmarkRoot}/dist/licenses/CROSSMARK-LICENSE.txt`), "utf8"),
+  await readFile(resolve(root, "node_modules/@crossmarkio/sdk/LICENSE"), "utf8"),
+  "Crossmark artifact must retain the exact installed SDK license"
+);
+
 for (const entryPath of [
+  "packages/adapters/crossmark/dist/index.js",
   "packages/ui/dist/index.js",
   "packages/react/dist/index.js",
   "packages/next/dist/index.js",

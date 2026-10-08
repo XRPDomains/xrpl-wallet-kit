@@ -47,6 +47,24 @@ Crossmark restore uses SDK state that is already available after reload. The ada
 
 This keeps Crossmark aligned with the core adapter contract: core manages storage and events, while the adapter proves whether the current wallet provider still owns the stored account. Interactive sign-in remains part of `connect()`, not `restoreSession()`.
 
+## Package Preparation
+
+Starting with 0.1.20, the prepared package bundles the pinned Crossmark SDK runtime, leaving
+`@xrpl-wallet-kit/core` as its only runtime dependency. The SDK and its legacy
+typings chain remain development dependencies. Public adapter types do not
+re-export upstream SDK declarations.
+
+Workspace `build` and this adapter's `build`/`prepack` run the preparation step.
+Run a workspace build before packing; `prepack` requires existing compiled JS
+and declarations. The step rejects unexpected bundled dependencies, unresolved
+runtime imports, and upstream declaration imports, and retains the exact SDK
+license. See `THIRD_PARTY_NOTICES.md` for the unresolved upstream license
+discrepancy. Published versions are unchanged until an explicit release.
+
+An isolated tarball consumer install, runtime/type smoke checks, dependency
+audit, and redistribution review are still required before release. Do not
+treat a source-level check as evidence that a published package is clean.
+
 ## Testing
 
 Pass a mock provider for isolated tests:

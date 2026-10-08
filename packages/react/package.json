@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/react",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "React bindings and hooks for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
@@ -21,8 +21,8 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@xrpl-wallet-kit/core": "0.1.19",
-    "@xrpl-wallet-kit/ui": "0.1.19"
+    "@xrpl-wallet-kit/core": "0.1.20",
+    "@xrpl-wallet-kit/ui": "0.1.20"
   },
   "peerDependencies": {
     "react": ">=18"

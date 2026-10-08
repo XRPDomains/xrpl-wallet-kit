@@ -1,7 +1,7 @@
 {
-  "name": "@xrpl-wallet-kit/adapter-ghostsig",
+  "name": "@xrpl-wallet-kit/adapter-xyra",
   "version": "0.1.20",
-  "description": "Opt-in GhostSig hosted popup adapter for XRPL Wallet Kit.",
+  "description": "Experimental opt-in Xyra hosted wallet adapter for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -15,5 +15,5 @@
   "devDependencies": { "xrpl": "^4.0.0" },
   "publishConfig": { "access": "public" },
   "repository": { "type": "git", "url": "git+https://github.com/XRPDomains/xrpl-wallet-kit.git" },
-  "homepage": "https://ghostsig.dev/"
+  "homepage": "https://www.xyra.now/developers"
 }

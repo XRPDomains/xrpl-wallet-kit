@@ -5,6 +5,7 @@ import { WalletManager, createBrowserWalletStorage } from "../../../packages/cor
 import { createCrossmarkAdapter } from "../../../packages/adapters/crossmark/src";
 import { createDropFiAdapter } from "../../../packages/adapters/dropfi/src";
 import { createGhostsigAdapter } from "../../../packages/adapters/ghostsig/src";
+import { createXyraAdapter } from "../../../packages/adapters/xyra/src";
 import { createGemWalletAdapter } from "../../../packages/adapters/gemwallet/src";
 import { createLedgerAdapter } from "../../../packages/adapters/ledger/src";
 import { createOtsuAdapter } from "../../../packages/adapters/otsu/src";
@@ -39,7 +40,8 @@ function createPreviewManager() {
     createXrplSnapAdapter(),
     createLedgerAdapter(),
     createOtsuAdapter(),
-    createGhostsigAdapter()
+    createGhostsigAdapter(),
+    createXyraAdapter()
   ];
 
   let manager: WalletManager;
