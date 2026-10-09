@@ -33,7 +33,8 @@ WalletManager          ← orchestrates adapters, sessions, events
     ├── LedgerAdapter
     ├── DropfiAdapter
     ├── XrplSnapAdapter
-    └── OtsuAdapter
+    ├── OtsuAdapter
+    └── GhostsigAdapter (opt-in)
 ```
 
 The **core** package contains the manager, types, errors, and storage logic. It has zero dependencies on any UI framework. The **ui** package adds a DOM-based modal and connect button. The **adapters** are separate packages — install only what you need.
@@ -50,6 +51,12 @@ The **core** package contains the manager, types, errors, and storage logic. It 
 | DropFi | `adapter-dropfi` | Extension + Mobile App | ✅ | ✅ | ✅ |
 | XRPL Snap | `adapter-xrpl-snap` | MetaMask Snap | ✅ | ✅ | ✅ |
 | Otsu Wallet | `adapter-otsu` | Browser Extension | ✅ | ✅ | ✅ |
+| [GhostSig](/docs/adapters/ghostsig) | `adapter-ghostsig` | Hosted web / popup (opt-in) | ✅ | ✅ | ✅ |
+
+GhostSig is published starting in **v0.1.20**. It supports transaction signing
+and submission, including Payment and NFT offers, but not `signMessage()`.
+Enable it explicitly with `wallets: ["ghostsig"]` or `createGhostsigAdapter()`;
+the default client list and `wallets: "all"` do not include it.
 
 ## Package Overview
 

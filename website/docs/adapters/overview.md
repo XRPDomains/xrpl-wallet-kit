@@ -14,6 +14,7 @@ An adapter is the only layer in XRPL Wallet Kit that talks directly to a wallet 
 | [DropFi](/docs/adapters/dropfi) | `@xrpl-wallet-kit/adapter-dropfi` | Extension + Mobile App | Browser / Mobile |
 | [XRPL Snap](/docs/adapters/xrpl-snap) | `@xrpl-wallet-kit/adapter-xrpl-snap` | MetaMask Snap | Browser |
 | [Otsu Wallet](/docs/adapters/otsu) | `@xrpl-wallet-kit/adapter-otsu` | Browser extension (MV3) | Browser |
+| [GhostSig](/docs/adapters/ghostsig) | `@xrpl-wallet-kit/adapter-ghostsig` | Hosted web / popup (opt-in) | Browser |
 
 ## Capability Matrix
 
@@ -27,19 +28,21 @@ An adapter is the only layer in XRPL Wallet Kit that talks directly to a wallet 
 | DropFi | ✅ | ✅ | ✅ | — | ✅ | `signature` (compact) |
 | XRPL Snap | ✅ | — | ✅ | — | ✅ | `signedTx` (Payment blob) |
 | Otsu Wallet | ✅ | ✅ | ✅ | ✅ | ✅ | `signature` (compact) |
+| GhostSig | ✅ | ✅ | — | ✅ | ✅ | — |
 
 > **signMessage proof types:** `signature` = compact ECDSA/Ed25519 hex; `signedTx` = signed XRPL transaction blob. Read `signatureKind` on the result to know which you received.
 
+### GhostSig Opt-In
+
+[GhostSig](/docs/adapters/ghostsig) is published in npm **v0.1.20**, with its
+factory exported by the client and browser bundle. It supports connect,
+disconnect, cached restore, sign-only, sign-and-submit, Payment and NFT offers;
+it does not support `signMessage()`. Enable it explicitly using
+`wallets: ["ghostsig"]` or a named adapter. Default wallet lists and
+`wallets: "all"` do not include it. Transactions require an explicit uint32
+`SourceTag` (`0` is valid). See its guide for validation and popup constraints.
+
 ## Recommended Setup
-
-### Experimental Workspace Adapter
-
-[GhostSig](/docs/adapters/ghostsig) is implemented as an opt-in web/popup wallet
-in the current workspace, but is not published in npm 0.1.19 or the CDN `latest`
-bundle. It supports connect/disconnect, cached restore, sign-only and
-sign-and-submit; it does not advertise signMessage, payments or nftOffers.
-Live passkey/testnet acceptance is still pending. Default wallet lists and
-`wallets: "all"` do not include it.
 
 Most apps should use `createWalletKit()` or `WalletManager` directly:
 
@@ -119,6 +122,7 @@ Restore behavior varies by wallet type:
 - **Xaman**: verify via saved SDK state; no new QR or deep link needed.
 - **WalletConnect**: look up the stored session topic in the SignClient store; restore without re-approval if still valid.
 - **Hardware (Ledger)**: USB device must be re-connected and unlocked — no silent restore.
+- **GhostSig**: restore cached account state without a popup; this is not fresh authentication. The next signature verifies the stored address and key.
 
 ## Availability Detection
 

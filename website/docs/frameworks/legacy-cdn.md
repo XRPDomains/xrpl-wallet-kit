@@ -214,7 +214,12 @@ XRPLWalletKit.createLedgerAdapter()
 XRPLWalletKit.createDropfiAdapter()
 XRPLWalletKit.createXrplSnapAdapter()
 XRPLWalletKit.createOtsuAdapter()
+XRPLWalletKit.createGhostsigAdapter(options) // v0.1.20+, opt-in
 ```
+
+GhostSig is not included by `wallets: 'all'`. Enable it explicitly with
+`wallets: ['ghostsig']` or pass `createGhostsigAdapter()` in `adapters`.
+See the [GhostSig guide](/docs/adapters/ghostsig) for popup and signing requirements.
 
 ## TypeScript in a `<script type="module">`
 

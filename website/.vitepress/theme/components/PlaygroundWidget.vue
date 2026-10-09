@@ -69,6 +69,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { loadWalletKit } from '../loadWalletKit'
 
 // ── Config state ─────────────────────────────────────────────
 const config = reactive({
@@ -107,7 +108,6 @@ const kitLoaded  = ref(false)
 let modalInstance: any = null
 let buttonInstance: any = null
 let kitBundle: any = null
-const KIT_BUNDLE_URL = 'https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js'
 
 // ── Preview mode CSS class ────────────────────────────────────
 const previewModeClass = computed(() =>
@@ -153,27 +153,9 @@ async function copyCode() {
 }
 
 // ── Load IIFE bundle once ────────────────────────────────────
-function loadKit(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (
-      (window as any).XRPLWalletKit &&
-      (window as any).__XRPL_WALLET_KIT_WEBSITE_BUNDLE_URL__ === KIT_BUNDLE_URL
-    ) {
-      kitBundle = (window as any).XRPLWalletKit
-      kitLoaded.value = true
-      return resolve()
-    }
-    const script = document.createElement('script')
-    script.src = KIT_BUNDLE_URL
-    script.onload = () => {
-      kitBundle = (window as any).XRPLWalletKit
-      ;(window as any).__XRPL_WALLET_KIT_WEBSITE_BUNDLE_URL__ = KIT_BUNDLE_URL
-      kitLoaded.value = true
-      resolve()
-    }
-    script.onerror = () => reject(new Error('Failed to load XRPL Wallet Kit'))
-    document.head.appendChild(script)
-  })
+async function loadKit(): Promise<void> {
+  kitBundle = await loadWalletKit()
+  kitLoaded.value = true
 }
 
 // ── Build demo manager — real adapter metadata, no live connections ──

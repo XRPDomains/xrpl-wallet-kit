@@ -429,6 +429,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { loadWalletKit } from '../loadWalletKit'
 
 // ── Config state ──────────────────────────────────────────────
 const config = reactive({
@@ -499,7 +500,6 @@ const mountRef      = ref<HTMLElement | null>(null)
 let modalInstance:  any = null
 let buttonInstance: any = null
 let kitBundle:      any = null
-const KIT_BUNDLE_URL = 'https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js'
 let inlineObserver: MutationObserver | null = null
 let inlineObserverCleanup: (() => void) | null = null
 let previewManager: any = null
@@ -571,7 +571,7 @@ const btnSizes = [
   { value: 'md', label: 'MD' },
   { value: 'lg', label: 'LG' },
 ]
-type WalletOptionId = 'xaman' | 'gemwallet' | 'crossmark' | 'dropfi' | 'xrplsnap' | 'walletconnect'
+type WalletOptionId = 'xaman' | 'gemwallet' | 'crossmark' | 'dropfi' | 'xrplsnap' | 'walletconnect' | 'ghostsig'
 const walletOptions: Array<{ id: WalletOptionId; label: string }> = [
   { id: 'xaman', label: 'Xaman' },
   { id: 'gemwallet', label: 'GemWallet' },
@@ -579,6 +579,7 @@ const walletOptions: Array<{ id: WalletOptionId; label: string }> = [
   { id: 'dropfi', label: 'DropFi' },
   { id: 'xrplsnap', label: 'MetaMask' },
   { id: 'walletconnect', label: 'WalletConnect' },
+  { id: 'ghostsig', label: 'GhostSig' },
 ]
 const selectedWalletIds = ref<WalletOptionId[]>(walletOptions.map((wallet) => wallet.id))
 
@@ -930,33 +931,15 @@ async function copyCode() {
 }
 
 // ── IIFE loader ───────────────────────────────────────────────
-function loadKit(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (
-      (window as any).XRPLWalletKit &&
-      (window as any).__XRPL_WALLET_KIT_WEBSITE_BUNDLE_URL__ === KIT_BUNDLE_URL
-    ) {
-      kitBundle = (window as any).XRPLWalletKit
-      kitLoaded.value = true
-      return resolve()
-    }
-    const script = document.createElement('script')
-    script.src = KIT_BUNDLE_URL
-    script.onload = () => {
-      kitBundle = (window as any).XRPLWalletKit
-      ;(window as any).__XRPL_WALLET_KIT_WEBSITE_BUNDLE_URL__ = KIT_BUNDLE_URL
-      kitLoaded.value = true
-      resolve()
-    }
-    script.onerror = () => reject(new Error('Failed to load XRPL Wallet Kit'))
-    document.head.appendChild(script)
-  })
+async function loadKit(): Promise<void> {
+  kitBundle = await loadWalletKit()
+  kitLoaded.value = true
 }
 
 function buildMockManager() {
   if (!kitBundle) return null
   const { WalletManager, createGemWalletAdapter, createCrossmarkAdapter, createDropFiAdapter,
-          createXrplSnapAdapter, createXamanAdapter, createWalletConnectAdapter } = kitBundle
+          createXrplSnapAdapter, createXamanAdapter, createWalletConnectAdapter, createGhostsigAdapter } = kitBundle
 
   const adapters: any[] = []
   if (selectedWalletIds.value.includes('xaman') && !previewManager?.getAdapter('xaman')) {
@@ -978,6 +961,10 @@ function buildMockManager() {
     try {
       adapters.push(createWalletConnectAdapter({ projectId: '7e0944cf9202885569eb41182016baed', useModal: true, modalMode: 'always' }))
     } catch {}
+  }
+
+  if (selectedWalletIds.value.includes('ghostsig') && !previewManager?.getAdapter('ghostsig')) {
+    try { adapters.push(createGhostsigAdapter()) } catch {}
   }
 
   if (!previewManager) previewManager = new WalletManager({ adapters, network: 'mainnet' })

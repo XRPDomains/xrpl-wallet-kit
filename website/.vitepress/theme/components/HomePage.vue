@@ -30,6 +30,7 @@ const manager = new WalletManager({
       <div class="xwk-home__adapter-list">
         <span>Xaman</span><span>GemWallet</span><span>WalletConnect</span><span>Crossmark</span>
         <span>Ledger</span><span>DropFi</span><span>XRPL Snap</span><span>Otsu</span>
+        <span>GhostSig</span>
       </div>
     </div>
 

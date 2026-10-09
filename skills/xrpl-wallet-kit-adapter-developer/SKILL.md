@@ -1,6 +1,6 @@
 ---
 name: xrpl-wallet-kit-adapter-developer
-description: Use when implementing, reviewing, or scaffolding a third-party XRPL Wallet Kit adapter from wallet provider documentation, injected API docs, WalletConnect wallet config, hardware SDK docs, Snap/provider APIs, or existing wallet integrations. Guides any coding agent to follow @xrpl-wallet-kit/core interfaces, capability rules, event cleanup, test expectations, and browser bundle validation.
+description: Implement, review, or scaffold an XRPL Wallet Kit adapter using wallet provider APIs, documentation, or SDKs. Align capabilities, signing results, lifecycle, exports, and integration docs with the local core contract.
 ---
 
 # XRPL Wallet Kit Adapter Developer
@@ -18,6 +18,7 @@ Use this guide when the task involves:
 - converting an existing dApp wallet integration into a clean adapter;
 - adding a WalletConnect wallet definition;
 - integrating injected extension APIs, mobile/deeplink SDKs, hardware wallets, or Snap-style providers.
+- integrating hosted web wallets using popup messaging.
 
 ## Required Project Context
 
@@ -43,11 +44,14 @@ If working outside this repository, require the adapter package to depend on `@x
    - mobile/deeplink/QR SDK;
    - hardware transport;
    - Snap or embedded provider.
+   - hosted web/popup wallet (`type: "web"`).
 3. Identify provider capabilities before coding.
 4. Implement the smallest adapter that accurately maps provider behavior into `WalletAdapter`.
 5. Add package exports and TypeScript declarations.
 6. Add focused tests or a preview example when behavior is non-trivial.
-7. Run validation commands from the repo root.
+7. Run focused validation appropriate to the change; distinguish automated coverage from live wallet acceptance.
+
+Keep changes in the existing checkout. Commit, push, npm publish, GitHub release, and additional worktrees require their own user authorization.
 
 ## Hard Rules
 
@@ -66,20 +70,22 @@ Every adapter must expose:
 
 - `metadata`: stable `id`, display `name`, `type`, optional `icon`, `group`, `homepage`;
 - `capabilities`: accurate booleans;
-- `connect(options)`: returns normalized `{ account, session?, raw? }`;
-- `isAvailable()`: detects provider availability without throwing for normal missing-provider cases.
+- `connect(options)`: returns normalized `{ account, session?, raw? }`.
+
+`isAvailable()` is optional in the core contract. When implemented, it must be passive and must not throw for normal missing-provider cases. Browser API availability is not proof that a passkey or wallet session is usable.
 
 When available, set `adapterApiVersion = WALLET_ADAPTER_API_VERSION`.
 
 Optional methods:
 
 - `disconnect()` if provider supports cleanup/logout;
-- `restoreSession(session)` for `autoReconnect`; this must be passive-only and must verify the current provider account before restoring;
+- `restoreSession(session)` for `autoReconnect`; keep it passive and document whether it verifies provider state or only restores cached account metadata;
 - `signMessage(request)` only if supported;
 - `signTransaction(request)` only if the wallet can sign without submitting;
 - `signAndSubmit(request)` only if supported.
 - `canRecoverSession()` plus `recoverSession()` only for redirect/deeplink/session recovery flows.
 - `cancelPendingConnection()` when the adapter can leave pending proposals, popups, timers, or temporary markers.
+- `switchNetwork(network)` only when provider network switching is implemented.
 
 ## Contract Validation
 
@@ -101,6 +107,7 @@ Set capabilities conservatively:
 - `disconnect`: true only if cleanup is implemented or session cleanup is meaningful.
 - `signMessage`: true only if the wallet supports message proof or an agreed transaction-style message proof.
 - `signTransaction`: true only if the wallet can sign without submit.
+- `signMessage` results must distinguish compact signatures from signed transaction proofs with `signatureKind` and normalize the supported proof fields.
 - `signAndSubmit`: true only if the wallet can submit or its provider handles submit.
 - `payments`, `nftOffers`: true only after testing the expected XRPL transaction payloads.
 - `qr`, `deeplink`: true only if the adapter emits usable QR/deeplink data.
@@ -118,6 +125,8 @@ Use `createWalletError` from `@xrpl-wallet-kit/core` where possible.
 ## Implementation Notes
 
 - Prefer extending `BaseWalletAdapter` when building inside this repo.
+- Keep browser globals behind runtime guards so package imports remain SSR-safe.
+- For popup messaging, validate origin, source, request correlation and reply shape; open approval UI from a user gesture.
 - Use provider SDKs directly; do not inject CDN scripts from the adapter unless the provider requires a documented loader.
 - Use structured provider APIs instead of string parsing when possible.
 - Normalize account metadata into `WalletAccount`.
@@ -126,13 +135,14 @@ Use `createWalletError` from `@xrpl-wallet-kit/core` where possible.
 - Honor `ConnectOptions.signal` when the provider or SDK exposes an abort/cancel API. If the provider cannot be aborted externally, `cancelPendingConnection()` must still clear local timers, markers, popups, and pending proposal references.
 - Use injected `WalletStorage` or core storage helpers for redirect/mobile recovery markers. Do not call `window.localStorage` directly in new adapter code.
 - For `restoreSession()`, never call `connect()`, sign-in, QR, deeplink, popup, hardware approval, or transaction approval APIs. Read only passive provider state that already exists after reload.
-- For `restoreSession()`, compare the current passive provider address with `session.account.address`. Return `null` when the address is missing, mismatched, locked, stale, or not yet hydrated.
+- For provider-backed `restoreSession()`, compare the current passive provider address with `session.account.address`. Return `null` when the address is missing, mismatched, locked, stale, or not yet hydrated.
 - Do not blindly return the stored session just because the provider exists. Local storage is not proof that the wallet is still connected to the same account.
-- If a wallet has no reliable passive account API, omit `restoreSession()` or implement it as `return null`.
-- For `signTransaction()`, return a signed-only result (`txBlob`, `signed`, `raw`) and never submit to the network.
+- If a wallet has no reliable passive account API, normally omit `restoreSession()` or return `null`. A documented cached-only restore is not fresh authentication; subsequent signing must re-prove account/key binding.
+- For `signTransaction()`, return a normalized `SignTransactionResult` with `txBlob` and never submit to the network. Preserve `submit: false` semantics in `signAndSubmit()`.
 - For `signAndSubmit()`, return a normalized result with `hash` whenever the provider submitted a transaction successfully. Core transaction lifecycle events and WalletToast rely on that hash.
 - Use or mirror `normalizeTxResult()` for provider-specific response shapes such as `hash`, `txHash`, `tx_hash`, `transactionHash`, nested `result.hash`, or nested `response.data.transaction_hash`.
 - Preserve provider results under `raw` so integrators can debug wallet-specific behavior without leaking it into normalized public fields.
+- A hash or preliminary submit response is not validated ledger success. Preserve unknown outcomes after dispatch and never automatically retry a potentially broadcast transaction.
 - For WalletConnect, keep wallet list/deeplink config separate from protocol logic.
 - For WalletConnect, `walletConnectChainId` is optional on `WalletNetwork`, but WalletConnect paths must validate it at runtime and throw a clear network configuration error when it is missing.
 - For mobile flows, consider focus/pageshow/visibility return paths and stale proposal cleanup.
@@ -140,7 +150,7 @@ Use `createWalletError` from `@xrpl-wallet-kit/core` where possible.
 
 ## Validation
 
-Run from repository root:
+Choose validation according to the changed surface. Prefer focused adapter tests and type checks during development; do not automatically bundle the SDK or build the website for every edit. Full validation commands, when requested or needed for integration/release, run from the repository root:
 
 ```powershell
 npm.cmd run typecheck
@@ -154,7 +164,7 @@ For quality review when available:
 npm.cmd run check:quality
 ```
 
-Manual smoke test at minimum:
+Manual acceptance checks when relevant (performed by the user for real wallet signing/submission):
 
 - provider missing/installed states;
 - connect success;
@@ -164,6 +174,15 @@ Manual smoke test at minimum:
 - sign message if implemented;
 - payment and NFT offer signing if claimed;
 - mobile deeplink/QR return for WalletConnect/mobile wallets.
+
+Mock tests do not establish production readiness. Report remaining live acceptance gaps and validation not run.
+
+## Consumer Docs and Registration
+
+- Follow neighboring guides: introduction, installation, minimal connection example, options, capabilities, and essential limitations. Keep audit histories, issue progress, test logs and protocol internals out of consumer quick starts.
+- Synchronize Supported Wallets, Adapters overview, installation and relevant client/browser examples. Check published package versions before claiming npm/CDN availability.
+- Choose default, opt-in, or standalone registration explicitly. Exporting a factory does not require including the wallet in default lists or `wallets: "all"`.
+- Use optimized official icons and the kit's embedded data-URI convention where applicable.
 
 ## Reference Loading
 
@@ -186,7 +205,7 @@ skills/xrpl-wallet-kit-adapter-developer/templates/adapter-package/
   tsconfig.json      — extends core tsconfig
 ```
 
-Copy this directory to `packages/adapters/<wallet-id>/` and replace `mywallet` / `MyWallet` with the actual wallet name and id.
+Adapt this directory to `packages/adapters/<wallet-id>/`, replacing `mywallet` / `MyWallet` and aligning package versions with the workspace. The scaffold is not a validated provider implementation: check result normalization, restore guarantees and capabilities against the current core contract before using it.
 
 ## Claude Code usage
 

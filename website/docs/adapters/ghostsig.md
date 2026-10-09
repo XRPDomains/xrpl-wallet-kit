@@ -1,100 +1,72 @@
-# GhostSig (Experimental)
+# GhostSig Adapter
 
-Implemented in the current workspace, **not yet published on npm or CDN latest**.
-Live passkey/testnet validation remains open in
-[issue #34](https://github.com/XRPDomains/xrpl-wallet-kit/issues/34).
+[GhostSig](https://ghostsig.dev/) is a hosted XRPL wallet. The adapter opens a
+popup for connection and transaction approval; no browser extension or
+WalletConnect project ID is required. Available starting in **v0.1.20** as an
+experimental, opt-in adapter.
 
-GhostSig is a hosted wallet opened in a popup. It is not an extension or
-WalletConnect wallet. The kit declares it as `type: "web"`, group `Web wallets`.
-Availability means the browser can open popups, not that passkey/PRF is supported.
+## Installation
 
-## Workspace Usage
+```sh
+npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-ghostsig xrpl@^4
+```
+
+## Quick Start
 
 ```ts
 import { WalletManager } from "@xrpl-wallet-kit/core";
 import { createGhostsigAdapter } from "@xrpl-wallet-kit/adapter-ghostsig";
 
 const manager = new WalletManager({
-  network: "testnet",
-  adapters: [createGhostsigAdapter({ timeoutMs: 60000 })]
+  network: "mainnet",
+  adapters: [createGhostsigAdapter()],
 });
-await manager.connect("ghostsig"); // invoke from a user gesture
-const result = await manager.signTransaction({
-  txJson: { TransactionType: "AccountSet", Account: manager.getAccount()!.address, SourceTag: 0 }
-});
-console.log(result.txBlob);
+
+// Call from a connect button's click handler.
+const { account } = await manager.connect("ghostsig");
+console.log(account.address);
 ```
 
-Install `xrpl` v4/v5 alongside this adapter when it is released. Compact message
-signing is unsupported; do not use this adapter for the kit's sign-in flow.
-`payments` and `nftOffers` are enabled after maintainer-reported live tests of
-Payment, NFT offer creation/acceptance and NFT burn on 2026-10-06.
-Network and transaction hashes were not supplied; sign-only and the remaining
-acceptance matrix are not covered by this report.
-Only the kit's standard mainnet/testnet/devnet configurations are accepted;
-custom RPC/network definitions are refused before the popup opens.
-
-## Selective Client and IIFE
+With the all-in-one client:
 
 ```ts
-import { createWalletClient } from "@xrpl-wallet-kit/client/selective";
-import { createGhostsigAdapter } from "@xrpl-wallet-kit/adapter-ghostsig";
-const manager = createWalletClient({ network: "testnet", adapters: [createGhostsigAdapter()] });
+import { createWalletClient } from "@xrpl-wallet-kit/client";
+
+const manager = createWalletClient({
+  network: "mainnet",
+  wallets: ["ghostsig"],
+  ghostsig: { timeoutMs: 60000 },
+});
 ```
 
-The locally built browser bundle exports `XRPLWalletKit.createGhostsigAdapter`.
-All-in-one setup can use `wallets: ["ghostsig"]` and optional
-`ghostsig: { timeoutMs: 60000 }`. Merely providing the option does not enable it.
-Neither the default wallet list nor `wallets: "all"` includes GhostSig.
-The existing jsDelivr `@latest` URL stays unchanged, but will not expose these
-exports until a new coordinated npm release is published. Do not add this wallet
-to CDN-based playground/theme-builder lists before that release.
+GhostSig is not included in the default wallet list or `wallets: "all"`.
+For plain HTML, the browser bundle exports
+`XRPLWalletKit.createGhostsigAdapter(options)`.
 
-## Signing and Submission
+## Options
 
-The popup receives protocol v1 requests pinned to `https://ghostsig.dev`.
-Replies must match source, origin, version and an unpredictable request ID.
-Address/key binding, signature, transaction hash and original fields are
-verified before returning a signed blob. Only missing Sequence/Fee/
-LastLedgerSequence may be added by the wallet; requested values cannot change.
-Transactions containing signing fields, multisign or unsupported metadata are
-refused. Cached restore opens no popup and is not fresh authentication; the
-next signature re-proves the stored address and key.
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `timeoutMs` | `number` | `60000` | Timeout for connection and signing requests, in milliseconds |
+| `url` | `string` | `https://ghostsig.dev/?connect` | Wallet popup URL; only the GhostSig origin or explicit HTTP localhost development is allowed |
 
-Provide an explicit uint32 `SourceTag` (`0` is allowed). The current wallet adds
-its own tag when omitted, so the adapter refuses missing tags before opening a
-popup rather than accepting an unrequested field. A wallet correction of an
-explicit Sequence is also rejected; prepare a fresh transaction. Other wallet
-adapters and existing dApp transaction flows are unchanged.
+## Capabilities
 
-Sign-and-submit succeeds only for the wallet's reported validated `tesSUCCESS`
-with a ledger index. It is not independently checked against a ledger node.
-Uncertain outcomes throw with verified hash/raw transaction in error details.
-Always inspect that hash before retrying. Cancellation/timeout after dispatch
-does not prove that a transaction was never submitted. A progress provider hash
-is unverified until the full signed transaction is received and checked.
+| Capability | Supported |
+|---|:---:|
+| connect / disconnect | Yes |
+| signTransaction (sign-only) | Yes |
+| signAndSubmit | Yes |
+| payments / nftOffers | Yes |
+| signMessage | No |
 
-## Popup Deployment
+Supports the kit's standard mainnet, testnet and devnet configurations.
+Custom RPC/network definitions are not supported.
 
-Use HTTPS or localhost development and allow popups. If setting COOP, use
-`Cross-Origin-Opener-Policy: same-origin-allow-popups`; `same-origin` severs the
-opener. `noopener` and `noreferrer` are incompatible. The wallet's own CSP
-governs its page; your normal script CSP must allow your application bundle.
-Allow `data:` in `img-src` for the embedded SVG icon.
-Only the production origin or explicitly configured `http://localhost` URL is
-accepted. Do not deploy a wallet copy on an arbitrary production origin.
+## Integration Notes
 
-Every terminal request removes listeners/timers and closes its popup.
-Disconnect clears local state, not remote passkeys. Popup reuse is intentionally
-deferred; every signature needs a fresh user gesture to avoid popup blocking.
-
-## Local Test
-
-React preview shows all configured wallets, including GhostSig, on mainnet by
-default. Wallet checkboxes control which entries appear in the connection modal.
-The vanilla preview includes the same wallet filtering and defaults Payment and
-NFT forms to `Sign only (no submit)`. Switch `Transaction mode` to
-`Sign and submit` for submission tests. GhostSig receives explicit SourceTag: 0
-in both modes; sign-only results display the returned txBlob.
-Record connect, reconnect, sign-only, submit, reject, timeout and wallet-switching
-results with the wallet build/date before treating the adapter as production-ready.
+- Open connection and signing popups from a user action, using HTTPS or localhost.
+- Include an explicit uint32 `SourceTag` in each transaction; `SourceTag: 0` is valid.
+- GhostSig does not support message signing for the kit's wallet sign-in flow.
+- If your site sets COOP, use `Cross-Origin-Opener-Policy: same-origin-allow-popups` so the wallet can reply.
+- If a submit request times out or is cancelled, check its transaction hash before retrying; the transaction may already have been submitted.

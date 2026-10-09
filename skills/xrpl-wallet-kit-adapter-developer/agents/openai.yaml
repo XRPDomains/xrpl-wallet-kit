@@ -1,3 +1,4 @@
-display_name: XRPL Wallet Kit Adapter Developer
-short_description: Build or review XRPL Wallet Kit adapters from wallet provider docs.
-default_prompt: Implement or review a production-ready XRPL Wallet Kit adapter from the provided wallet API documentation, following the local adapter interface, capability rules, cleanup rules, and validation checklist.
+interface:
+  display_name: "XRPL Wallet Kit Adapter Developer"
+  short_description: "Implement or review XRPL Wallet Kit adapters."
+  default_prompt: "Use $xrpl-wallet-kit-adapter-developer to implement or review an adapter against the local core contract, with scoped validation and concise integration docs."
