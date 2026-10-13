@@ -18,6 +18,7 @@
 - Set the canonical signature flag in Ledger single-sign requests while preserving transaction flags for XRP app 2.3.2 compatibility.
 - Block standalone inner Batch requests in both numeric and object Flags forms.
 - Align release checks with the website's shared latest-CDN loader and validate npm credentials before publication.
+- Mock and clean up browser globals in conformance fixtures when Node does not expose `navigator`.
 
 ## 0.1.20
 

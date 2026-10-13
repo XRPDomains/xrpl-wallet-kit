@@ -21,6 +21,8 @@ LLM review could not run because no endpoint was configured.
   Also reject the SDK object form with `tfInnerBatchTxn: true`.
 - Release validation: the website CDN smoke check still assumed URL literals in
   widgets. Check the shared loader URL and both widget calls instead.
+- CI validation: the conformance fixture assumed Node exposed `navigator`.
+  Supply and clean up a Ledger browser mock when that global is absent.
 
 The Ledger comparison used xrpl-connect's current adapter implementation and
 [error-preservation fix #204](https://github.com/XRPL-Commons/xrpl-connect/commit/dee50719).
@@ -52,6 +54,10 @@ lockfile version alignment, release smoke checks, and release documentation.
 Unrelated user audits, notes and local MCP configuration are excluded.
 
 ## Validation Boundaries
+
+Dependency audit policy passed with previously reviewed upstream `elliptic` and
+`node-forge` exceptions; those advisories remain unresolved. Website dependency
+audit reported no vulnerabilities. This is not a claim of a clean security audit.
 
 Regression tests use mocked RPC/device operations and offline test keys. They do
 not establish real-device compatibility for every firmware or transaction type.

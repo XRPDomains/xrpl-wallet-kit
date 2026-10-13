@@ -86,8 +86,13 @@ function createFixture(id: typeof ids[number], scenario: AdapterConformanceCase)
     remainingResources: () => [...listeners.values()].reduce((total, set) => total + set.size, 0),
     exerciseEvents: async () => {
       // Ledger's injected transport needs browser availability for manager admission.
-      const hid = Object.getOwnPropertyDescriptor(navigator, "hid");
-      if (id === "ledger") Object.defineProperty(navigator, "hid", { configurable: true, value: {} });
+      const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+      const browserNavigator = globalThis.navigator ?? {};
+      const hid = Object.getOwnPropertyDescriptor(browserNavigator, "hid");
+      if (id === "ledger") {
+        if (!navigatorDescriptor) Object.defineProperty(globalThis, "navigator", { configurable: true, value: browserNavigator });
+        Object.defineProperty(browserNavigator, "hid", { configurable: true, value: {} });
+      }
       const manager = new WalletManager({ adapters: [adapter], accountStatus: { enabled: false }, storage: new MemoryWalletStorage(), logger: { level: "silent" } });
       const observed: string[] = [];
       const offAccount = manager.on("accountChanged", event => observed.push(event.account.address));
@@ -106,7 +111,11 @@ function createFixture(id: typeof ids[number], scenario: AdapterConformanceCase)
         offAccount(); offNetwork();
         try { await manager.disconnect(); } finally {
           manager.destroy();
-          if (id === "ledger") { if (hid) Object.defineProperty(navigator, "hid", hid); else Reflect.deleteProperty(navigator, "hid"); }
+          if (id === "ledger") {
+            if (hid) Object.defineProperty(browserNavigator, "hid", hid);
+            else Reflect.deleteProperty(browserNavigator, "hid");
+            if (!navigatorDescriptor) Reflect.deleteProperty(globalThis, "navigator");
+          }
         }
       }
     },
