@@ -1,4 +1,4 @@
-import { BaseWalletAdapter, createWalletError, validateMultisignTransaction } from "@xrpl-wallet-kit/core";
+import { BaseWalletAdapter, createWalletError, validateMultisignTransaction, WalletKitError, WalletKitErrorCode } from "@xrpl-wallet-kit/core";
 import type {
   ConnectOptions,
   ConnectResult,
@@ -17,10 +17,12 @@ export const LEDGER_ICON =
 
 const DEFAULT_TIMEOUT = 60_000;
 const DEFAULT_ACCOUNT_INDEX = 0;
+const FULLY_CANONICAL_SIG = 0x80000000;
 type LedgerTransport = { close(): Promise<void> };
 type LedgerXrpApp = {
   getAddress(path: string, verify: boolean, askChainCode: boolean): Promise<{ address: string; publicKey: string }>;
   signTransaction(path: string, signingBlob: string): Promise<string>;
+  getAppConfiguration?(): Promise<{ version: string }>;
 };
 
 export enum LedgerDeviceState {
@@ -44,6 +46,7 @@ export interface LedgerSession {
   address: string;
   publicKey?: string;
   derivationPath?: string;
+  appVersion?: string;
   signTransaction(tx: unknown, submit?: boolean): Promise<LedgerSignResult>;
   signMultisignTransaction?(tx: unknown): Promise<LedgerSignResult>;
 }
@@ -84,6 +87,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
   private transport?: LedgerTransport;
   private xrp?: LedgerXrpApp;
   private derivationPath: string;
+  private connectionGeneration = 0;
 
   constructor(private options: LedgerAdapterOptions = {}) {
     super();
@@ -103,11 +107,14 @@ export class LedgerAdapter extends BaseWalletAdapter {
   }
 
   async connect(options: ConnectOptions): Promise<ConnectResult> {
+    const generation = ++this.connectionGeneration;
     this.network = options.network;
     try {
-      this.session = this.options.connectLedger
+      const session = this.options.connectLedger
         ? await this.options.connectLedger()
-        : await this.connectDefaultLedger();
+        : await this.connectDefaultLedger(generation);
+      if (generation !== this.connectionGeneration) throw createWalletError.notConnected();
+      this.session = session;
 
       return {
         account: {
@@ -127,12 +134,13 @@ export class LedgerAdapter extends BaseWalletAdapter {
           },
           connectedAt: Date.now(),
           metadata: {
-            derivationPath: this.session.derivationPath ?? this.derivationPath
+            derivationPath: this.session.derivationPath ?? this.derivationPath,
+            appVersion: this.session.appVersion
           }
         }
       };
     } catch (error) {
-      await this.cleanup();
+      if (generation === this.connectionGeneration) await this.cleanup();
       throw this.mapConnectionError(error);
     }
   }
@@ -143,9 +151,10 @@ export class LedgerAdapter extends BaseWalletAdapter {
   }
 
   async disconnect(): Promise<void> {
-    await this.cleanup();
+    this.connectionGeneration++;
     this.session = undefined;
     this.network = undefined;
+    await this.cleanup();
   }
 
   async signAndSubmit(request: SignAndSubmitRequest): Promise<TxResult> {
@@ -153,55 +162,56 @@ export class LedgerAdapter extends BaseWalletAdapter {
     if (this.isMultisignTransaction(request.txJson)) {
       throw createWalletError.unsupportedMethod("multisign submission", this.metadata.name);
     }
-    try {
-      const result = await this.session.signTransaction(request.txJson, request.submit ?? true);
-      return {
-        hash: result.hash,
-        status: result.status,
-        signed: result.signed ?? Boolean(result.hash || result.txBlob),
-        raw: {
-          txBlob: result.txBlob,
-          ...asRecord(result.raw ?? result)
-        }
-      };
-    } catch (error) {
-      throw this.mapSigningError(error);
-    }
+    // RPC and validation errors must not be translated into device errors.
+    const result = await this.session.signTransaction(request.txJson, request.submit ?? true);
+    return {
+      hash: result.hash,
+      status: result.status,
+      signed: result.signed ?? Boolean(result.hash || result.txBlob),
+      raw: {
+        txBlob: result.txBlob,
+        ...asRecord(result.raw ?? result)
+      }
+    };
   }
 
   async signTransaction(request: SignTransactionRequest): Promise<SignTransactionResult> {
     if (!this.session) throw createWalletError.notConnected();
-    try {
-      const multisign = this.isMultisignTransaction(request.txJson);
-      const result = multisign
-        ? await this.signMultisignTransaction(request.txJson)
-        : await this.session.signTransaction(request.txJson, false);
-      return {
-        txBlob: result.txBlob,
-        signed: result.signed ?? Boolean(result.txBlob),
-        raw: result.raw ?? result
-      };
-    } catch (error) {
-      throw this.mapSigningError(error);
-    }
+    const multisign = this.isMultisignTransaction(request.txJson);
+    const result = multisign
+      ? await this.signMultisignTransaction(request.txJson)
+      : await this.session.signTransaction(request.txJson, false);
+    return {
+      txBlob: result.txBlob,
+      signed: result.signed ?? Boolean(result.txBlob),
+      raw: result.raw ?? result
+    };
   }
 
   async getAccounts(count = 5, startIndex = 0): Promise<LedgerAccount[]> {
-    const cleanupAfter = !this.transport;
+    if (!Number.isSafeInteger(count) || count < 0 || !Number.isSafeInteger(startIndex) || startIndex < 0 || startIndex + count > 0x80000000) {
+      throw new WalletKitError(WalletKitErrorCode.INVALID_REQUEST, "Ledger account range must contain valid non-negative BIP44 indexes");
+    }
+    if (count === 0) return [];
+    const generation = this.connectionGeneration;
+    let ownedTransport: LedgerTransport | undefined;
+    let xrp = this.xrp;
     try {
-      if (!this.transport || !this.xrp) {
+      if (!xrp) {
         const Xrp = await loadLedgerXrpApp();
-        this.transport = await this.createTransport();
-        this.xrp = new Xrp(this.transport);
+        ownedTransport = await this.createTransport();
+        xrp = new Xrp(ownedTransport);
       }
 
       const accounts: LedgerAccount[] = [];
       for (let index = startIndex; index < startIndex + count; index += 1) {
+        if (generation !== this.connectionGeneration) throw createWalletError.notConnected();
         const path = getDerivationPath(index);
         const account = await this.withTimeout(
-          this.xrp.getAddress(path, false, false),
+          xrp.getAddress(path, false, false),
           "Ledger account lookup timeout. Please check your Ledger device."
         );
+        if (generation !== this.connectionGeneration) throw createWalletError.notConnected();
         accounts.push({
           address: account.address,
           publicKey: account.publicKey,
@@ -213,33 +223,54 @@ export class LedgerAdapter extends BaseWalletAdapter {
     } catch (error) {
       throw this.mapConnectionError(error);
     } finally {
-      if (cleanupAfter) await this.cleanup();
+      await ownedTransport?.close().catch(() => {});
     }
   }
 
-  private async connectDefaultLedger(): Promise<LedgerSession> {
+  private async connectDefaultLedger(generation: number): Promise<LedgerSession> {
     const support = getLedgerBrowserSupport();
     if (!support.supported) {
       throw createWalletError.walletNotAvailable("Ledger", new Error(support.message));
     }
 
-    this.transport = await this.createTransport();
-    const Xrp = await loadLedgerXrpApp();
-    this.xrp = new Xrp(this.transport);
-    const account = await this.withTimeout(
-      this.xrp.getAddress(this.derivationPath, false, false),
-      "Ledger connection timeout. Please check your Ledger device."
-    );
+    const transport = await this.createTransport();
+    try {
+      const Xrp = await loadLedgerXrpApp();
+      const xrp = new Xrp(transport);
+      const account = await this.withTimeout(
+        xrp.getAddress(this.derivationPath, false, false),
+        "Ledger connection timeout. Please check your Ledger device."
+      );
 
-    if (!account.address) throw new Error("Ledger did not return an XRPL address");
+      if (!account.address) throw new Error("Ledger did not return an XRPL address");
 
-    return {
-      address: account.address,
-      publicKey: account.publicKey,
-      derivationPath: this.derivationPath,
-      signTransaction: (tx, submit) => this.signWithDefaultLedger(tx, submit),
-      signMultisignTransaction: (tx) => this.signMultisignWithDefaultLedger(tx)
-    };
+      // App version is diagnostic only; older apps may not implement this APDU.
+      let appVersion: string | undefined;
+      try {
+        if (xrp.getAppConfiguration) {
+          appVersion = (await this.withTimeout(xrp.getAppConfiguration(), "Ledger app version lookup timeout")).version;
+        }
+      } catch {
+        appVersion = undefined;
+      }
+
+      if (generation !== this.connectionGeneration) throw createWalletError.notConnected();
+      await this.cleanup();
+      if (generation !== this.connectionGeneration) throw createWalletError.notConnected();
+      this.transport = transport;
+      this.xrp = xrp;
+      return {
+        address: account.address,
+        publicKey: account.publicKey,
+        derivationPath: this.derivationPath,
+        appVersion,
+        signTransaction: (tx, submit) => this.signWithDefaultLedger(tx, submit),
+        signMultisignTransaction: (tx) => this.signMultisignWithDefaultLedger(tx)
+      };
+    } catch (error) {
+      await transport.close().catch(() => {});
+      throw error;
+    }
   }
 
   private async signWithDefaultLedger(tx: unknown, submit = true): Promise<LedgerSignResult> {
@@ -249,30 +280,46 @@ export class LedgerAdapter extends BaseWalletAdapter {
       throw createWalletError.unsupportedMethod("XRPL multisigning through the single-sign path", this.metadata.name);
     }
 
-    const { Client, encode } = await import("xrpl");
-    const client = new Client(this.network.rpcUrl);
-    await client.connect();
+    const session = this.session;
+    const device = this.xrp;
+    const network = this.network;
+    const generation = this.connectionGeneration;
+    const assertCurrent = () => {
+      if (generation !== this.connectionGeneration || this.session !== session || this.xrp !== device) {
+        throw createWalletError.notConnected();
+      }
+    };
+    const { Client, encode, encodeForSigning, verifyKeypairSignature } = await import("xrpl");
+    const client = new Client(network.rpcUrl);
     try {
+      assertCurrent();
+      await client.connect();
       const txJson = asRecord(tx);
+      if (txJson.TxnSignature !== undefined || txJson.Signers !== undefined) {
+        throw new WalletKitError(WalletKitErrorCode.INVALID_REQUEST, "Ledger signing requires an unsigned transaction");
+      }
       const prepared = await client.autofill({
         ...txJson,
-        Account: typeof txJson.Account === "string" ? txJson.Account : this.session.address
+        Account: typeof txJson.Account === "string" ? txJson.Account : session.address
       } as any) as unknown as Record<string, unknown>;
 
       const txForSigning = { ...prepared } as Record<string, unknown>;
       delete txForSigning.TxnSignature;
       delete txForSigning.Signers;
+      // XRP app 2.3.2 rejects an explicit Flags field without this signature bit.
+      txForSigning.Flags = (Number(prepared.Flags ?? 0) | FULLY_CANONICAL_SIG) >>> 0;
 
-      const publicKey = this.session.publicKey ?? (await this.xrp.getAddress(this.derivationPath, false, false)).publicKey;
+      assertCurrent();
+      const publicKey = session.publicKey ?? (await device.getAddress(this.derivationPath, false, false)).publicKey;
       txForSigning.SigningPubKey = publicKey.toUpperCase();
 
       const signingBlob = encode(txForSigning as never).toUpperCase();
-      const signature = await this.withTimeout(
-        this.xrp.signTransaction(this.derivationPath, signingBlob),
-        "Ledger signing timeout. Please confirm the transaction on your Ledger device."
-      );
+      assertCurrent();
+      const signature = await this.signOnDevice(txForSigning, signingBlob,
+        "Ledger signing timeout. Please confirm the transaction on your Ledger device.");
 
-      if (!signature) throw new Error("Ledger did not return a transaction signature");
+      assertCurrent();
+      this.verifyDeviceSignature(encodeForSigning(txForSigning as never), signature, publicKey, verifyKeypairSignature);
 
       const signedTx = {
         ...txForSigning,
@@ -302,7 +349,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
         raw: response
       };
     } finally {
-      await client.disconnect();
+      await client.disconnect().catch(() => {});
     }
   }
 
@@ -316,21 +363,66 @@ export class LedgerAdapter extends BaseWalletAdapter {
     if (!this.xrp || !this.session) throw createWalletError.notConnected();
     if (!this.network) throw createWalletError.connectionFailed(this.metadata.name, new Error("XRPL network is required for Ledger signing"));
 
-    const { encode, encodeForMultiSigning } = await import("xrpl");
+    const session = this.session;
+    const device = this.xrp;
+    const generation = this.connectionGeneration;
+    const assertCurrent = () => {
+      if (generation !== this.connectionGeneration || this.session !== session || this.xrp !== device) {
+        throw createWalletError.notConnected();
+      }
+    };
+    const { encode, encodeForMultiSigning, verifyKeypairSignature } = await import("xrpl");
     const prepared = await validateMultisignTransaction(asRecord(tx));
 
-    const publicKey = (this.session.publicKey ?? (await this.xrp.getAddress(this.derivationPath, false, false)).publicKey).toUpperCase();
-    const signingBlob = encodeForMultiSigning(prepared as never, this.session.address).toUpperCase();
-    const signature = await this.withTimeout(
-      this.xrp.signTransaction(this.derivationPath, signingBlob),
-      "Ledger multisigning timeout. Please confirm the transaction on your Ledger device."
-    );
-    if (!signature) throw new Error("Ledger did not return a transaction signature");
+    assertCurrent();
+    const publicKey = (session.publicKey ?? (await device.getAddress(this.derivationPath, false, false)).publicKey).toUpperCase();
+    // The XRP app adds the multisign prefix and signer AccountID itself.
+    const signingBlob = encode(prepared as never).toUpperCase();
+    assertCurrent();
+    const signature = await this.signOnDevice(prepared, signingBlob,
+      "Ledger multisigning timeout. Please confirm the transaction on your Ledger device.");
+    assertCurrent();
+    this.verifyDeviceSignature(encodeForMultiSigning(prepared as never, session.address), signature, publicKey, verifyKeypairSignature);
 
-    const signer = { Signer: { Account: this.session.address, SigningPubKey: publicKey, TxnSignature: signature.toUpperCase() } };
+    const signer = { Signer: { Account: session.address, SigningPubKey: publicKey, TxnSignature: signature.toUpperCase() } };
     const signedTx = { ...prepared, Signers: [signer] };
     const txBlob = encode(signedTx as never);
     return { txBlob, signed: true, raw: { txBlob, signedTx, signer } };
+  }
+
+  private verifyDeviceSignature(preimage: string, signature: string, publicKey: string,
+    verify: (message: string, signature: string, publicKey: string) => boolean): void {
+    let valid = false;
+    try {
+      valid = Boolean(signature) && verify(preimage, signature, publicKey);
+    } catch {
+      valid = false;
+    }
+    if (!valid) throw createWalletError.signFailed(new Error("Ledger returned an invalid transaction signature"));
+  }
+
+  private async signOnDevice(tx: Record<string, unknown>, signingBlob: string, timeoutMessage: string): Promise<string> {
+    if (!this.xrp) throw createWalletError.notConnected();
+    try {
+      return await this.withTimeout(this.xrp.signTransaction(this.derivationPath, signingBlob), timeoutMessage);
+    } catch (error) {
+      const mapped = this.mapSigningError(error);
+      if (!(mapped instanceof WalletKitError)) throw mapped;
+      throw new WalletKitError(mapped.code, mapped.message, {
+        cause: error,
+        category: mapped.category,
+        details: {
+          ...mapped.details,
+          stage: "device-signing",
+          ledgerStatusCode: getLedgerStatusCode(error),
+          appVersion: this.session?.appVersion,
+          derivationPath: this.derivationPath,
+          network: this.network?.id,
+          preparedTransaction: { ...tx },
+          submitAttempted: false
+        }
+      });
+    }
   }
 
   private async createTransport(): Promise<LedgerTransport> {
@@ -460,7 +552,7 @@ function parseLedgerError(error: unknown): LedgerErrorInfo {
   if ([0x6e00, 0x6511, 0x650f].includes(statusCode ?? 0) || /app.*open|xrp.*app|cla_not_supported/.test(lower)) {
     return { state: LedgerDeviceState.APP_NOT_OPEN, message: "Please open the XRP app on your Ledger device.", rejected: false, timeout: false };
   }
-  if (/no device|not found|disconnected|cannot open device|transport/i.test(message)) {
+  if (/no device|device.*not found|disconnected|cannot open device|transport/i.test(message)) {
     return { state: LedgerDeviceState.NOT_CONNECTED, message: "Ledger device not found. Please connect and unlock your Ledger device.", rejected: false, timeout: false };
   }
 

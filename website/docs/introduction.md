@@ -85,6 +85,14 @@ XRPL Wallet Kit has no React dependency. The headless core works with any JavaSc
 | Vanilla TypeScript | [Vanilla TS guide](/docs/frameworks/vanilla) |
 | Plain HTML / CDN | [HTML legacy guide](/docs/frameworks/legacy-cdn) |
 
+## Experimental Batch Integration
+
+Version **0.1.21** adds opt-in, single-account **All-or-Nothing Batch**
+preparation, inner-transaction preflight and per-operation confirmation tracking.
+Applications can group 2-8 operations while retaining the existing signing API.
+Wallet acceptance still needs live testing. See [Batch Transactions](/docs/configuration/batch)
+for scope, examples and integration requirements.
+
 ## Next Steps
 
 - [Installation](/docs/installation) — install the packages

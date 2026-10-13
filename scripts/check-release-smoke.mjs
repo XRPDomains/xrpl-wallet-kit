@@ -109,14 +109,19 @@ assert.ok(
 const vitepressConfig = await readFile(resolve(root, "website/.vitepress/config.ts"), "utf8");
 assert.ok(vitepressConfig.includes(`text: "v${workspaceVersion}"`), "website nav version must match root");
 
+const websiteLoader = await readFile(resolve(root, "website/.vitepress/theme/loadWalletKit.ts"), "utf8");
+assert.ok(
+  websiteLoader.includes("https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js"),
+  "website loader must load the latest browser bundle from jsDelivr"
+);
 for (const widgetPath of [
   "website/.vitepress/theme/components/PlaygroundWidget.vue",
   "website/.vitepress/theme/components/ThemeBuilderWidget.vue"
 ]) {
   const widget = await readFile(resolve(root, widgetPath), "utf8");
   assert.ok(
-    widget.includes("https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js"),
-    `${widgetPath} must load the latest browser bundle from jsDelivr`
+    widget.includes("import { loadWalletKit } from '../loadWalletKit'") && widget.includes("await loadWalletKit()"),
+    `${widgetPath} must use the shared browser bundle loader`
   );
 }
 

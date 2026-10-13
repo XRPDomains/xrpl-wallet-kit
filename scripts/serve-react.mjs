@@ -1,35 +1,5 @@
-import { createServer, loadEnv } from "vite";
-import react from "@vitejs/plugin-react";
-import { resolve } from "node:path";
+// Both preview commands use one console and wallet session on port 5173.
+import { fileURLToPath } from "node:url";
 
-const env = loadEnv("development", process.cwd(), "VITE_");
-const defineEnv = Object.fromEntries(
-  Object.entries(env).map(([key, value]) => [`import.meta.env.${key}`, JSON.stringify(value)])
-);
-
-const server = await createServer({
-  root: "examples/react",
-  envDir: process.cwd(),
-  define: defineEnv,
-  plugins: [react()],
-  resolve: {
-    alias: [
-      { find: /^@xrpl-wallet-kit\/core$/, replacement: resolve("packages/core/src/index.ts") },
-      { find: /^@xrpl-wallet-kit\/ui$/, replacement: resolve("packages/ui/src/index.ts") }
-    ]
-  },
-  server: {
-    host: "0.0.0.0",
-    port: Number(process.env.PORT ?? 5174),
-    strictPort: true
-  },
-  clearScreen: false
-});
-
-await server.listen();
-server.printUrls();
-
-process.on("SIGINT", async () => {
-  await server.close();
-  process.exit(0);
-});
+process.chdir(fileURLToPath(new URL("../", import.meta.url)));
+await import("./serve-vanilla.mjs");

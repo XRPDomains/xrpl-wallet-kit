@@ -1,4 +1,6 @@
 export * from "./adapter";
+export { prepareBatchTransaction, validateBatchTransaction, BATCH_ALL_OR_NOTHING, INNER_BATCH_FLAG } from "./batch";
+export type { PrepareBatchOptions } from "./batch";
 export * from "./errors";
 export * from "./discovery";
 export * from "./events";

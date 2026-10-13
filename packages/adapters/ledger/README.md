@@ -35,6 +35,10 @@ const kit = createWalletKit({
 - Hardware wallets are explicit user-presence devices. `restoreSession()` returns `null` and does not silently reconnect after refresh.
 - Default derivation path is `44'/144'/0'/0/0`.
 - `signTransaction()` signs without submit.
+- Default signing verifies the device signature locally before returning or submitting it. RPC errors keep their original message and cause rather than being translated into device errors.
+- Disconnecting or changing the Ledger session while signing prevents subsequent submission.
+- Default single-sign signing autofills network fields and adds `tfFullyCanonicalSig`, preserving transaction-specific flags, for compatibility with XRP app versions such as 2.3.2. It does not change destination, amount or tags.
+- Device signing errors include the prepared transaction and Ledger status code in `details`; `submitAttempted: false` means the adapter did not reach submission. App version is included when available.
 - `signAndSubmit()` signs and submits when requested by the caller.
 - `signTransaction()` supports XRPL multisigning when `SigningPubKey` is empty. It returns a signed blob plus the signer contribution under `raw.signer`/`raw.signedTx` for the dApp to combine with other signers.
 - `signAndSubmit()` rejects multisign payloads with `UNSUPPORTED_METHOD`; the dApp must combine a quorum of signer contributions before submission.

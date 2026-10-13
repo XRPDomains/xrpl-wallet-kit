@@ -242,6 +242,12 @@ export interface TxResult {
 
 export type WalletTransactionStatus = "submitted" | "confirmed" | "failed" | "unknown";
 
+export interface WalletBatchResult {
+  mode: "all-or-nothing";
+  status: "pending" | "confirmed" | "failed" | "unknown";
+  innerTransactions: { index: number; hash: string; status: "pending" | "confirmed" | "failed" | "unknown"; resultCode?: string }[];
+}
+
 export interface WalletTransaction {
   hash: string;
   status: WalletTransactionStatus;
@@ -254,6 +260,7 @@ export interface WalletTransaction {
   result?: unknown;
   error?: unknown;
   metadata?: Record<string, unknown>;
+  batch?: WalletBatchResult;
 }
 
 export interface AddWalletTransactionRequest {
@@ -268,6 +275,7 @@ export interface AddWalletTransactionRequest {
   result?: unknown;
   error?: unknown;
   metadata?: Record<string, unknown>;
+  batch?: WalletBatchResult;
 }
 
 export interface ConnectOptions extends WalletRequestOptions {
@@ -368,6 +376,8 @@ export interface StoredWalletSessionEnvelope {
 }
 
 export interface WalletManagerConfig {
+  /** Experimental opt-in allowlist, not a declaration that a provider supports Batch. */
+  batch?: { adapterIds: readonly string[] };
   preflight?: TransactionPreflightPolicy;
   metadata?: WalletAppMetadata;
   appName?: string;

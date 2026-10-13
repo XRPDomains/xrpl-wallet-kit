@@ -1,0 +1,42 @@
+.batch-panel { border-top: 1px solid #d1d5db; margin-top: 20px; padding: 20px 0; }
+.batch-heading, .batch-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.batch-heading h2 { font-size: 20px; }
+.batch-heading span, .batch-context { color: #4b5563; font-size: 13px; }
+.batch-context { overflow-wrap: anywhere; margin: 12px 0; }
+.batch-warning { color: #9a3412; font-size: 13px; }
+.batch-inputs { border: 0; padding: 0; margin: 16px 0; min-width: 0; }
+.batch-inputs legend { font-weight: 600; margin-bottom: 10px; }
+.batch-payment { display: grid; grid-template-columns: 20px minmax(0, 1fr) 110px 150px; gap: 10px; align-items: end; margin-bottom: 12px; }
+.batch-payment strong { padding-bottom: 10px; }
+.batch-panel label { font-size: 13px; }
+.batch-payment label, .batch-fee { display: grid; gap: 6px; min-width: 0; }
+.batch-panel input:not([type="checkbox"]) { width: 100%; min-width: 0; padding: 10px; border: 1px solid #b8c0cc; border-radius: 6px; background: #fff; font: inherit; color: #172033; }
+.batch-fee { max-width: 180px; }
+.batch-panel button { border-radius: 6px; }
+.batch-panel button:disabled { opacity: .5; cursor: not-allowed; }
+.batch-panel input:focus-visible, .batch-panel button:focus-visible { outline: 2px solid #0284c7; outline-offset: 2px; }
+.batch-actions span { font-size: 13px; }
+.batch-review, .batch-output { margin-top: 20px; }
+.batch-panel h3 { font-size: 15px; margin: 0 0 10px; }
+.batch-review dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.batch-review dl div { min-width: 0; }
+.batch-review dt { font-size: 12px; color: #4b5563; }
+.batch-review dd { margin: 4px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+.batch-table-wrap { overflow-x: auto; margin: 14px 0; }
+.batch-panel table { border-collapse: collapse; width: 100%; text-align: left; font-size: 12px; }
+.batch-panel th, .batch-panel td { padding: 10px 8px; border-bottom: 1px solid #d1d5db; vertical-align: top; }
+.batch-panel td:nth-child(2) { overflow-wrap: anywhere; min-width: 170px; }
+.batch-panel details { margin: 12px 0; }
+.batch-panel summary { cursor: pointer; padding: 8px 0; font-size: 13px; }
+.batch-check { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0; }
+.batch-check input { flex: 0 0 16px; margin: 2px 0; }
+.batch-transaction { border-top: 1px solid #d1d5db; padding: 12px 0; font-size: 13px; }
+.batch-transaction code { display: block; overflow-wrap: anywhere; font-size: 12px; margin: 6px 0; }
+.batch-transaction ul { padding-left: 20px; }
+.batch-panel pre { overflow-wrap: anywhere; font-size: 12px; }
+@media (max-width: 640px) {
+  .batch-payment { grid-template-columns: 20px minmax(0, 1fr) minmax(0, 1fr); }
+  .batch-payment label:first-of-type { grid-column: 2 / 4; }
+  .batch-payment label:nth-of-type(2) { grid-column: 2; }
+  .batch-review dl { grid-template-columns: minmax(0, 1fr); }
+}

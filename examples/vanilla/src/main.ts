@@ -6,6 +6,8 @@ import type { TransactionPayload, WalletAdapter } from "../../../packages/core/s
 import type { WalletUiConfig, WalletUiLayout, WalletUiThemeMode } from "../../../packages/ui/src";
 
 import "./styles.css";
+import { mountReactPreview } from "./react-preview";
+import { BATCH_TEST_ADAPTERS } from "../../shared/BatchPanel";
 
 if (!("Buffer" in globalThis)) {
   (globalThis as typeof globalThis & { Buffer: typeof Buffer }).Buffer = Buffer;
@@ -66,8 +68,7 @@ type SignMessagePreviewAdapter = WalletAdapter & {
 };
 
 let manager: WalletManager;
-let modal: { open(): void; updateOptions(options: Record<string, unknown>): void; destroy(): void } | undefined;
-let walletButton: { updateOptions(options: Record<string, unknown>): void; destroy(): void } | undefined;
+let reactPreview: ReturnType<typeof mountReactPreview> | undefined;
 let walletToast: { mount(): void; destroy(): void } | undefined;
 let bootstrapRun = 0;
 const hiddenWalletIds = new Set<string>();
@@ -80,14 +81,12 @@ walletList.addEventListener("change", (event) => {
   if (!(checkbox instanceof HTMLInputElement) || !checkbox.dataset.walletId) return;
   if (checkbox.checked) hiddenWalletIds.delete(checkbox.dataset.walletId);
   else hiddenWalletIds.add(checkbox.dataset.walletId);
-  modal?.updateOptions(getWalletUiOptions());
-  walletButton?.updateOptions(getWalletButtonOptions());
+  reactPreview?.updateOptions(getWalletUiOptions(), getWalletButtonOptions());
 });
 
 [uiTheme, walletLayout].forEach((control) => {
   control.addEventListener("change", () => {
-    modal?.updateOptions(getWalletUiOptions());
-    walletButton?.updateOptions(getWalletButtonOptions());
+    reactPreview?.updateOptions(getWalletUiOptions(), getWalletButtonOptions());
     log("ui_config", getWalletUiOptions());
   });
 });
@@ -161,11 +160,10 @@ setDefaultSignMessage();
 
 async function resetPreview() {
   bootstrapRun += 1;
-  modal?.destroy();
-  walletButton?.destroy();
+  reactPreview?.destroy();
+  manager?.destroy();
   walletToast?.destroy();
-  modal = undefined;
-  walletButton = undefined;
+  reactPreview = undefined;
   walletToast = undefined;
   document.querySelectorAll(".xwk-overlay").forEach((node) => node.remove());
   document.querySelectorAll(".xwk-toast-root").forEach((node) => node.remove());
@@ -224,6 +222,7 @@ async function bootstrap(run = bootstrapRun) {
   manager = new WalletManager({
     metadata: PREVIEW_CONFIG.metadata,
     network: getSelectedNetwork(),
+    batch: { adapterIds: BATCH_TEST_ADAPTERS },
     autoReconnect: true,
     persistTransactions: true,
     storage: createBrowserWalletStorage("xwk.preview."),
@@ -245,13 +244,9 @@ async function bootstrap(run = bootstrapRun) {
   }
   manager.register(createLedgerAdapter());
 
-  const { createWalletButton, createWalletModal, createWalletToast } = await import("../../../packages/ui/src");
+  const { createWalletToast } = await import("../../../packages/ui/src");
   if (run !== bootstrapRun) return;
   renderWalletList();
-  modal = createWalletModal({
-    manager,
-    ...getWalletUiOptions()
-  });
   walletToast = createWalletToast({
     manager,
     ...getWalletUiOptions(),
@@ -260,12 +255,7 @@ async function bootstrap(run = bootstrapRun) {
     autoDismissMs: 5000
   });
   walletToast.mount();
-  walletButton = createWalletButton({
-    manager,
-    modal,
-    target: "#wallet-button",
-    ...getWalletButtonOptions()
-  });
+  reactPreview = mountReactPreview(manager, getWalletUiOptions(), getWalletButtonOptions());
 
   manager.on("connecting", (event) => log("connecting", event));
   manager.on("connected", (event) => {
@@ -299,7 +289,6 @@ async function bootstrap(run = bootstrapRun) {
   manager.on("tx_failed", (event) => log("tx_failed", { hash: event.hash, message: formatError(event.error) }));
   manager.on("error", (event) => log("error", { message: formatError(event.error) }));
 
-  await manager.autoReconnect();
   renderSession();
   renderTransactionState();
   renderSigningState();

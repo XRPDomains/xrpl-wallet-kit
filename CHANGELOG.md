@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.1.21
+
+### Added
+
+- Experimental opt-in single-account All-or-Nothing Batch preparation for 2-8 transactions, recursive inner preflight, amendment/fee checks and per-inner confirmation tracking. Wallet acceptance requires live testing; no Ledger Batch support is claimed.
+- Shared React Batch panel in the unified local wallet test console on port 5173, with separate prepare, review, sign-only and explicit submit actions.
+- Batch integration guides and GhostSig transaction examples on the website.
+
+### Fixed
+
+- Ledger multisign now sends ordinary unsigned transaction serialization to the XRP app, which constructs its own signing preimage.
+- Verify default Ledger signatures before returning or broadcasting; prevent stale connections/signing/account discovery from surviving disconnect.
+- Preserve RPC errors instead of translating them into device errors. Include device status, app version and prepared payload in device-signing diagnostics.
+- Set the canonical signature flag in Ledger single-sign requests while preserving transaction flags for XRP app 2.3.2 compatibility.
+- Block standalone inner Batch requests in both numeric and object Flags forms.
+- Align release checks with the website's shared latest-CDN loader and validate npm credentials before publication.
+
 ## 0.1.20
 
 ### Added

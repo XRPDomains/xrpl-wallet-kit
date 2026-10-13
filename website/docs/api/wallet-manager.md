@@ -81,6 +81,22 @@ const result = await manager.signAndSubmit({ txJson });
 
 When a transaction hash is returned, the manager emits `tx_submitted` and records the transaction in the recent transaction store if transaction persistence is enabled.
 
+### Batch (Experimental)
+
+Batch uses the existing `signTransaction()` and `signAndSubmit()` entrypoints,
+not a separate manager signing method. Starting in 0.1.21, opt in through
+`WalletManagerConfig.batch: { adapterIds: ["xaman"] }` and prepare the payload
+with the exported `prepareBatchTransaction(client, options)` helper.
+
+V1 permits 2-8 inner transactions from one account in All-or-Nothing mode.
+The recent transaction record exposes `transaction.batch.innerTransactions`;
+outer success alone does not trigger Batch completion. Unresolved inner results
+remain unknown after confirmation attempts.
+
+These APIs require `v0.1.21` or later npm/CDN packages.
+See [Batch Transactions](/docs/configuration/batch) for the complete integration
+and current wallet acceptance status.
+
 ### signMessage()
 
 Sign an arbitrary UTF-8 message.

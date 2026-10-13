@@ -65,6 +65,14 @@ Ledger **does not support** arbitrary message signing. There is no `signMessage`
 
 The adapter autofills the transaction via an `xrpl.js` client connection, then sends it to the Ledger for signing. The user must confirm the transaction on the device screen.
 
+Starting in **0.1.21**, the default signing flow verifies the device signature
+locally before returning or submitting it. It preserves RPC errors, rejects
+already-signed input, and stops submission if the Ledger session changes.
+Single-sign requests set `tfFullyCanonicalSig` for compatibility with XRP app
+2.3.2 while preserving transaction-specific flags. For NFT transactions, use an
+up-to-date XRP app; the transaction types supported depend on that app version.
+Batch support on Ledger is not confirmed.
+
 ```ts
 // Sign-only (no broadcast)
 const signed = await manager.signTransaction({

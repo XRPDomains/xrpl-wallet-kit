@@ -22,8 +22,14 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
           cache: npm
+      - name: Verify npm credentials before publishing
+        if: ${{ inputs.publish }}
+        run: npm whoami
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: npm ci
       - run: npm run build:browser
+      - run: node --import tsx --test tests/*.test.ts
       - run: npm run smoke:release
       - run: npm --prefix website ci
       - run: npm --prefix website run build
@@ -57,4 +63,4 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           git tag "v${VERSION}"
           git push origin "v${VERSION}"
-          gh release create "v${VERSION}" --generate-notes --verify-tag
+          gh release create "v${VERSION}" --notes-file "docs/releases/v${VERSION}.md" --generate-notes --verify-tag

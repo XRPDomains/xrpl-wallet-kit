@@ -4,6 +4,11 @@ XRPL's core strength is fast, low-fee payments settling in 3–5 seconds. The `P
 
 ## XRP Payment
 
+For multi-recipient payments or a payment plus a platform fee, see
+[Batch Transactions](/docs/configuration/batch). Version 0.1.21 adds experimental
+single-account All-or-Nothing flows with explicit application opt-in.
+Ordinary Payment examples below do not require Batch.
+
 ```ts
 await manager.signAndSubmit({
   txJson: {

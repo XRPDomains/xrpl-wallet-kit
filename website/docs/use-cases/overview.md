@@ -9,6 +9,7 @@ Use this as a shareable overview when planning an integration, onboarding a new 
 | Use case | What users do | Main kit surface | Start here |
 |---|---|---|---|
 | Payments & Commerce | Send XRP, IOU tokens, exchange deposits, and cross-currency payments | `signAndSubmit`, `showBalance`, recent transactions | [Payments & Commerce](/docs/use-cases/payments) |
+| Batch (Development Preview) | Review and sign 2-8 single-account operations together | `prepareBatchTransaction`, opt-in signing, inner-result tracking | [Batch Transactions](/docs/configuration/batch) |
 | NFT Marketplace | Mint, list, accept, cancel, and burn XLS-20 NFTs | `signAndSubmit`, transaction lifecycle events | [NFT Marketplace](/docs/use-cases/nft-marketplace) |
 | DEX & AMM | Place offers, cancel offers, add liquidity, remove liquidity, and route swaps | `signAndSubmit`, custom transaction builders | [DEX & AMM](/docs/use-cases/dex-amm) |
 | Cross-chain Bridge | Sign XRPL-side bridge transactions while an external SDK handles the destination chain | `signAndSubmit`, memos, destination tags | [Cross-chain Bridge](/docs/use-cases/bridge) |

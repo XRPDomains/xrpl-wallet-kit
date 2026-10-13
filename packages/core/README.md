@@ -73,6 +73,17 @@ structured warnings/errors without silently rewriting transaction intent.
 Default behavior is unchanged. See [Transaction Preflight](../../docs/transaction-preflight.md)
 for policy overrides, diagnostics, and limitations.
 
+## Batch (Development Preview)
+
+`prepareBatchTransaction` prepares single-account All-or-Nothing batches using
+`xrpl.js`, verifies the current Batch amendments and enforces an explicit fee ceiling.
+Signing requires an experimental `batch.adapterIds` allowlist; it does not assert
+wallet compatibility. Preflight checks inner transactions and confirmation tracks
+their results separately from the outer wrapper.
+
+This experimental feature is available starting in 0.1.21. See [Batch Transactions](../../docs/batch.md)
+for preparation, review/signing separation, wallet acceptance and unresolved results.
+
 ## Networks
 
 Adapters can advertise supported networks and network-switching support through granular capability metadata. Switching is rejected before invoking the wallet when the target is not supported.

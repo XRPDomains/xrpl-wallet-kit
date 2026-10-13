@@ -1,5 +1,6 @@
 import { createWalletError, isWalletKitError, normalizeWalletError, WalletKitError, WalletKitErrorCode } from "./errors";
 import { snapshotPreflightValue, validateTransactionPreflight } from "./preflight";
+import { createBatchTracking, inspectBatchResult, validateBatchTransaction } from "./batch";
 import { assertWalletRequestActive, WalletRequestTracker } from "./request";
 import type { TransactionPreflightContext, TransactionPreflightReport } from "./types";
 import { WalletEventEmitter } from "./events";
@@ -663,9 +664,36 @@ export class WalletManager extends WalletEventEmitter {
     return request.preflight !== false && (request.preflight !== undefined || this.config.preflight !== undefined);
   }
 
+  private prepareBatchRequest<T extends SignTransactionRequest | SignAndSubmitRequest>(request: T, adapter: WalletAdapter): T {
+    if (!request.txJson || typeof request.txJson !== "object" || Array.isArray(request.txJson)) return request;
+    if (request.txJson.TransactionType !== "Batch") {
+      const flags = request.txJson.Flags;
+      const innerBatch = typeof flags === "number" ? (flags & 0x40000000) !== 0
+        : flags !== null && typeof flags === "object" && "tfInnerBatchTxn" in flags && flags.tfInnerBatchTxn === true;
+      if (innerBatch) {
+        throw new WalletKitError(WalletKitErrorCode.INVALID_REQUEST, "Inner Batch transactions cannot be signed or submitted independently.");
+      }
+      return request;
+    }
+    if (!this.config.batch?.adapterIds.includes(adapter.metadata.id)) {
+      throw createWalletError.unsupportedMethod("Batch (enable this adapter explicitly for experimental testing)", adapter.metadata.name);
+    }
+    const account = this.getAccount();
+    const issues = validateBatchTransaction(request.txJson, account?.address);
+    if (issues.length || request.walletPayload !== undefined || (request.methodHint && request.methodHint !== "generic") ||
+      ["Signers", "SigningPubKey", "TxnSignature"].some(field => field in request.txJson) ||
+      (account?.network?.family ?? "xrpl") !== "xrpl") {
+      throw new WalletKitError(WalletKitErrorCode.INVALID_REQUEST, "Batch requires a prepared unsigned single-account All-or-Nothing txJson without walletPayload or specialized method hints.", { details: { issues } });
+    }
+    return { ...request, txJson: structuredClone(request.txJson) };
+  }
+
   async signAndSubmit<TTransaction extends TransactionPayload = TransactionPayload>(request: SignAndSubmitRequest<TTransaction>) {
     if (this.destroyed) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Wallet manager was destroyed.");
     const adapter = this.requireActiveAdapter("signAndSubmit");
+    request = this.prepareBatchRequest(request, adapter);
+    const batchIntent = request.txJson?.TransactionType === "Batch" ? structuredClone(request.txJson) : undefined;
+    const batchSession = batchIntent ? this.activeSession : undefined;
     const submit = request.submit !== false;
     if (request.submit === false && typeof adapter.signTransaction !== "function"
       && !adapter.capabilities.details?.transactionModes?.includes("sign-only")) {
@@ -683,17 +711,28 @@ export class WalletManager extends WalletEventEmitter {
           control.progress({ state: "opened" });
           this.emit("signing", { adapterId: adapter.metadata.id, kind: "transaction" });
           prepared.assertCurrent(); assertWalletRequestActive(control.signal);
+          if (batchIntent && this.activeSession !== batchSession) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Wallet session changed; prepare Batch again.");
           return normalizeTxResult(await adapter.signAndSubmit!(prepared.request));
         }, result => ({ state: submit ? "submitted" : "signed", hash: result.hash }));
       if (this.destroyed) return result;
       this.emit("signed", { adapterId: adapter.metadata.id, kind: "transaction", result });
       if (result.hash && submit && !this.destroyed) {
+        let batch;
+        if (batchIntent) {
+          try { batch = await createBatchTracking(batchIntent); }
+          catch (error) {
+            this.logger.warn("Batch was submitted but inner hashes could not be derived; do not resubmit.", error);
+            batch = { mode: "all-or-nothing" as const, status: "unknown" as const, innerTransactions: [] };
+          }
+        }
+        if (this.destroyed) return result;
         this.addTransaction({
           hash: result.hash,
           status: "submitted",
           adapterId: adapter.metadata.id,
           account: account ?? undefined,
-          result
+          result,
+          batch
         });
       }
       return result;
@@ -719,7 +758,8 @@ export class WalletManager extends WalletEventEmitter {
       failedAt: request.failedAt ?? existing?.failedAt,
       result: request.result ?? existing?.result,
       error: request.error ?? existing?.error,
-      metadata: request.metadata ?? existing?.metadata
+      metadata: request.metadata ?? existing?.metadata,
+      batch: request.batch ?? existing?.batch
     };
     this.transactions.set(transaction.hash, transaction);
     void this.persistTransaction(transaction).catch((error) => {
@@ -746,6 +786,8 @@ export class WalletManager extends WalletEventEmitter {
     if (this.destroyed) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Wallet manager was destroyed.");
     const adapter = this.getAdapter();
     if (!adapter) throw createWalletError.notConnected();
+    request = this.prepareBatchRequest(request, adapter);
+    const batchSession = request.txJson?.TransactionType === "Batch" ? this.activeSession : undefined;
     const supportsSignOnlyFallback = typeof adapter.signAndSubmit === "function"
       && adapter.capabilities.details?.transactionModes?.includes("sign-only");
     if (typeof adapter.signTransaction !== "function" && !supportsSignOnlyFallback) {
@@ -763,6 +805,7 @@ export class WalletManager extends WalletEventEmitter {
           control.progress({ state: "opened" });
           this.emit("signing", { adapterId: adapter.metadata.id, kind: "transaction" });
           prepared.assertCurrent(); assertWalletRequestActive(control.signal);
+          if (batchSession && this.activeSession !== batchSession) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Wallet session changed; prepare Batch again.");
           const raw = typeof adapter.signTransaction === "function" ? await adapter.signTransaction(prepared.request)
             : await adapter.signAndSubmit!({ ...prepared.request, submit: false });
           return normalizeSignTransactionResult(raw);
@@ -919,6 +962,19 @@ export class WalletManager extends WalletEventEmitter {
         if (controller?.signal.aborted) return;
         if (!result || !result.validated) continue;
         if (result.transactionResult === "tesSUCCESS") {
+          const raw = result.raw as { result?: { TransactionType?: string; tx_json?: { TransactionType?: string } } };
+          if (transaction.batch || raw.result?.TransactionType === "Batch" || raw.result?.tx_json?.TransactionType === "Batch") {
+            const batch = await inspectBatchResult(transaction.hash, result, transaction.batch,
+              hash => this.lookupTransaction(hash, rpcUrl, controller?.signal));
+            if (controller?.signal.aborted) return;
+            if (batch.status === "unknown") {
+              transaction = { ...transaction, batch };
+              continue;
+            }
+            this.addTransaction({ ...transaction, batch, status: batch.status === "confirmed" ? "confirmed" : "failed",
+              ...(batch.status === "confirmed" ? { confirmedAt: Date.now() } : { failedAt: Date.now(), error: new Error("Batch inner transaction failed") }), result: result.raw });
+            return;
+          }
           this.addTransaction({
             ...transaction,
             status: "confirmed",
@@ -931,6 +987,7 @@ export class WalletManager extends WalletEventEmitter {
         this.addTransaction({
           ...transaction,
           status: "failed",
+          batch: transaction.batch ? { ...transaction.batch, status: "failed" } : undefined,
           failedAt: Date.now(),
           result: result.raw,
           error: new Error(result.transactionResult ?? "Transaction failed")
@@ -940,6 +997,10 @@ export class WalletManager extends WalletEventEmitter {
         if (controller?.signal.aborted) return;
         this.logger.debug(`Transaction confirmation lookup failed for ${transaction.hash}`, error);
       }
+    }
+    if (transaction.batch && !controller?.signal.aborted) {
+      this.addTransaction({ ...transaction, status: "unknown", batch: { ...transaction.batch, status: "unknown",
+        innerTransactions: transaction.batch.innerTransactions.map(inner => inner.status === "pending" ? { ...inner, status: "unknown" } : inner) } });
     }
   }
 

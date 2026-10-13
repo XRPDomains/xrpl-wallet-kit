@@ -16,6 +16,7 @@ import { createDefaultWalletUiConfig, resolveWalletButtonOptions } from "../../.
 import { WalletButton, WalletKitProvider, useWalletKit } from "../../../packages/react/src";
 import type { WalletAdapter } from "../../../packages/core/src";
 import "./styles.css";
+import { BatchPanel, BATCH_TEST_ADAPTERS } from "../../shared/BatchPanel";
 
 if (!("Buffer" in globalThis)) {
   (globalThis as typeof globalThis & { Buffer: typeof Buffer }).Buffer = Buffer;
@@ -55,6 +56,7 @@ function createPreviewManager() {
   manager = new WalletManager({
     metadata: PREVIEW_CONFIG.metadata,
     network: "mainnet",
+    batch: { adapterIds: BATCH_TEST_ADAPTERS },
     autoReconnect: true,
     storage: createBrowserWalletStorage("xwk.react.preview."),
     adapters
@@ -111,6 +113,7 @@ function Preview() {
             {...button}
           />
         </section>
+        <BatchPanel />
         <ReactStatePanel visibleWallets={visibleWallets} onToggleWallet={(id, visible) => {
           setVisibleWallets(current => visible ? [...new Set([...current, id])] : current.filter(walletId => walletId !== id));
         }} />

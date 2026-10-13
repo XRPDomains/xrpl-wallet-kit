@@ -1,5 +1,6 @@
 import { createServer, loadEnv, normalizePath } from "vite";
 import { randomBytes } from "node:crypto";
+import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 
 const env = loadEnv("development", process.cwd(), "VITE_");
@@ -110,6 +111,7 @@ const server = await createServer({
   envDir: process.cwd(),
   define: defineEnv,
   resolve: {
+    dedupe: ["react", "react-dom"],
     alias: [
       { find: /^@xrpl-wallet-kit\/core$/, replacement: resolve("packages/core/src/index.ts") },
       { find: /^@xrpl-wallet-kit\/ui$/, replacement: resolve("packages/ui/src/index.ts") }
@@ -120,7 +122,7 @@ const server = await createServer({
     port: 5173,
     strictPort: true
   },
-  plugins: [{
+  plugins: [react(), {
     name: "xwk-auth-test-server",
     configureServer: addAuthTestServer
   }],

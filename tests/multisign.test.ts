@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { decode, encode, Wallet } from "xrpl";
+import { decode, encode, encodeForMultiSigning, Wallet } from "xrpl";
 import type { Transaction } from "xrpl";
 import { combineMultisignContributions, submitMultisignTransaction, validateMultisignTransaction, WalletKitErrorCode } from "../packages/core/src/index";
 import type { MultisignPolicy } from "../packages/core/src/index";
@@ -161,7 +161,10 @@ test("default Ledger multisign uses prepared intent without RPC or autofill", as
   await adapter.connect({ network: { id: "mainnet", name: "Mainnet", networkType: "MAINNET", rpcUrl: "wss://invalid.example", walletConnectChainId: "xrpl:0" } });
   const { sign: signBytes } = await import("ripple-keypairs");
   const internals = adapter as unknown as { xrp: unknown; signMultisignWithDefaultLedger(input: unknown): Promise<{ txBlob: string }> };
-  internals.xrp = { signTransaction: async (_path: string, blob: string) => signBytes(blob, first.privateKey) };
+  internals.xrp = { signTransaction: async (_path: string, blob: string) => {
+    assert.equal(blob, encode(tx).toUpperCase());
+    return signBytes(encodeForMultiSigning(decode(blob), first.classicAddress), first.privateKey);
+  } };
   const contribution = await internals.signMultisignWithDefaultLedger(tx);
   assert.equal((await combineMultisignContributions(tx, [contribution.txBlob], policy)).weight, 1);
   await assert.rejects(internals.signMultisignWithDefaultLedger({ ...tx, Fee: undefined }), invalid);

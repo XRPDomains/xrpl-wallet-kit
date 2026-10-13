@@ -1,4 +1,5 @@
 import type { TransactionPreflightContext, TransactionPreflightIssue, TransactionPreflightPolicy, TransactionPreflightReport } from "./types";
+import { validateBatchTransaction } from "./batch";
 
 function isLedgerIndex(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= 0xffffffff;
@@ -62,6 +63,20 @@ export async function validateTransactionPreflight(
     issues.push({ code: "LEDGER_FRESHNESS_UNKNOWN", severity: "warning", message: "No validated ledger index was supplied; expiry cannot be checked.", field: "LastLedgerSequence" });
   }
   if (policy.maxLedgerOffset !== undefined && ledger === undefined) error("LEDGER_SEQUENCE_REQUIRED", "LastLedgerSequence is required to enforce the ledger window.", "LastLedgerSequence");
+  if (tx.TransactionType === "Batch") {
+    issues.push(...validateBatchTransaction(tx, context.account.address));
+    if (Array.isArray(tx.RawTransactions) && tx.RawTransactions.length <= 8) {
+      for (const [index, wrapper] of tx.RawTransactions.entries()) {
+        const inner = wrapper?.RawTransaction;
+        if (!inner || typeof inner !== "object" || Array.isArray(inner) || inner.TransactionType === "Batch") continue;
+        // Fee/expiry enforcement belongs to the outer Batch; type and app policies apply to each inner.
+        const report = await validateTransactionPreflight({ ...context, txJson: inner }, {
+          ...policy, maxFeeDrops: undefined, requireLastLedgerSequence: false, maxLedgerOffset: undefined
+        });
+        issues.push(...report.issues.map(issue => ({ ...issue, field: `RawTransactions[${index}].RawTransaction${issue.field ? `.${issue.field}` : ""}` })));
+      }
+    }
+  }
   // Run checks in declaration order so diagnostics do not depend on network timing.
   for (const check of policy.checks ?? []) {
     try {

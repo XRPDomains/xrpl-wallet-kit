@@ -52,7 +52,7 @@ export default defineConfig({
       { text: "Theme Builder", link: "/docs/theme-builder" },
       { text: "API Reference", link: "/docs/api/wallet-manager" },
         {
-          text: "v0.1.20",
+          text: "v0.1.21",
         items: [
           {
             text: "Changelog",
@@ -98,6 +98,7 @@ export default defineConfig({
           { text: "Connect Button", link: "/docs/configuration/connect-button" },
           { text: "Recent Transactions", link: "/docs/configuration/recent-transactions" },
           { text: "Multisign", link: "/docs/configuration/multisign" },
+          { text: "Batch (Preview)", link: "/docs/configuration/batch" },
           { text: "Identity & Avatar", link: "/docs/configuration/identity" },
         ],
       },
