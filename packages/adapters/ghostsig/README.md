@@ -39,17 +39,18 @@ caller-provided fields cannot change. Non-signing metadata, pre-signed and
 multisign requests are unsupported. Return values include verified `txBlob` for
 sign-only; they never confuse a compact signature with a serialized transaction.
 
-Supply an explicit uint32 SourceTag (`0` is allowed). The current wallet's raw
-signer adds its own SourceTag when omitted; the adapter refuses that implicit
-extra field instead of silently changing intent. It also refuses any correction
+Starting in 0.1.22, if SourceTag is omitted or `undefined`, the adapter adds `SourceTag: 0` to a
+clone of txJson before sending and verifying it. The original dApp object is
+unchanged. Explicit uint32 tags (including `0`) are preserved; invalid values
+are rejected. A wallet reply that changes the normalized tag is rejected.
+The adapter also refuses any correction
 of a caller-supplied Sequence: prepare a fresh transaction if the wallet says
-that Sequence is stale. This requirement applies only to this new adapter.
+that Sequence is stale. These signing checks apply only to this adapter.
 
-`payments` and `nftOffers` are advertised following maintainer-reported live
-sign-and-submit tests on 2026-10-06: Payment, NFTokenCreateOffer,
-NFTokenAcceptOffer and NFTokenBurn passed in the vanilla preview. The report
-does not specify network, transaction hashes or NFT broker/buy-offer variants;
-it does not establish sign-only or full cross-network acceptance.
+`payments` and `nftOffers` are advertised following maintainer-reported live tests.
+On 2026-10-13, the maintainer reported that documented GhostSig transaction
+commands passed in their setup. This is not a guarantee across all environments
+or networks. Batch acceptance requires separate live testing.
 `signMessage` and custom XRPL networks are not advertised.
 The three kit standard network configurations are accepted;
 GhostSig uses its own nodes, not caller-specified RPC endpoints.
@@ -66,6 +67,9 @@ or timed-out dispatched submission may still reach the ledger; a progress
 `providerHash` is not independently verified until the full signed reply arrives.
 
 ## Browser Deployment
+
+Connect and signing popups request 560 x 720 px and remain resizable.
+The browser may adapt window dimensions or open a tab on mobile.
 
 Allow popups and use HTTPS (localhost HTTP is allowed). If setting COOP, use
 `Cross-Origin-Opener-Policy: same-origin-allow-popups`; `same-origin` severs the

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.1.22
+
+### Fixed
+
+- GhostSig defaults an omitted or undefined SourceTag to 0 on a cloned txJson used for both dispatch and signature verification. Explicit uint32 tags are preserved; invalid tags and wallet-modified tags remain rejected.
+- Widen GhostSig connect/sign popups from 420 to 560 px, keeping 720 px height, resizing and scrolling.
+
+### Documentation
+
+- Record maintainer-reported successful live testing of documented GhostSig and Ledger transaction commands on 2026-10-13. Results apply to the tested setup, not every network/firmware combination; Batch acceptance remains separate.
+- Synchronize package versions and website navigation to 0.1.22.
+
 ## 0.1.21
 
 ### Added

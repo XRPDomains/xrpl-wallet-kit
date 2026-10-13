@@ -68,7 +68,9 @@ Custom RPC/network definitions are not supported.
 The examples below use `manager` and the connected `account` from Quick Start.
 Run each request separately from a button's click handler so GhostSig can open
 its approval popup. Replace the recipient and NFT/offer IDs before signing.
-Every transaction needs an explicit `SourceTag`; `0` is valid.
+Starting in **0.1.22**, when `SourceTag` is omitted or `undefined`, the adapter adds `SourceTag: 0` to
+a copy of `txJson` before sending and verifying it. It does not modify the dApp's
+object. Explicit uint32 tags are preserved; invalid or wallet-modified tags are rejected.
 
 ### Payment
 
@@ -188,8 +190,10 @@ Burning permanently destroys the NFT. See the
 
 ## Integration Notes
 
+- The maintainer reported successful live testing of the documented transaction commands on 2026-10-13 in their setup. Batch acceptance requires separate testing.
+- Connect and signing popups request 560 x 720 px and remain resizable; browsers may adjust dimensions or open a tab on mobile.
 - Open connection and signing popups from a user action, using HTTPS or localhost.
-- Include an explicit uint32 `SourceTag` in each transaction; `SourceTag: 0` is valid.
+- Omitted or `undefined` `SourceTag` defaults to `0`; explicit tags must be uint32.
 - GhostSig does not support message signing for the kit's wallet sign-in flow.
 - If your site sets COOP, use `Cross-Origin-Opener-Policy: same-origin-allow-popups` so the wallet can reply.
 - If a submit request times out or is cancelled, check its transaction hash before retrying; the transaction may already have been submitted.

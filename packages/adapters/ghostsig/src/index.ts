@@ -97,8 +97,10 @@ export class GhostsigAdapter extends BaseWalletAdapter {
     if (tx.Account !== undefined && tx.Account !== account.address) invalid("GhostSig transaction Account differs from connected account.");
     if ("Signers" in tx || "TxnSignature" in tx || "SigningPubKey" in tx) invalid("GhostSig expects an unsigned single-sign transaction.");
     tx.Account = account.address;
+    // Normalize the cloned intent before dispatch and signed-blob verification.
+    if (tx.SourceTag === undefined) tx.SourceTag = 0;
     if (!Number.isInteger(tx.SourceTag) || (tx.SourceTag as number) < 0 || (tx.SourceTag as number) > 0xffffffff) {
-      invalid("GhostSig requires an explicit uint32 SourceTag (0 is allowed) to prevent the wallet adding an unrequested field.");
+      invalid("GhostSig SourceTag must be uint32 (0 is allowed).");
     }
     try {
       validate(tx);

@@ -8,6 +8,14 @@ on:
         required: true
         type: boolean
         default: false
+      test_scope:
+        description: Regression coverage for this release
+        required: true
+        type: choice
+        default: full
+        options:
+          - full
+          - ghostsig
 
 permissions:
   contents: write
@@ -29,7 +37,12 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: npm ci
       - run: npm run build:browser
-      - run: node --import tsx --test tests/*.test.ts
+      - name: Full regression tests
+        if: ${{ inputs.test_scope != 'ghostsig' }}
+        run: node --import tsx --test tests/*.test.ts
+      - name: Focused GhostSig regression tests
+        if: ${{ inputs.test_scope == 'ghostsig' }}
+        run: node --import tsx --test tests/ghostsig.test.ts
       - run: npm run smoke:release
       - run: npm --prefix website ci
       - run: npm --prefix website run build

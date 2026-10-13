@@ -28,7 +28,7 @@ export class GhostsigPopup {
     const id = Array.from(globalThis.crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, "0")).join("");
     const win = window;
     let popup: Window | null;
-    try { popup = win.open(url.href, `ghostsig-${id}`, "popup=yes,width=420,height=720,resizable=yes,scrollbars=yes"); }
+    try { popup = win.open(url.href, `ghostsig-${id}`, "popup=yes,width=560,height=720,resizable=yes,scrollbars=yes"); }
     catch { popup = null; }
     if (!popup || popup.closed) return Promise.reject(createWalletError.walletNotAvailable("GhostSig", new Error("Popup blocked.")));
     const opened = popup;

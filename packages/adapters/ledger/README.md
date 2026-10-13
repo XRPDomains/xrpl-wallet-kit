@@ -60,6 +60,10 @@ Use `connectLedger` in tests or custom integrations to inject a prebuilt Ledger 
 
 ## Testing
 
+On 2026-10-13, the maintainer reported that documented Ledger transaction
+commands passed in their setup. This does not certify every XRP app/firmware
+version or network. Ledger Batch support is not confirmed.
+
 Hardware transport should be mocked in unit tests. Manual smoke testing should cover:
 
 - unsupported browser;

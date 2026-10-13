@@ -30,8 +30,9 @@ function browser(t: TestContext) {
   let autoReady = false;
   let respond: ((data: Record<string, unknown>) => void) | undefined;
   const win = {
-    open(_url: string, name: string) {
+    open(_url: string, name: string, features: string) {
       assert.match(name, /^ghostsig-[a-f0-9]{64}$/);
+      assert.equal(features, "popup=yes,width=560,height=720,resizable=yes,scrollbars=yes");
       if (blocked) return null;
       const popup = { closed: false, sent: [] as Array<{ data: Record<string, unknown>; origin: string }>,
         close() { this.closed = true; }, postMessage(data: Record<string, unknown>, origin: string) { this.sent.push({ data, origin }); respond?.(data); } };
@@ -161,6 +162,53 @@ test("GhostSig passive restore opens no popup and sign-only verifies full identi
   await assert.rejects(adapter.signTransaction({ txJson: tx }), code(WalletKitErrorCode.NOT_CONNECTED));
 });
 
+test("GhostSig normalizes SourceTag on cloned intent across all signing entrypoints", async t => {
+  const b = browser(t);
+  const adapter = createGhostsigAdapter();
+  await adapter.restoreSession({ adapterId: "ghostsig", account: { address: wallet.address, publicKey: wallet.publicKey, network: XRPL_TESTNET }, connectedAt: 1 });
+  for (const mode of ["sign-only", "submit-false", "submit"] as const) {
+    for (const tag of ["omitted", undefined, 0, 42, 0xffffffff]) {
+      const txJson: Record<string, unknown> = { ...tx };
+      if (tag === "omitted") delete txJson.SourceTag;
+      else txJson.SourceTag = tag;
+      const before = structuredClone(txJson);
+      Object.freeze(txJson);
+      const pending = mode === "sign-only" ? adapter.signTransaction({ txJson })
+        : adapter.signAndSubmit({ txJson, submit: mode === "submit" });
+      b.ready();
+      const params = b.popups[b.popups.length - 1].sent[0].data.params as { submit: boolean; payload: string };
+      const normalized = JSON.parse(params.payload);
+      assert.equal(normalized.SourceTag, tag === "omitted" || tag === undefined ? 0 : tag);
+      assert.equal(params.submit, mode === "submit");
+      assert.deepEqual(normalized, { ...before, SourceTag: normalized.SourceTag });
+      const signedTx = wallet.sign(normalized);
+      b.result({ ...shared, blob: signedTx.tx_blob, hash: signedTx.hash, signature: decode(signedTx.tx_blob).TxnSignature,
+        ...(mode === "submit" ? { submitted: { kind: "validated", ok: true, code: "tesSUCCESS", ledger: 12 } } : {}) });
+      const result = await pending;
+      assert.equal(result.signed, true);
+      assert.deepEqual(txJson, before);
+    }
+  }
+  await adapter.disconnect();
+});
+
+test("GhostSig rejects wallet changes to normalized or explicit SourceTag", async t => {
+  const b = browser(t);
+  const adapter = createGhostsigAdapter();
+  await adapter.restoreSession({ adapterId: "ghostsig", account: { address: wallet.address, publicKey: wallet.publicKey, network: XRPL_TESTNET }, connectedAt: 1 });
+  for (const tag of [undefined, 0, 42]) {
+    for (const submit of [false, true]) {
+      const pending = submit ? adapter.signAndSubmit({ txJson: { ...tx, SourceTag: tag } })
+        : adapter.signTransaction({ txJson: { ...tx, SourceTag: tag } });
+      b.ready();
+      const changed = wallet.sign({ ...tx, SourceTag: tag === 42 ? 0 : 42 });
+      b.result({ ...shared, blob: changed.tx_blob, hash: changed.hash, signature: decode(changed.tx_blob).TxnSignature });
+      await assert.rejects(pending, code(submit ? WalletKitErrorCode.SIGN_FAILED : WalletKitErrorCode.INVALID_REQUEST));
+    }
+  }
+  await adapter.disconnect();
+});
+
 test("GhostSig rejects changed intent, identity, blob, signature, hash and sign-only submission", async t => {
   const b = browser(t);
   const adapter = createGhostsigAdapter();
@@ -174,7 +222,8 @@ test("GhostSig rejects changed intent, identity, blob, signature, hash and sign-
     await assert.rejects(pending, code(WalletKitErrorCode.INVALID_REQUEST));
     assert.equal(b.listeners.size, 0);
   }
-  for (const txJson of [{ ...tx, Account: stranger.address }, { ...tx, TxnSignature: "BAD" }, { ...tx, SigningPubKey: "" }, { ...tx, Signers: [] }, { ...tx, SourceTag: undefined }]) {
+  for (const txJson of [{ ...tx, Account: stranger.address }, { ...tx, TxnSignature: "BAD" }, { ...tx, SigningPubKey: "" }, { ...tx, Signers: [] },
+    ...[null, -1, 1.5, 0x100000000, "0", NaN, Infinity].map(SourceTag => ({ ...tx, SourceTag }))]) {
     await assert.rejects(adapter.signTransaction({ txJson }), code(WalletKitErrorCode.INVALID_REQUEST));
   }
   const damaged = decode(reply.blob); damaged.Sequence = 2;

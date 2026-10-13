@@ -149,6 +149,10 @@ Session restore always returns `null`. Hardware wallets require a fresh device p
 
 ## Manual Test Checklist
 
+The maintainer reported successful live testing of the documented transaction
+commands on 2026-10-13 in their setup. This does not certify every XRP app,
+firmware or network; Ledger Batch support remains unconfirmed.
+
 - [ ] Browser compatibility check — `navigator.hid` or `navigator.usb` present
 - [ ] Connect — device picker shows, Ledger address returned after approval
 - [ ] `signTransaction` — user confirms on Ledger, `txBlob` returned (no broadcast)
