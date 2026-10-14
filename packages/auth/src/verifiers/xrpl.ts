@@ -76,27 +76,27 @@ async function verifySignedTransaction(params: WalletAuthVerifyParams, options: 
 
   const xrpl = options.dependencies?.xrpl ?? await loadPeer<XrplModule>("xrpl", options);
   const legacyVerifier = options.dependencies?.verifyXrplSignature;
-  const keypairs = legacyVerifier ? undefined : options.dependencies?.rippleKeypairs ?? await loadPeer<RippleKeypairsModule>("ripple-keypairs", options);
+  const keypairs = options.dependencies?.rippleKeypairs ?? await loadPeer<RippleKeypairsModule>("ripple-keypairs", options);
   if (!legacyVerifier && (!xrpl.encodeForSigning || !xrpl.encodeForMultiSigning)) throw new Error(PEER_ERROR);
 
   try {
     const tx = xrpl.decode(txBlob);
     if (tx.Account !== params.address || extractFirstMemoText(tx) !== params.message) return false;
-    if (legacyVerifier) {
-      const result = legacyVerifier.verifySignature(txBlob);
-      return typeof result === "boolean" ? result === true : result?.signatureValid === true &&
-        (!result.signedBy || result.signedBy === params.address);
-    }
-
-    // Match the legacy verifier's first-signer identity binding, not ledger quorum authorization.
+    // Prove account-key ownership, not just ledger/delegated signing authority.
     if (tx.SigningPubKey === "" && tx.Signers?.length) {
       const signer = tx.Signers[0].Signer;
-      if (keypairs!.deriveAddress(signer.SigningPubKey) !== params.address || signer.Account !== params.address) return false;
-      return keypairs!.verify(xrpl.encodeForMultiSigning!(tx as Transaction, signer.Account), signer.TxnSignature, signer.SigningPubKey);
+      if (keypairs.deriveAddress(signer.SigningPubKey) !== params.address || signer.Account !== params.address) return false;
+      return legacyVerifier ? legacyValid() : keypairs.verify(xrpl.encodeForMultiSigning!(tx as Transaction, signer.Account), signer.TxnSignature, signer.SigningPubKey);
     }
     if (tx.Signers !== undefined || !tx.SigningPubKey || !tx.TxnSignature) return false;
-    if (keypairs!.deriveAddress(tx.SigningPubKey) !== params.address) return false;
-    return keypairs!.verify(xrpl.encodeForSigning!(tx as Transaction), tx.TxnSignature, tx.SigningPubKey);
+    if (keypairs.deriveAddress(tx.SigningPubKey) !== params.address) return false;
+    return legacyVerifier ? legacyValid() : keypairs.verify(xrpl.encodeForSigning!(tx as Transaction), tx.TxnSignature, tx.SigningPubKey);
+
+    function legacyValid(): boolean {
+      const result = legacyVerifier!.verifySignature(txBlob!);
+      return typeof result === "boolean" ? result === true : result?.signatureValid === true
+        && (result.signedBy === undefined || result.signedBy === params.address);
+    }
   } catch {
     return false;
   }

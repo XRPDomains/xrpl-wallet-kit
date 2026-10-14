@@ -14,6 +14,7 @@ type FakeStyleElement = {
 
 function installFakeDocument() {
   const children: FakeStyleElement[] = [];
+  const noncesOnInsertion: Array<string | null> = [];
   const head = {
     children,
     querySelector(selector: string) {
@@ -21,6 +22,7 @@ function installFakeDocument() {
       return children.find((child) => child.dataset.xwkStyle === id) ?? null;
     },
     appendChild(element: FakeStyleElement) {
+      noncesOnInsertion.push(element.getAttribute("nonce"));
       const currentIndex = children.indexOf(element);
       if (currentIndex >= 0) children.splice(currentIndex, 1);
       children.push(element);
@@ -55,6 +57,7 @@ function installFakeDocument() {
   (globalThis as typeof globalThis & { document: unknown }).document = document;
   return {
     children,
+    noncesOnInsertion,
     restore() {
       if (previousDocument === undefined) {
         delete (globalThis as typeof globalThis & { document?: unknown }).document;
@@ -89,6 +92,7 @@ test("ensureWalletStyle applies and clears CSP nonce on reused style nodes", () 
     ensureWalletStyle("xwk-modal", ".xwk-modal{color:black}", "nonce-123");
 
     assert.equal(dom.children[0]?.getAttribute("nonce"), "nonce-123");
+    assert.equal(dom.noncesOnInsertion[0], "nonce-123");
 
     ensureWalletStyle("xwk-modal", ".xwk-modal{color:white}", "nonce-456");
 

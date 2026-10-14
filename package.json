@@ -20,6 +20,7 @@
     "check:bundle": "npm run build && node scripts/check-bundle-size.mjs",
     "smoke:release": "node scripts/check-release-smoke.mjs",
     "check:integrity": "node scripts/check-file-integrity.mjs",
+    "test:csp": "node tests/ui-csp-browser.mjs",
     "check:unused": "knip --no-progress --reporter compact",
     "check:unused:report": "knip --no-progress --reporter compact --no-exit-code",
     "check:duplicates": "jscpd --config .jscpd.json packages examples tests",
@@ -33,6 +34,7 @@
     "dev:html-legacy": "npm --workspace @xrpl-wallet-kit/example-html-legacy-bundle run dev"
   },
   "devDependencies": {
+    "vue": "^3.5.0",
     "@rollup/plugin-inject": "^5.0.5",
     "@types/react": "^18.3.28",
     "@vitejs/plugin-react": "^4.3.4",

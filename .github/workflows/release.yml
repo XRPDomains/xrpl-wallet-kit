@@ -63,6 +63,7 @@ jobs:
           npm publish --workspace @xrpl-wallet-kit/auth --access public
           npm publish --workspace @xrpl-wallet-kit/ui --access public
           npm publish --workspace @xrpl-wallet-kit/react --access public
+          npm publish --workspace @xrpl-wallet-kit/vue --access public
           npm publish --workspace @xrpl-wallet-kit/next --access public
           npm publish --workspace @xrpl-wallet-kit/client --access public
           npm publish --workspace @xrpl-wallet-kit/browser --access public

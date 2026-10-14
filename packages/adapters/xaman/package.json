@@ -21,6 +21,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "xumm-sdk": "^1.11.2",
     "@xrpl-wallet-kit/core": "0.1.22",
     "xumm": "^1.8.0"
   },

@@ -201,6 +201,7 @@ test("createXrplSignatureVerifier verifies compact signatures with supplied publ
 test("createXrplSignatureVerifier verifies signedTx memo proof", async () => {
   const verifier = createXrplSignatureVerifier({
     dependencies: {
+      rippleKeypairs: { deriveAddress: () => "rAuthAddress", verify: () => true },
       verifyXrplSignature: {
         verifySignature() {
           return { signatureValid: true, signedBy: "rAuthAddress" };
@@ -210,6 +211,8 @@ test("createXrplSignatureVerifier verifies signedTx memo proof", async () => {
         decode() {
           return {
             Account: "rAuthAddress",
+            SigningPubKey: "EDAUTH",
+            TxnSignature: "SIG",
             Memos: [{ Memo: { MemoData: "48656C6C6F" } }]
           };
         }

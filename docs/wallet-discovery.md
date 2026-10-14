@@ -1,5 +1,14 @@
 # XRPL Wallet Discovery
 
+## Availability Refresh (Next Release)
+
+`manager.getWalletAvailability()` coalesces in-flight checks and caches snapshots
+for five seconds. Registration/removal invalidates the cache. Returned maps are
+isolated copies. Use `getWalletAvailability({ refresh: true })` after an explicit
+wallet installation or when fresh detection is needed. Detection never prompts
+for authorization. Open modal lists refresh periodically and retain keyboard
+focus; connecting views are not replaced by discovery results.
+
 ## Decision
 
 Reuse the existing Wallet Standard registration handshake instead of introducing

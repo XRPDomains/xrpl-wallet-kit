@@ -48,11 +48,10 @@ export function ensureWalletStyle(id: string, styles: string, nonce?: string): v
   if (!element) {
     element = document.createElement("style");
     element.dataset.xwkStyle = id;
-    document.head.appendChild(element);
-  } else if (element.nextSibling) {
-    document.head.appendChild(element);
   }
   if (nonce) element.setAttribute("nonce", nonce);
   else element.removeAttribute("nonce");
   if (element.textContent !== styles) element.textContent = styles;
+  // CSP evaluates a stylesheet on insertion; authorize it before attaching.
+  if (!element.parentNode || element.nextSibling) document.head.appendChild(element);
 }

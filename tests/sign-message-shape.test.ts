@@ -9,7 +9,7 @@ import { OtsuAdapter } from "../packages/adapters/otsu/src/index";
 import { XamanAdapter } from "../packages/adapters/xaman/src/index";
 import { XrplSnapAdapter, type Eip1193Provider } from "../packages/adapters/xrpl-snap/src/index";
 
-const account = { address: "rShapeAddress", publicKey: "EDPUBLICKEY" };
+const account = { address: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh", publicKey: "EDPUBLICKEY" };
 const network = {
   id: "mainnet",
   name: "XRPL Mainnet",

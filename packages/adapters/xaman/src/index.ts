@@ -1,4 +1,5 @@
 import { Xumm } from "xumm";
+import { XamanBrowserAuth } from "./browser-auth";
 import { assertWalletRequestActive, BaseWalletAdapter, createBrowserWalletStorage, createWalletError, isWalletKitError, normalizeTxResult, utf8ToHex, WalletKitError, WalletKitErrorCode } from "@xrpl-wallet-kit/core";
 import type { ConnectOptions, ConnectResult, SignAndSubmitRequest, SignMessageRequest, WalletCapabilities, WalletMetadata, WalletRequestOptions, WalletSession, WalletStorage } from "@xrpl-wallet-kit/core";
 
@@ -14,6 +15,7 @@ let didWarnAboutMissingConfiguration = false;
 export interface XamanPkceAuth {
   authorize(): Promise<XamanAuthResult | undefined | Error>;
   logout?: () => Promise<void> | void;
+  cancelAuthorization?: () => void;
 }
 
 export interface XamanAuthResult {
@@ -83,6 +85,7 @@ export class XamanAdapter extends BaseWalletAdapter {
   private sdk?: XamanSdkLike;
   private auth?: XamanPkceAuth;
   private recoveryStorage: WalletStorage;
+  private connectVersion = 0;
 
   constructor(private options: XamanAdapterOptions) {
     super();
@@ -111,20 +114,42 @@ export class XamanAdapter extends BaseWalletAdapter {
   }
 
   async connect(options: ConnectOptions) {
+    if (this.auth instanceof XamanBrowserAuth && this.auth.isPending) {
+      this.auth.cancelAuthorization();
+      this.auth = undefined;
+    }
+    const version = ++this.connectVersion;
+    const auth = this.auth;
     await this.setPendingRecoveryMarker();
     try {
-      const result = await this.withAbort(() => this.authorize(), options.signal);
+      const result = await this.withWalletRequest({ ...options, timeoutMs: options.timeoutMs ?? XAMAN_SIGNING_TIMEOUT_MS }, () => this.authorize());
+      if (version !== this.connectVersion) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Stale Xaman connection.");
       if (result instanceof Error) throw result;
       const connectResult = await this.createConnectResultFromAuth(result, options);
+      if (version !== this.connectVersion) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Stale Xaman connection.");
+      this.sdk = result.sdk ?? this.sdk;
       this.clearPendingRecoveryMarker();
       return connectResult;
     } catch (error) {
-      this.clearPendingRecoveryMarker();
+      if (version === this.connectVersion) {
+        (this.auth ?? auth)?.cancelAuthorization?.();
+        if (this.auth instanceof XamanBrowserAuth) this.auth = undefined;
+        this.clearPendingRecoveryMarker();
+      }
       throw error;
     }
   }
 
   async restoreSession(session: WalletSession) {
+    if (!this.options.auth && !this.options.sdk && this.options.apiKey && XamanBrowserAuth.supported()) {
+      const auth = new XamanBrowserAuth(this.options.apiKey);
+      const result = await auth.restore();
+      if (result?.me?.account === session.account.address) {
+        this.auth = auth;
+        this.sdk = result.sdk ?? this.sdk;
+        return this.createConnectResultFromAuth(result, { network: session.account.network });
+      }
+    }
     if (!this.sdk && this.options.apiKey) {
       this.sdk = new Xumm(this.options.apiKey) as unknown as XamanSdkLike;
       this.auth = this.sdk as unknown as XamanPkceAuth;
@@ -136,31 +161,46 @@ export class XamanAdapter extends BaseWalletAdapter {
   }
 
   async canRecoverSession(): Promise<boolean> {
+    if (!this.options.auth && !this.options.sdk && this.options.apiKey && XamanBrowserAuth.supported()) {
+      return new XamanBrowserAuth(this.options.apiKey).canRecover();
+    }
     return this.hasPendingRecoveryMarker();
   }
 
   async recoverSession(options: ConnectOptions): Promise<ConnectResult | null> {
-    if (!await this.hasPendingRecoveryMarker()) return null;
+    if (!await this.canRecoverSession()) return null;
+    const version = ++this.connectVersion;
     try {
       const result = await this.withAbort(() => this.authorize(), options.signal);
+      if (version !== this.connectVersion) return null;
       if (!result || result instanceof Error) {
         this.clearPendingRecoveryMarker();
         return null;
       }
       const connectResult = await this.createConnectResultFromAuth(result, options);
+      if (version !== this.connectVersion) return null;
+      this.sdk = result.sdk ?? this.sdk;
       this.clearPendingRecoveryMarker();
       return connectResult;
     } catch {
-      this.clearPendingRecoveryMarker();
+      if (version === this.connectVersion) {
+        this.auth?.cancelAuthorization?.();
+        if (this.auth instanceof XamanBrowserAuth) this.auth = undefined;
+        this.clearPendingRecoveryMarker();
+      }
       return null;
     }
   }
 
   cancelPendingConnection(): void {
+    this.connectVersion++;
+    this.auth?.cancelAuthorization?.();
+    if (this.auth instanceof XamanBrowserAuth) this.auth = undefined;
     this.clearPendingRecoveryMarker();
   }
 
   async disconnect(): Promise<void> {
+    this.connectVersion++;
     try {
       const logoutTargets = [this.sdk, this.auth].filter(
         (target, index, targets): target is XamanSdkLike | XamanPkceAuth => Boolean(target) && targets.indexOf(target) === index
@@ -171,7 +211,7 @@ export class XamanAdapter extends BaseWalletAdapter {
       }
     } finally {
       this.clearPendingRecoveryMarker();
-      this.clearPkceStorage();
+      if (!(this.auth instanceof XamanBrowserAuth)) this.clearPkceStorage();
       this.sdk = undefined;
       this.auth = this.options.auth;
       await this.runCleanup();
@@ -250,8 +290,12 @@ export class XamanAdapter extends BaseWalletAdapter {
   private async authorize(): Promise<XamanAuthResult | Error> {
     if (!this.auth) {
       if (!this.options.apiKey) throw new Error("Xaman apiKey is required when auth is not injected");
-      this.sdk = new Xumm(this.options.apiKey) as unknown as XamanSdkLike;
-      this.auth = this.sdk as unknown as XamanPkceAuth;
+      if (!this.options.sdk && XamanBrowserAuth.supported()) {
+        this.auth = new XamanBrowserAuth(this.options.apiKey);
+      } else {
+        this.sdk = new Xumm(this.options.apiKey) as unknown as XamanSdkLike;
+        this.auth = this.sdk as unknown as XamanPkceAuth;
+      }
     }
 
     const result = await this.auth.authorize();
@@ -260,11 +304,11 @@ export class XamanAdapter extends BaseWalletAdapter {
   }
 
   private async createConnectResultFromAuth(result: XamanAuthResult, options: ConnectOptions): Promise<ConnectResult> {
-    this.sdk = result.sdk ?? this.sdk;
-    const accountAddress = result.me?.sub ?? result.me?.account ?? await this.resolveSdkValue(this.sdk?.user?.account) ?? this.sdk?.state?.account;
+    const sdk = result.sdk ?? this.sdk;
+    const accountAddress = result.me?.sub ?? result.me?.account ?? await this.resolveSdkValue(sdk?.user?.account) ?? sdk?.state?.account;
     if (!accountAddress) throw new Error("Xaman did not return an XRPL account");
 
-    const networkType = result.me?.networkType ?? await this.resolveSdkValue(this.sdk?.user?.networkType);
+    const networkType = result.me?.networkType ?? await this.resolveSdkValue(sdk?.user?.networkType);
     const account = { address: accountAddress, network: options.network, networkType };
 
     return {
@@ -273,7 +317,7 @@ export class XamanAdapter extends BaseWalletAdapter {
         adapterId: this.metadata.id,
         account,
         connectedAt: Date.now(),
-        metadata: { networkEndpoint: result.me?.networkEndpoint ?? await this.resolveSdkValue(this.sdk?.user?.networkEndpoint) }
+        metadata: { networkEndpoint: result.me?.networkEndpoint ?? await this.resolveSdkValue(sdk?.user?.networkEndpoint) }
       } satisfies WalletSession,
       raw: result
     };

@@ -1,284 +1,49 @@
 # Vue 3
 
-XRPL Wallet Kit is framework-agnostic — the core has no React dependency, so it integrates cleanly into any Vue 3 application. This guide shows the recommended composable pattern using `@xrpl-wallet-kit/client`.
+`@xrpl-wallet-kit/vue` provides app-scoped state, composables and a wallet button.
+These bindings are implemented locally and await publication; they are not included in npm 0.1.22.
 
-## Installation
-
-::: code-group
-```sh [npm]
-npm install @xrpl-wallet-kit/client
-```
-```sh [yarn]
-yarn add @xrpl-wallet-kit/client
-```
-```sh [pnpm]
-pnpm add @xrpl-wallet-kit/client
-```
-:::
-
-For fine-grained installs, use individual packages instead:
-
-```sh
-npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/ui @xrpl-wallet-kit/adapter-xaman
-```
-
-## Quick Start
-
-```vue
-<!-- App.vue -->
-<script setup lang="ts">
-import { onMounted } from 'vue'
-import { createWalletKit } from '@xrpl-wallet-kit/client'
-
-const { manager } = createWalletKit({
-  autoReconnect: true,
-  wallets: 'all',
-  walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-  xamanClientId: import.meta.env.VITE_XAMAN_API_KEY,
-  connectButton: '#connect-btn',
-})
-
-onMounted(() => manager.autoReconnect())
-</script>
-
-<template>
-  <button id="connect-btn" />
-</template>
-```
-
-`createWalletKit` mounts a `WalletButton` onto the `#connect-btn` element automatically. The modal opens on click, and sessions restore on page reload.
-
-## `useWalletKit()` Composable
-
-For reactive wallet state across your Vue app, create a shared composable:
+## Setup
 
 ```ts
-// composables/useWalletKit.ts
-import { ref, onMounted, onUnmounted } from 'vue'
-import { createWalletKit } from '@xrpl-wallet-kit/client'
-import type { WalletSession, WalletAccount } from '@xrpl-wallet-kit/core'
-
-// Create kit once, outside the composable, so state is shared app-wide
-const { manager, modal } = createWalletKit({
-  autoReconnect: true,
-  wallets: 'all',
-  walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-  xamanClientId: import.meta.env.VITE_XAMAN_API_KEY,
-})
-
-const session = ref<WalletSession | null>(null)
-const account = ref<WalletAccount | null>(null)
-const status = ref<'disconnected' | 'connecting' | 'connected'>('disconnected')
-
-// Sync state from manager events
-manager.on('connected', (s) => {
-  session.value = s
-  account.value = s.account
-  status.value = 'connected'
-})
-manager.on('disconnected', () => {
-  session.value = null
-  account.value = null
-  status.value = 'disconnected'
-})
-
-export function useWalletKit() {
-  onMounted(() => manager.autoReconnect())
-
-  return {
-    manager,
-    modal,
-    session,
-    account,
-    status,
-    openModal: () => modal.open(),
-    closeModal: () => modal.close(),
-    disconnect: () => manager.disconnect(),
-  }
-}
-```
-
-Use it in any component:
-
-```vue
-<!-- components/WalletStatus.vue -->
-<script setup lang="ts">
-import { useWalletKit } from '@/composables/useWalletKit'
-
-const { account, status, openModal, disconnect } = useWalletKit()
-</script>
-
-<template>
-  <div>
-    <button v-if="status === 'disconnected'" @click="openModal">
-      Connect Wallet
-    </button>
-    <span v-else-if="status === 'connecting'">Connecting…</span>
-    <div v-else>
-      <span>{{ account?.address }}</span>
-      <button @click="disconnect">Disconnect</button>
-    </div>
-  </div>
-</template>
-```
-
-## Provide / Inject (App-wide)
-
-For apps where you want to pass the kit through the component tree via Vue's provide/inject:
-
-```ts
-// main.ts
 import { createApp } from 'vue'
-import { createWalletKit } from '@xrpl-wallet-kit/client'
+import { createWalletClient } from '@xrpl-wallet-kit/client'
+import { createWalletKitPlugin } from '@xrpl-wallet-kit/vue'
 import App from './App.vue'
 
-const kit = createWalletKit({
+const manager = createWalletClient({
+  network: 'mainnet',
   autoReconnect: true,
-  wallets: 'all',
-  walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
+  wallets: ['gemwallet', 'crossmark', 'ghostsig'],
 })
-
-const app = createApp(App)
-app.provide('walletKit', kit)
-app.mount('#app')
+createApp(App).use(createWalletKitPlugin({ manager, autoReconnect: true })).mount('#app')
 ```
 
-```vue
-<!-- Any descendant component -->
-<script setup lang="ts">
-import { inject } from 'vue'
-import type { WalletKitInstance } from '@xrpl-wallet-kit/client'
-
-const kit = inject<WalletKitInstance>('walletKit')!
-</script>
-```
-
-## Mounting the Connect Button
-
-`WalletButton` from `@xrpl-wallet-kit/ui` mounts onto any DOM element. In Vue, use a template ref:
+## Components
 
 ```vue
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { WalletManager } from '@xrpl-wallet-kit/core'
-import { WalletModal, WalletButton } from '@xrpl-wallet-kit/ui'
-import { createGemWalletAdapter } from '@xrpl-wallet-kit/adapter-gemwallet'
-
-const btnRef = ref<HTMLElement | null>(null)
-let button: WalletButton | null = null
-
-const manager = new WalletManager({
-  autoReconnect: true,
-  adapters: [createGemWalletAdapter()],
-})
-const modal = new WalletModal({ manager })
-
-onMounted(async () => {
-  button = new WalletButton({ manager, modal, target: btnRef.value! })
-  await manager.autoReconnect()
-})
-
-onUnmounted(() => {
-  button?.destroy()
-  modal.destroy()
-  manager.destroy()
-})
+import { WalletButton, useWalletKit, useWalletModal } from '@xrpl-wallet-kit/vue'
+const { account, status, signTransaction } = useWalletKit()
+const { openAndWait } = useWalletModal()
 </script>
-
 <template>
-  <div ref="btnRef" />
+  <WalletButton :options="{ showBalance: false }" />
+  <span v-if="account">{{ account.address }}</span>
 </template>
 ```
 
-## Listening to Events
+`account`, `session`, `status`, `wallets`, `availability` and `modal` are readonly refs.
+`connect`, `disconnect`, `signMessage`, `signTransaction` and `signAndSubmit` preserve
+manager result and error types. `openAndWait()` resolves a session or rejects when
+the user closes the picker. `refreshAvailability()` refreshes wallet detection.
 
-```ts
-import { useWalletKit } from '@/composables/useWalletKit'
+## Lifecycle
 
-const { manager } = useWalletKit()
+DOM and optional restoration start on mount, not during SSR or import. Each app
+gets its own state and subscriptions; use a separate manager per app or SSR request.
+Unmount destroys UI and listeners without disconnecting the caller-owned manager.
+Call `manager.destroy()` when the application no longer needs it.
 
-manager.on('connected', ({ account }) => {
-  console.log('Connected:', account.address)
-})
-
-manager.on('disconnected', () => {
-  console.log('Disconnected')
-})
-
-manager.on('error', ({ error }) => {
-  console.error('Wallet error:', error.message)
-})
-```
-
-See [Events & Hooks](/docs/advanced/events-hooks) for the full event reference.
-
-## Signing a Transaction
-
-```ts
-const { manager } = useWalletKit()
-
-const result = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: 'Payment',
-    Account: manager.getAccount()!.address,
-    Destination: 'rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe',
-    Amount: '1000000', // 1 XRP in drops
-    Fee: '12',
-    Sequence: 1,
-  },
-})
-
-console.log('Transaction hash:', result.hash)
-```
-
-## Transaction Toasts
-
-Add toast notifications for every transaction result:
-
-```ts
-import { WalletToast } from '@xrpl-wallet-kit/ui'
-
-const { manager } = useWalletKit()
-const toast = new WalletToast({ manager })
-toast.mount()
-```
-
-Toasts appear automatically on submit, confirm, and failure — no extra wiring.
-
-## Theming
-
-```ts
-import { createWalletKit } from '@xrpl-wallet-kit/client'
-
-createWalletKit({
-  autoReconnect: true,
-  wallets: 'all',
-  theme: {
-    accent: '#0284c7',
-    radius: '12px',
-  },
-  themeMode: 'dark',
-})
-```
-
-See [Theming](/docs/configuration/theming) for the full token reference.
-
-## TypeScript
-
-All types are re-exported from `@xrpl-wallet-kit/core`:
-
-```ts
-import type {
-  WalletSession,
-  WalletAccount,
-  WalletAdapter,
-  WalletUiTheme,
-} from '@xrpl-wallet-kit/core'
-```
-
-## Next Steps
-
-- [Nuxt 3](/docs/frameworks/nuxt) — SSR-safe plugin setup
-- [Theming](/docs/configuration/theming) — customize colors and fonts
-- [Adapters](/docs/adapters/overview) — configure individual wallets
-- [Events & Hooks](/docs/advanced/events-hooks) — full event reference
+Configure themes and CSP through the plugin's `ui` option. Button options go
+through `WalletButton.options`. See [Nuxt](/docs/frameworks/nuxt) for SSR setup.

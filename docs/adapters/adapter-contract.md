@@ -152,7 +152,7 @@ Do not blindly return the stored session just because the provider exists. Local
 
 For injected extension adapters, prefer a passive address source such as `getAddress()`, `selectedAddress`, `accounts[0]`, `sync.getAddress()`, or the SDK session snapshot. If an extension has both `isConnected()` and a passive address, treat the address match as the stronger signal when the SDK is known to report `isConnected() === false` during reload hydration. Document that behavior in the adapter README and cover it with tests.
 
-For wallets without a reliable passive account API, do not implement `restoreSession()` or return `null`. Core may support legacy fallback behavior for older adapters without this hook, but new adapters should implement explicit restore semantics instead of reviving stored sessions blindly.
+For wallets without a reliable passive account API, omit `restoreSession()` or return `null`. Core rejects cached restoration and emits `session_stale` when the hook is absent; availability alone cannot verify authorization. Require an explicit user connection instead.
 
 `recoverSession()` is different from `restoreSession()`: it is for mobile/deeplink/redirect returns where a pending external connection may have completed while the dApp was away. It may read temporary recovery markers, but it must still avoid app-specific UI and must be cancellable through `cancelPendingConnection()`.
 
@@ -207,7 +207,7 @@ Do not expect `{ message }` at the top level. The message is under `error.messag
 
 `session_restored` means the manager has set an active session after reading stored state or recovering a pending return flow.
 
-When `stale: true` is present, the manager restored through the legacy fallback path for an adapter that does not implement `restoreSession()`. It means the restored session was not actively re-verified by an adapter-specific passive account check. It does not automatically mean the session is invalid, and the manager does not emit `disconnected` after this event.
+Historical releases up to 0.1.22 could emit `stale: true` after legacy cached restoration. The next release removes that fallback: an unverifiable stored session produces `session_stale`, not `session_restored` or `connected`.
 
 Recommended app behavior:
 

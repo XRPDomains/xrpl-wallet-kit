@@ -1,0 +1,65 @@
+name: Documentation from release tag
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Published GitHub release tag, for example v0.1.22
+        required: true
+        type: string
+      deploy_pages:
+        description: Deploy to configured GitHub Pages (otherwise build artifact only)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: docs-release
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Validate published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || exit 1
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,tagName --jq 'select(.isDraft == false) | .tagName' | grep -Fx "$RELEASE_TAG"
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.release_tag }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm --prefix website ci
+      - run: npm --prefix website run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-docs
+          path: website/.vitepress/dist
+      - uses: actions/configure-pages@v5
+        if: ${{ inputs.deploy_pages }}
+      - uses: actions/upload-pages-artifact@v3
+        if: ${{ inputs.deploy_pages }}
+        with:
+          path: website/.vitepress/dist
+  deploy:
+    if: ${{ inputs.deploy_pages }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

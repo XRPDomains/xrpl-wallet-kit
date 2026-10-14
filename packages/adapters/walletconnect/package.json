@@ -21,6 +21,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "ripple-address-codec": "^5.0.1",
     "@xrpl-wallet-kit/core": "0.1.22",
     "@walletconnect/modal": "^2.7.0",
     "@walletconnect/sign-client": "^2.23.9",

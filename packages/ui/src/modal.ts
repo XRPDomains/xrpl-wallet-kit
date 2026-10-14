@@ -46,6 +46,7 @@ class WalletPickerView {
     private availability: Record<string, boolean>;
     private availabilityLoading: boolean;
     private availabilityRequest = 0;
+    private availabilityTimer?: ReturnType<typeof setInterval>;
     private offEvents: Array<() => void>;
     private openHandlers: Set<() => void>;
     private closeHandlers: Set<() => void>;
@@ -83,6 +84,7 @@ class WalletPickerView {
         this.offEvents.push(options.manager.on("walletsChanged", () => {
             if (this.root?.dataset.xwkView === "list") void this.refreshAvailability();
         }));
+        if (typeof document !== "undefined") void this.refreshAvailability();
     }
     autoOpen() {
         this.open();
@@ -94,6 +96,10 @@ class WalletPickerView {
         this.renderView("list");
         this.openHandlers.forEach((handler) => handler());
         void this.refreshAvailability();
+        if (this.availabilityTimer) clearInterval(this.availabilityTimer);
+        this.availabilityTimer = setInterval(() => {
+            if (this.root?.dataset.xwkView === "list") void this.refreshAvailability();
+        }, 5000);
         if (this.pendingQr) {
             const { adapterId, uri, deeplink } = this.pendingQr;
             this.pendingQr = undefined;
@@ -118,6 +124,9 @@ class WalletPickerView {
         return request.promise;
     }
     close(notify = true, restoreFocus = notify, animate = true) {
+        this.availabilityRequest++;
+        if (this.availabilityTimer) clearInterval(this.availabilityTimer);
+        this.availabilityTimer = undefined;
         if (notify)
             this.rejectOpenWait("Wallet picker was closed before a wallet connected.");
         document.removeEventListener("keydown", this.onDocumentKeyDown);
@@ -213,8 +222,10 @@ class WalletPickerView {
         return this.on("close", handler);
     }
     updateOptions(options: WalletUiConfig & Partial<Pick<WalletUiOptions, "mount">>) {
+        this.availabilityRequest++;
         this.options = { ...this.options, mount: options.mount ?? this.options.mount, ...resolveWalletUiOptions(options) };
         this.activeGroupId = undefined;
+        if (this.root?.dataset.xwkView === "list") void this.refreshAvailability();
     }
     private bind() {
         this.root?.querySelector("[data-xwk-close]")?.addEventListener("click", () => this.close());
@@ -564,14 +575,22 @@ class WalletPickerView {
             if (request !== this.availabilityRequest) return;
             this.availability = availability;
         }
+        catch {
+            if (request !== this.availabilityRequest) return;
+        }
         finally {
             if (request === this.availabilityRequest) this.availabilityLoading = false;
         }
         if (this.root?.dataset.xwkView !== "list")
             return;
-        const grid = this.root.querySelector(".xwk-grid");
+        const grid = this.root.querySelector<HTMLElement>(".xwk-grid");
         if (!grid)
             return;
+        const active = document.activeElement;
+        const focused = active instanceof HTMLElement && grid.contains(active) ? active : undefined;
+        const walletId = focused?.dataset.walletId;
+        const groupId = focused?.dataset.walletGroupId;
+        const scrollTop = grid.scrollTop;
         const layout = this.options.layout ?? "list";
         const activeGroup = this.activeGroupId ? this.getGroups().find((group) => group.id === this.activeGroupId) : undefined;
         grid.innerHTML = activeGroup
@@ -579,6 +598,12 @@ class WalletPickerView {
             : this.renderWalletList(layout);
         this.bindGroupButtons();
         this.bindWalletButtons();
+        grid.scrollTop = scrollTop;
+        if (focused) {
+            const replacement = Array.from(grid.querySelectorAll<HTMLElement>("[data-wallet-id], [data-wallet-group-id]"))
+                .find(element => walletId ? element.dataset.walletId === walletId : groupId && element.dataset.walletGroupId === groupId);
+            (replacement ?? this.root.querySelector<HTMLElement>("[data-xwk-close]") ?? this.root).focus({ preventScroll: true });
+        }
     }
     private showList() {
         this.activeGroupId = undefined;

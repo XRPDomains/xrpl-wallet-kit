@@ -5,7 +5,7 @@ import { createWalletConnectAdapter, XRPLWalletConnectMethod } from "../packages
 import { WalletKitErrorCode, type WalletRequestProgress } from "../packages/core/src/index";
 
 const network = { id: "mainnet", name: "Mainnet", networkType: "MAINNET", rpcUrl: "wss://example.invalid", walletConnectChainId: "xrpl:0" } as const;
-const account = { address: "rLifecycle", network };
+const account = { address: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh", network };
 const txJson = { TransactionType: "Payment", Account: account.address };
 function deferred<T>() {
   let resolve!: (value: T) => void;

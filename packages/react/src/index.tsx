@@ -51,7 +51,7 @@ export function WalletKitProvider(props: WalletKitProviderProps) {
   const refreshAvailability = useCallback(async () => {
     const requestId = ++availabilityRequestRef.current;
     try {
-      const nextAvailability = await props.manager.getWalletAvailability();
+      const nextAvailability = await props.manager.getWalletAvailability({ refresh: true });
       if (requestId === availabilityRequestRef.current) setAvailability(nextAvailability);
     } catch {
       if (requestId === availabilityRequestRef.current) setAvailability(createUnknownAvailability(props.manager));

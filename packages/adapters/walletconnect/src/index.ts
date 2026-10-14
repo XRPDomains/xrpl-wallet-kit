@@ -1,4 +1,5 @@
 import type SignClient from "@walletconnect/sign-client";
+import { isValidClassicAddress } from "ripple-address-codec";
 import type { WalletConnectModal } from "@walletconnect/modal";
 import type { SessionTypes, SignClientTypes } from "@walletconnect/types";
 import { assertWalletRequestActive, BaseWalletAdapter, createBrowserWalletStorage, isWalletKitError, normalizeTxResult, pickPath, utf8ToHex, waitForWalletRequest, WalletKitErrorCode } from "@xrpl-wallet-kit/core";
@@ -378,9 +379,7 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     const sessions = client.session.getAll();
     return sessions.find((storedSession) => {
       if (!this.sessionMatchesWalletProfile(storedSession)) return false;
-      const accounts = storedSession.namespaces[XRPL_NAMESPACE]?.accounts ?? [];
-      const chainId = this.requireWalletConnectChainId(network);
-      return accounts.some((account) => account === `${chainId}:${address}` || account.endsWith(`:${address}`));
+      return this.sessionHasNetworkAccount(storedSession, network, address);
     });
   }
 
@@ -672,8 +671,9 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
     const accounts = session.namespaces[XRPL_NAMESPACE]?.accounts ?? [];
     const chainId = this.requireWalletConnectChainId(network);
     return accounts.some((account) => {
-      if (!account.startsWith(`${chainId}:`)) return false;
-      return !address || account === `${chainId}:${address}` || account.endsWith(`:${address}`);
+      if (typeof account !== "string" || !account.startsWith(`${chainId}:`)) return false;
+      const current = account.slice(chainId.length + 1);
+      return isValidClassicAddress(current) && (!address || current === address);
     });
   }
 
@@ -1025,12 +1025,13 @@ export class WalletConnectXrplAdapter extends BaseWalletAdapter {
   }
 
   private extractAddress(session: SessionTypes.Struct, network: XrplNetwork): string {
-    const account = session.namespaces.xrpl?.accounts?.[0];
+    const chainId = this.requireWalletConnectChainId(network);
+    const account = session.namespaces.xrpl?.accounts?.find(value => typeof value === "string" && value.startsWith(`${chainId}:`));
     if (!account) throw new Error("WalletConnect XRPL account not found in session");
 
-    const parts = account.split(":");
-    const chainId = this.requireWalletConnectChainId(network);
-    return parts[2] ?? account.replace(`${chainId}:`, "");
+    const address = account.slice(chainId.length + 1);
+    if (!isValidClassicAddress(address)) throw new Error("WalletConnect returned an invalid XRPL classic address.");
+    return address;
   }
 
   private setupEventListeners(): void {

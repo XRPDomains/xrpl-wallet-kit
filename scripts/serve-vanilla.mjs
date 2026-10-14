@@ -69,7 +69,8 @@ function addAuthTestServer(server) {
         expectedUri: `http://${req.headers.host}`,
         expectedAddress: body.address,
         now: new Date(),
-        maxAgeSeconds: 10 * 60
+        maxAgeSeconds: 10 * 60,
+        isNonceUsed: nonce => !issuedNonces.has(nonce) || issuedNonces.get(nonce).used
       });
       log("message_validated", { valid: validation.valid, errors: validation.errors });
       if (!validation.valid) {
@@ -95,6 +96,10 @@ function addAuthTestServer(server) {
         return sendJson(res, 401, { ok: false, stage: "proof_verification", error: "Signature proof is not valid for this message/address.", logs });
       }
 
+      // Synchronous check-and-set after verification: concurrent requests cannot both consume.
+      if (nonceState.used || Date.now() - nonceState.issuedAt > 10 * 60 * 1000) {
+        return sendJson(res, 401, { ok: false, error: "Nonce was already consumed or expired." });
+      }
       nonceState.used = true;
       log("authenticated", { address: body.address, nonce: parsed.nonce });
       return sendJson(res, 200, { ok: true, address: body.address, nonce: parsed.nonce, logs });

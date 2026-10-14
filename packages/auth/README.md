@@ -89,6 +89,29 @@ The dApp does not branch by wallet id. `manager.signMessage()` delegates to the 
 
 ## Pre-Issued Nonce
 
+### Backend Replay Protection (Next Release)
+
+`validateAuthMessage` fails closed when `isNonceUsed` is missing. Use
+`noncePolicy: "format-only"` only for message inspection, never as authentication.
+Checking usage and marking it later is not atomic and cannot prevent parallel replay.
+Prefer the server helper below (not yet published in npm 0.1.22):
+
+```ts
+import { verifyWalletAuth } from '@xrpl-wallet-kit/auth';
+const ok = await verifyWalletAuth(body, {
+  expectedDomain: 'app.example',
+  expectedUri: 'https://app.example',
+  verifier,
+  consumeNonce: challenge => nonceStore.consumeIssuedChallenge(challenge),
+});
+```
+
+Your server-side `nonceStore` must atomically accept an issued, unexpired, unused
+nonce bound to the browser session and challenge domain/URI/address. Return `true`
+only when the conditional database update consumes exactly one challenge. Reject
+unknown nonces. Do not issue an authenticated session until this helper returns
+`true`. The library cannot provide a distributed nonce store for your backend.
+
 If your dApp already issued a nonce before the user clicks sign-in, return that nonce from `getNonce()`. This is common in SSR pages, legacy apps, or flows where the nonce is rendered into the page by the server.
 
 ```ts

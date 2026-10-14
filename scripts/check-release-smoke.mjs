@@ -69,6 +69,7 @@ for (const entryPath of [
   "packages/adapters/crossmark/dist/index.js",
   "packages/ui/dist/index.js",
   "packages/react/dist/index.js",
+  "packages/vue/dist/index.js",
   "packages/next/dist/index.js",
   "packages/adapters/ghostsig/dist/index.js"
 ]) {

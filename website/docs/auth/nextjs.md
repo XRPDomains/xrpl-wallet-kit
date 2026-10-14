@@ -25,6 +25,7 @@ export interface SessionData {
   authenticatedAt?: number;
   pendingNonce?: string;
   nonceIssuedAt?: number;
+  nonceOwner?: string;
 }
 
 export const sessionOptions: SessionOptions = {
@@ -50,6 +51,11 @@ XRPL_NODE_URL=wss://xrplcluster.com
 
 ## 2. API routes
 
+Implement `lib/nonce-store` in your backend. `issue(nonce, expiresAt, owner)` persists
+an unused challenge; `consumeIssuedChallenge(parsed, owner)` must conditionally consume
+an issued, unexpired nonce exactly once. The encrypted session's `pendingNonce`
+must match before consumption. Clearing a cookie alone cannot prevent parallel replay.
+
 ### GET /api/auth/nonce
 
 ```ts
@@ -59,11 +65,14 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { generateNonce } from "@xrpl-wallet-kit/auth";
 import { sessionOptions, type SessionData } from "@/lib/session";
+import { nonceStore } from "@/lib/nonce-store";
 
 export async function GET() {
   const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
 
   const nonce = generateNonce();
+  session.nonceOwner ??= generateNonce();
+  await nonceStore.issue(nonce, Date.now() + 300000, session.nonceOwner);
   session.pendingNonce = nonce;
   session.nonceIssuedAt = Date.now();
   await session.save();
@@ -81,6 +90,7 @@ import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseAuthMessage, validateAuthMessage } from "@xrpl-wallet-kit/auth";
 import { createXrplSignatureVerifier } from "@xrpl-wallet-kit/auth/verifiers";
+import { nonceStore } from "@/lib/nonce-store";
 import { sessionOptions, type SessionData } from "@/lib/session";
 
 // Create verifier once — reused across requests
@@ -108,14 +118,15 @@ export async function POST(req: Request) {
     }
 
     const hostname = (await headers()).get("host")?.split(":")[0] ?? "";
-    const { valid, reason } = validateAuthMessage(parsed, {
+    const { valid, errors } = await validateAuthMessage(message, {
       expectedDomain: hostname,
-      maxAge: 300,
-      usedNonces: new Set([session.pendingNonce]),
+      expectedAddress: address,
+      maxAgeSeconds: 300,
+      isNonceUsed: nonce => nonce !== session.pendingNonce,
     });
 
     if (!valid) {
-      return NextResponse.json({ error: reason }, { status: 400 });
+      return NextResponse.json({ error: errors }, { status: 400 });
     }
 
     // Verify signature
@@ -125,6 +136,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Signature verification failed." }, { status: 401 });
     }
 
+    // Consume the issued nonce in a shared atomic store before persisting auth.
+    if (!session.nonceOwner || !await nonceStore.consumeIssuedChallenge(parsed, session.nonceOwner)) {
+      return NextResponse.json({ error: "Nonce used or expired." }, { status: 401 });
+    }
     // Persist authenticated session
     session.pendingNonce = undefined;
     session.address = address;

@@ -122,7 +122,7 @@ On your backend, install the peer packages and use the built-in XRPL verifier:
 
 ```ts
 import { createXrplSignatureVerifier } from "@xrpl-wallet-kit/auth/verifiers";
-import { validateAuthMessage } from "@xrpl-wallet-kit/auth";
+import { verifyWalletAuth } from "@xrpl-wallet-kit/auth";
 
 const verifier = createXrplSignatureVerifier();
 
@@ -130,40 +130,33 @@ const verifier = createXrplSignatureVerifier();
 app.post("/api/auth/verify", async (req, res) => {
   const { message, signatureKind, proof, signature, txBlob, address, publicKey } = req.body;
 
-  // 1. Validate the message structure
-  const validation = await validateAuthMessage(message, {
+  const valid = await verifyWalletAuth({ message, signatureKind, proof, signature, txBlob, address, publicKey }, {
     expectedDomain: "yourapp.com",
+    expectedUri: "https://yourapp.com",
     maxAgeSeconds: 300,
-    isNonceUsed: (nonce) => db.nonceIsUsed(nonce), // prevent replay attacks
-  });
-
-  if (!validation.valid) {
-    return res.status(400).json({ error: validation.errors });
-  }
-
-  // 2. Verify the cryptographic signature
-  const valid = await verifier.verify({
-    message,
-    signatureKind,  // "signature" | "signedTx"
-    proof,
-    signature,
-    txBlob,
-    address,
-    publicKey,
+    verifier,
+    consumeNonce: challenge => db.consumeIssuedChallenge(challenge, req.sessionID),
   });
 
   if (!valid) {
     return res.status(401).json({ error: "Invalid signature" });
   }
 
-  // 3. Mark nonce as used & issue session
-  await db.markNonceUsed(validation.message!.nonce);
+  // Nonce consumption succeeded atomically; now issue a session.
   const token = issueSessionToken(address);
   res.json({ token });
 });
 ```
 
 ## Message Format
+
+The helper above is implemented for the next release, not npm 0.1.22.
+`db.consumeIssuedChallenge` is application code: atomically consume an issued,
+unexpired challenge bound to this request's browser session and identity. Return
+false for unknown or already-used nonces, including simultaneous requests.
+`validateAuthMessage` alone checks message fields and nonce usage; it does not
+verify signatures or atomically consume a nonce. Omitting `isNonceUsed` is rejected
+unless `noncePolicy: "format-only"` is explicitly selected for inspection.
 
 The default message format is human-readable and similar to EIP-4361 (Sign-In with Ethereum):
 

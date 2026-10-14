@@ -7,6 +7,8 @@ export interface WalletAuthValidationOptions {
   now?: Date;
   maxAgeSeconds?: number;
   isNonceUsed?: (nonce: string) => boolean | Promise<boolean>;
+  /** Explicit opt-out for parsing/format checks, never sufficient for authentication. */
+  noncePolicy?: "require-check" | "format-only";
 }
 
 export interface WalletAuthValidationResult {
@@ -112,6 +114,9 @@ export async function validateAuthMessage(message: string, options: WalletAuthVa
 
   if (options.isNonceUsed && parsed.nonce && await options.isNonceUsed(parsed.nonce)) {
     errors.push("Nonce has already been used.");
+  }
+  if (!options.isNonceUsed && options.noncePolicy !== "format-only") {
+    errors.push("Nonce replay protection is required. Provide isNonceUsed or use verifyWalletAuth with atomic consumeNonce.");
   }
 
   return {

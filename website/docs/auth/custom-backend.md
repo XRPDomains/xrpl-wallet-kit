@@ -13,6 +13,12 @@ npm install express express-session
 
 ## Server setup
 
+Implement the application-specific `nonceStore` used below. `issue(nonce,
+expiresAt, sessionId)` stores an unused challenge; `consumeIssuedChallenge(parsed, sessionId)` must
+atomically consume an issued, unexpired nonce only if it is still unused. Bind
+the nonce to the requesting session/context. Clearing a session field alone
+does not prevent parallel replay.
+
 ### Create the verifier
 
 Create the verifier **once** when the server starts. It holds a WebSocket connection to an XRPL node for `signedTx` verification.
@@ -39,6 +45,7 @@ import {
   validateAuthMessage,
 } from "@xrpl-wallet-kit/auth";
 import { verifier } from "./verifier";
+import { nonceStore } from "./nonce-store";
 
 const router = Router();
 
@@ -46,7 +53,8 @@ const router = Router();
 // Issues a fresh nonce and stores it in the server session.
 // Client must call this first, then build the sign-in message.
 router.get("/nonce", async (req: Request, res: Response) => {
-  const nonce = generateNonce();   // 16-byte hex, crypto-secure
+  const nonce = generateNonce();   // 24-byte hex, crypto-secure
+  await nonceStore.issue(nonce, Date.now() + 300000, req.sessionID);
 
   req.session.pendingNonce = nonce;
   req.session.nonceIssuedAt = Date.now();
@@ -86,14 +94,15 @@ router.post("/verify", async (req: Request, res: Response) => {
   }
 
   // 3 — Validate domain, age, nonce
-  const { valid, reason } = validateAuthMessage(parsed, {
+  const { valid, errors } = await validateAuthMessage(message, {
     expectedDomain: req.hostname,                      // e.g. "myapp.com"
-    maxAge: 300,                                       // 5 minutes
-    usedNonces: new Set([req.session.pendingNonce]),
+    expectedAddress: address,
+    maxAgeSeconds: 300,
+    isNonceUsed: nonce => nonce !== req.session.pendingNonce,
   });
 
   if (!valid) {
-    return res.status(400).json({ error: reason });
+    return res.status(400).json({ error: errors });
   }
 
   // 4 — Verify cryptographic signature
@@ -116,6 +125,9 @@ router.post("/verify", async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Verification service unavailable." });
   }
 
+  if (!await nonceStore.consumeIssuedChallenge(parsed, req.sessionID)) {
+    return res.status(401).json({ error: "Nonce used or expired." });
+  }
   // 5 — Mark session as authenticated
   req.session.pendingNonce = undefined;   // one-time use — invalidate
   req.session.address = address;

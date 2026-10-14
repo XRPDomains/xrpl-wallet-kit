@@ -5,6 +5,7 @@ on:
     paths:
       - "packages/react/**"
       - "packages/next/**"
+      - "packages/vue/**"
       - "packages/ui/**"
       - "packages/core/**"
       - "package-lock.json"
@@ -17,6 +18,7 @@ jobs:
     strategy:
       matrix:
         react: ["18", "19"]
+        xrpl: ["4", "5.0.0", "5"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,7 +34,9 @@ jobs:
           npm pack --workspace @xrpl-wallet-kit/ui --pack-destination .packs
           npm pack --workspace @xrpl-wallet-kit/react --pack-destination .packs
           npm pack --workspace @xrpl-wallet-kit/next --pack-destination .packs
+          npm pack --workspace @xrpl-wallet-kit/vue --pack-destination .packs
       - name: Verify packed React consumer
         env:
           REACT_VERSION: ${{ matrix.react }}
+          XRPL_VERSION: ${{ matrix.xrpl }}
         run: node scripts/check-react-consumer.mjs

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Security: reject unverified cached sessions, bind legacy auth proofs to account keys, validate WalletConnect classic addresses, require nonce checks with an atomic server verification helper, and allowlist wallet URL schemes. Existing backend integrations must supply replay protection; format-only inspection is explicitly opt-in.
+
+- Coalesce and cache passive wallet availability checks; preserve keyboard focus during modal list refreshes.
+- Isolate browser Xaman OAuth attempts, verify tokens with the issuer and recover same-origin return tabs without adopting cancelled callbacks.
+- Add app-scoped Vue 3 bindings and replace Vue/Nuxt recipes with SSR-safe provider guidance.
+- Set stylesheet nonces before DOM insertion and add enforced browser CSP coverage with negative controls.
+- Expand packed-consumer CI to xrpl v4/v5, Vue and React 18/19 with offline codec/signing checks.
+- Add manual documentation builds from published release tags, with optional GitHub Pages deployment.
+
 ## 0.1.22
 
 ### Fixed

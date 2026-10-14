@@ -196,7 +196,7 @@ test("WalletManager can restore legacy unversioned sessions", async () => {
   assert.deepEqual(connectedAddresses, ["rLegacyAddress"]);
 });
 
-test("WalletManager emits connected for stale auto reconnect without adapter restoreSession", async () => {
+test("WalletManager never promotes stored sessions without passive adapter restoration", async () => {
   class StoredOnlyAdapter extends BaseWalletAdapter {
     metadata = { id: "stored-only", name: "Stored Only", type: "extension" } as const;
     capabilities = { connect: true };
@@ -237,9 +237,11 @@ test("WalletManager emits connected for stale auto reconnect without adapter res
 
   const restored = await manager.autoReconnect();
 
-  assert.equal(restored?.account.address, "rStoredOnly");
-  assert.deepEqual(restoredEvents, [{ address: "rStoredOnly", stale: true }]);
-  assert.deepEqual(connectedAddresses, ["rStoredOnly"]);
+  assert.equal(restored, null);
+  assert.equal(manager.getSession(), null);
+  assert.equal(await storage.getItem("session"), null);
+  assert.deepEqual(restoredEvents, []);
+  assert.deepEqual(connectedAddresses, []);
 });
 
 test("WalletManager clears stored sessions when passive restore is unavailable", async () => {

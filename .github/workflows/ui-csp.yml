@@ -1,0 +1,20 @@
+name: Wallet UI browser policy
+on:
+  pull_request:
+    paths: ["packages/ui/**", "packages/core/**", "tests/ui-csp-browser.mjs", "tests/fixtures/csp.*", ".github/workflows/ui-csp.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  csp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save --package-lock=false --ignore-scripts playwright@1.62.1
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:csp

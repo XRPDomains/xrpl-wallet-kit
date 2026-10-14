@@ -46,6 +46,15 @@ export class WalletManager extends WalletEventEmitter {
   private transactions = new Map<string, WalletTransaction>();
   private pendingConfirmations = new Map<string, AbortController>();
   private transactionStore?: WalletTransactionStore;
+  private availabilityCache?: { value: WalletAvailabilityMap; expires: number };
+  private availabilityPending?: Promise<WalletAvailabilityMap>;
+  private availabilityVersion = 0;
+
+  private invalidateAvailability(): void {
+    this.availabilityVersion++;
+    this.availabilityCache = undefined;
+    this.availabilityPending = undefined;
+  }
 
   constructor(private config: WalletManagerConfig) {
     super();
@@ -66,6 +75,7 @@ export class WalletManager extends WalletEventEmitter {
   register(adapter: WalletAdapter): this {
     if (this.destroyed) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Wallet manager was destroyed.");
     this.adapters.set(adapter.metadata.id, adapter);
+    this.invalidateAvailability();
     this.logger.debug(`Registered adapter ${adapter.metadata.id}`);
     this.emitSafely("walletsChanged", { wallets: this.getWallets() }, error => this.logger.warn("Wallet list observer failed", error));
     return this;
@@ -77,6 +87,7 @@ export class WalletManager extends WalletEventEmitter {
     const adapter = this.adapters.get(adapterId);
     if (!adapter || (expectedAdapter && adapter !== expectedAdapter)) return false;
     this.adapters.delete(adapterId);
+    this.invalidateAvailability();
     if (!this.destroyed) {
       this.invalidateRestoration();
       this.emitDisconnected(adapterId);
@@ -105,7 +116,27 @@ export class WalletManager extends WalletEventEmitter {
     return [...this.adapters.values()].map((adapter) => adapter.metadata);
   }
 
-  async getWalletAvailability(): Promise<WalletAvailabilityMap> {
+  async getWalletAvailability(options: { refresh?: boolean } = {}): Promise<WalletAvailabilityMap> {
+    if (this.destroyed) return {};
+    if (this.availabilityPending) return { ...await this.availabilityPending };
+    if (!options.refresh && this.availabilityCache && this.availabilityCache.expires > Date.now()) {
+      return { ...this.availabilityCache.value };
+    }
+    const version = this.availabilityVersion;
+    const pending = this.readWalletAvailability();
+    this.availabilityPending = pending;
+    try {
+      const value = await pending;
+      if (this.destroyed) return {};
+      if (version !== this.availabilityVersion) return this.getWalletAvailability(options);
+      this.availabilityCache = { value, expires: Date.now() + 5000 };
+      return { ...value };
+    } finally {
+      if (this.availabilityPending === pending) this.availabilityPending = undefined;
+    }
+  }
+
+  private async readWalletAvailability(): Promise<WalletAvailabilityMap> {
     const entries = await Promise.all([...this.adapters.values()].map(async (adapter) => {
       if (!adapter.isAvailable) return [adapter.metadata.id, false] as const;
       try {
@@ -125,22 +156,8 @@ export class WalletManager extends WalletEventEmitter {
   }
 
   async getAvailableWallets(): Promise<WalletAdapter[]> {
-    const results = await Promise.all([...this.adapters.values()].map(async (adapter) => {
-      if (!adapter.isAvailable) return null;
-      try {
-        const availability = await this.withTimeout(Promise.resolve(adapter.isAvailable()), DEFAULT_AVAILABILITY_CHECK_TIMEOUT_MS);
-        if (availability.timedOut) {
-          this.logger.warn(`Availability check timed out for ${adapter.metadata.id}`);
-          return null;
-        }
-        return availability.value ? adapter : null;
-      } catch (error) {
-        this.logger.warn(`Availability check failed for ${adapter.metadata.id}`, error);
-        return null;
-      }
-    }));
-
-    return results.filter((adapter): adapter is WalletAdapter => Boolean(adapter));
+    const availability = await this.getWalletAvailability();
+    return [...this.adapters.values()].filter(adapter => availability[adapter.metadata.id]);
   }
 
   getAdapter(adapterId?: string): WalletAdapter | undefined {
@@ -228,7 +245,9 @@ export class WalletManager extends WalletEventEmitter {
           return null;
         }
         const restored = restoredResult.value;
-        if (!restored?.session) {
+        if (!restored?.session || restored.session.adapterId !== session.adapterId
+          || restored.account.address !== session.account.address
+          || restored.session.account.address !== session.account.address) {
           await this.clearStoredSessionAsStale(session, "restore_unavailable", version);
           if (version !== this.lifecycleVersion) return null;
           return null;
@@ -245,37 +264,9 @@ export class WalletManager extends WalletEventEmitter {
         return enrichedSession;
       }
 
-      if (adapter.isAvailable) {
-        const availability = await this.withTimeout(Promise.resolve(adapter.isAvailable()), DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS);
-        if (version !== this.lifecycleVersion) return null;
-        if (availability.timedOut) {
-          await this.clearStoredSessionAsStale(session, "availability_timeout", version);
-          if (version !== this.lifecycleVersion) return null;
-          return null;
-        }
-        if (!availability.value) {
-          await this.clearStoredSessionAsStale(session, "adapter_unavailable", version);
-          if (version !== this.lifecycleVersion) return null;
-          return null;
-        }
-      }
-
-      if (session.expiresAt && session.expiresAt <= Date.now()) {
-        await this.clearStoredSessionAsStale(session, "session_expired", version);
-        if (version !== this.lifecycleVersion) return null;
-        return null;
-      }
-
-      const enrichedSession = await this.enrichSession(this.withWalletMetadata(session, adapter));
-      if (version !== this.lifecycleVersion) return null;
-      this.assertSessionNetwork(adapter, enrichedSession, this.getNetwork(), "autoReconnect");
-      this.setSession(enrichedSession);
-      await this.loadPersistedTransactions(enrichedSession);
-      if (version !== this.lifecycleVersion) return null;
-      this.emit("session_restored", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession, stale: true });
-      if (version !== this.lifecycleVersion) return null;
-      this.emit("connected", { adapterId: enrichedSession.adapterId, account: enrichedSession.account, session: enrichedSession });
-      return enrichedSession;
+      // Availability and local storage cannot establish wallet authorization.
+      await this.clearStoredSessionAsStale(session, "restore_unsupported", version);
+      return null;
     } catch (error) {
       if (version !== this.lifecycleVersion) return null;
       this.logger.warn("Auto reconnect failed", error);

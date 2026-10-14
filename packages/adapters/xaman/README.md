@@ -1,5 +1,17 @@
 # @xrpl-wallet-kit/adapter-xaman
 
+## Browser authorization (next release)
+
+Browser logins use an independent OAuth state and a five-minute deadline. A
+same-origin return tab can complete the original pending login through local
+storage. Tokens are scoped to the configured app and authenticated with Xaman's
+userinfo endpoint; a URL or local-storage record alone is not proof of login.
+Cancellation prevents a late callback from activating an account. Other tabs
+without an explicit pending login do not connect automatically. Storage must be
+available for this flow. xApps and injected authentication retain their SDK path.
+These changes are not included in npm 0.1.22. Live mobile acceptance is still
+required before publication.
+
 Xaman adapter for XRPL Wallet Kit.
 
 Xaman is a mobile XRPL wallet. This adapter uses the Xaman SDK / OAuth PKCE flow, emits QR and deeplink connection payloads through XRPL Wallet Kit, and supports mobile return recovery.
