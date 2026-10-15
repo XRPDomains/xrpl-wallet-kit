@@ -54,6 +54,7 @@ export const enUSMessages: WalletUiMessages = {
   notActivated: "Not activated",
   connectWalletAria: (walletName) => `Connect ${walletName}`,
   confirmOnDevice: (walletName) => `Confirm on your ${walletName} device.`,
+  ledgerConnectOnDevice: "Confirm on your Ledger device. If asked, approve opening the XRP app.",
   openWalletAppApprove: (walletName) => `Open your ${walletName} app and approve.`,
   approveBrowserWallet: () => "Approve in your browser wallet.",
   clickConnectPopup: (walletName) => `Click connect in your ${walletName} popup.`,

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Ledger can request opening XRP on the hardware during explicit connection (`autoOpenApp`, default true), with selected-device-only reconnect attempts, cancellation and manual fallback. No Ledger Live desktop dependency or signing-flow change.
+
 - Security: reject unverified cached sessions, bind legacy auth proofs to account keys, validate WalletConnect classic addresses, require nonce checks with an atomic server verification helper, and allowlist wallet URL schemes. Existing backend integrations must supply replay protection; format-only inspection is explicitly opt-in.
 
 - Coalesce and cache passive wallet availability checks; preserve keyboard focus during modal list refreshes.

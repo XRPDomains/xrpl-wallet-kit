@@ -1,4 +1,6 @@
 import { BaseWalletAdapter, createWalletError, validateMultisignTransaction, WalletKitError, WalletKitErrorCode } from "@xrpl-wallet-kit/core";
+import { ensureLedgerXrpApp } from "./device-app";
+import type { LedgerAppTransport } from "./device-app";
 import type {
   ConnectOptions,
   ConnectResult,
@@ -18,7 +20,7 @@ export const LEDGER_ICON =
 const DEFAULT_TIMEOUT = 60_000;
 const DEFAULT_ACCOUNT_INDEX = 0;
 const FULLY_CANONICAL_SIG = 0x80000000;
-type LedgerTransport = { close(): Promise<void> };
+type LedgerTransport = LedgerAppTransport;
 type LedgerXrpApp = {
   getAddress(path: string, verify: boolean, askChainCode: boolean): Promise<{ address: string; publicKey: string }>;
   signTransaction(path: string, signingBlob: string): Promise<string>;
@@ -29,6 +31,7 @@ export enum LedgerDeviceState {
   NOT_CONNECTED = "NOT_CONNECTED",
   LOCKED = "LOCKED",
   APP_NOT_OPEN = "APP_NOT_OPEN",
+  OPENING_APP = "OPENING_APP",
   READY = "READY",
   UNKNOWN = "UNKNOWN"
 }
@@ -39,6 +42,9 @@ export interface LedgerAdapterOptions {
   derivationPath?: string;
   preferWebHID?: boolean;
   timeout?: number;
+  /** Request XRP on the hardware device during explicit connect. Default true. */
+  autoOpenApp?: boolean;
+  onDeviceState?: (state: LedgerDeviceState) => void;
   icon?: string;
 }
 
@@ -88,6 +94,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
   private xrp?: LedgerXrpApp;
   private derivationPath: string;
   private connectionGeneration = 0;
+  private connectionAbort?: AbortController;
 
   constructor(private options: LedgerAdapterOptions = {}) {
     super();
@@ -107,13 +114,20 @@ export class LedgerAdapter extends BaseWalletAdapter {
   }
 
   async connect(options: ConnectOptions): Promise<ConnectResult> {
+    this.connectionAbort?.abort();
+    const controller = new AbortController();
+    this.connectionAbort = controller;
+    const abort = () => controller.abort();
+    options.signal?.addEventListener("abort", abort, { once: true });
+    if (options.signal?.aborted) controller.abort();
     const generation = ++this.connectionGeneration;
     this.network = options.network;
     try {
+      if (controller.signal.aborted) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Ledger connection cancelled.");
       const session = this.options.connectLedger
         ? await this.options.connectLedger()
-        : await this.connectDefaultLedger(generation);
-      if (generation !== this.connectionGeneration) throw createWalletError.notConnected();
+        : await this.connectDefaultLedger(generation, { ...options, signal: controller.signal });
+      if (generation !== this.connectionGeneration || controller.signal.aborted) throw createWalletError.notConnected();
       this.session = session;
 
       return {
@@ -142,6 +156,9 @@ export class LedgerAdapter extends BaseWalletAdapter {
     } catch (error) {
       if (generation === this.connectionGeneration) await this.cleanup();
       throw this.mapConnectionError(error);
+    } finally {
+      options.signal?.removeEventListener("abort", abort);
+      if (this.connectionAbort === controller) this.connectionAbort = undefined;
     }
   }
 
@@ -151,6 +168,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
   }
 
   async disconnect(): Promise<void> {
+    this.connectionAbort?.abort();
     this.connectionGeneration++;
     this.session = undefined;
     this.network = undefined;
@@ -227,14 +245,30 @@ export class LedgerAdapter extends BaseWalletAdapter {
     }
   }
 
-  private async connectDefaultLedger(generation: number): Promise<LedgerSession> {
+  private async connectDefaultLedger(generation: number, options: ConnectOptions): Promise<LedgerSession> {
     const support = getLedgerBrowserSupport();
     if (!support.supported) {
       throw createWalletError.walletNotAvailable("Ledger", new Error(support.message));
     }
 
-    const transport = await this.createTransport();
+    let transport = await this.createTransport();
     try {
+      const assertCurrent = () => {
+        if (generation !== this.connectionGeneration || options.signal?.aborted) throw createWalletError.notConnected();
+      };
+      assertCurrent();
+      if (this.options.autoOpenApp !== false) {
+        transport = await ensureLedgerXrpApp(transport, {
+          signal: options.signal, timeoutMs: options.timeoutMs ?? this.options.timeout ?? DEFAULT_TIMEOUT, assertCurrent,
+          onOpening: () => {
+            this.options.onDeviceState?.(LedgerDeviceState.OPENING_APP);
+            options.onRequestProgress?.({ state: "opened" });
+          },
+          onTransport: next => { transport = next; },
+          reopen: previous => this.reopenSameDevice(previous)
+        });
+      }
+      assertCurrent();
       const Xrp = await loadLedgerXrpApp();
       const xrp = new Xrp(transport);
       const account = await this.withTimeout(
@@ -259,6 +293,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
       if (generation !== this.connectionGeneration) throw createWalletError.notConnected();
       this.transport = transport;
       this.xrp = xrp;
+      this.options.onDeviceState?.(LedgerDeviceState.READY);
       return {
         address: account.address,
         publicKey: account.publicKey,
@@ -268,9 +303,15 @@ export class LedgerAdapter extends BaseWalletAdapter {
         signMultisignTransaction: (tx) => this.signMultisignWithDefaultLedger(tx)
       };
     } catch (error) {
-      await transport.close().catch(() => {});
+      void transport.close().catch(() => {});
       throw error;
     }
+  }
+
+  private async reopenSameDevice(previous: LedgerTransport): Promise<LedgerTransport> {
+    const native = previous as LedgerTransport & { device?: unknown; constructor: { open?: (device: unknown) => Promise<LedgerTransport> } };
+    if (!native.device || !native.constructor.open) throw new Error("Open XRP on your Ledger device and select it again in the browser.");
+    return native.constructor.open(native.device);
   }
 
   private async signWithDefaultLedger(tx: unknown, submit = true): Promise<LedgerSignResult> {
@@ -550,7 +591,8 @@ function parseLedgerError(error: unknown): LedgerErrorInfo {
     return { state: LedgerDeviceState.LOCKED, message: "Ledger is locked. Please unlock your Ledger device.", rejected: false, timeout: false };
   }
   if ([0x6e00, 0x6511, 0x650f].includes(statusCode ?? 0) || /app.*open|xrp.*app|cla_not_supported/.test(lower)) {
-    return { state: LedgerDeviceState.APP_NOT_OPEN, message: "Please open the XRP app on your Ledger device.", rejected: false, timeout: false };
+    return { state: LedgerDeviceState.APP_NOT_OPEN, message: /connect again|select.*again/.test(lower)
+      ? message : "Please open the XRP app on your Ledger device.", rejected: false, timeout: false };
   }
   if (/no device|device.*not found|disconnected|cannot open device|transport/i.test(message)) {
     return { state: LedgerDeviceState.NOT_CONNECTED, message: "Ledger device not found. Please connect and unlock your Ledger device.", rejected: false, timeout: false };

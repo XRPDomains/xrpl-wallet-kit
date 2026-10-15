@@ -26,6 +26,8 @@ const adapter = createLedgerAdapter({
 | `derivationPath` | `string` | `44'/144'/0'/0/0` | Full custom derivation path (overrides `accountIndex`) |
 | `preferWebHID` | `boolean` | `true` | Prefer WebHID transport; fall back to WebUSB if unavailable |
 | `timeout` | `number` | `60000` | Timeout in ms for device operations (connect + sign) |
+| `autoOpenApp` | `boolean` | `true` | Request XRP directly on the hardware during explicit connection; next release, not npm 0.1.22 |
+| `onDeviceState` | `(state: LedgerDeviceState) => void` | — | Observe `OPENING_APP` / `READY` during the default connection flow |
 | `connectLedger` | `() => Promise<LedgerSession>` | — | Inject a custom connection flow (useful for custom account pickers) |
 | `icon` | `string` | — | Override the default Ledger icon |
 
@@ -33,16 +35,24 @@ const adapter = createLedgerAdapter({
 
 1. User clicks Ledger in the connect modal
 2. Browser shows a WebHID or WebUSB device picker — user selects their Ledger
-3. The adapter opens a transport connection and calls `getAddress()` from the XRP app
-4. The Ledger device displays the address for confirmation (if `verify: true`)
+3. With `autoOpenApp`, the adapter checks the active device app and requests XRP; approve opening it on the hardware if prompted
+4. After XRP is ready, the adapter reads its address and public key
 5. The adapter returns the account address and public key
 
 ::: warning Requirements
 - Ledger device must be **connected** via USB
 - Ledger must be **unlocked** (PIN entered)
-- **XRP app** must be open on the device
+- **XRP app** must be installed; open it manually when automatic launch is unsupported
 - Browser must support WebHID (`navigator.hid`) or WebUSB (`navigator.usb`)
 :::
+
+Automatic opening targets the **Ledger hardware**, not Ledger Live desktop.
+Set `autoOpenApp: false` to keep manual app selection. Already-open XRP is not
+restarted. Switching apps can reset USB: only the selected device handle is
+reopened. If the browser requires permission again, select the device again after
+opening XRP manually. Custom `connectLedger` integrations remain responsible for
+their own app-opening behavior. Signing logic is unchanged; no transaction is
+signed or submitted by the app-opening commands.
 
 ## Capabilities
 

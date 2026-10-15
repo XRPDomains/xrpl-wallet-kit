@@ -959,6 +959,8 @@ class WalletPickerView {
         const messages = this.messages();
         const adapter = this.options.manager.getAdapter(adapterId);
         const walletName = wallet?.name ?? adapter?.metadata.name ?? messages.walletFallbackName;
+        if (adapterId === "ledger")
+            return messages.ledgerConnectOnDevice ?? messages.confirmOnDevice(walletName);
         if (wallet?.type === "hardware")
             return messages.confirmOnDevice(walletName);
         if (wallet?.type === "walletconnect" || wallet?.group === "WalletConnect")

@@ -56,6 +56,7 @@ export const viVNMessages: WalletUiMessages = {
   notActivated: "Chưa kích hoạt",
   connectWalletAria: (walletName) => `Kết nối ${walletName}`,
   confirmOnDevice: (walletName) => `Xác nhận trên thiết bị ${walletName}.`,
+  ledgerConnectOnDevice: "Xác nhận trên thiết bị Ledger. Nếu được hỏi, hãy đồng ý mở ứng dụng XRP.",
   openWalletAppApprove: (walletName) => `Mở ứng dụng ${walletName} và xác nhận.`,
   approveBrowserWallet: () => "Xác nhận trong ví trình duyệt.",
   clickConnectPopup: (walletName) => `Bấm kết nối trong popup ${walletName}.`,

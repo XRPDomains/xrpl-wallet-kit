@@ -22,6 +22,7 @@ export interface WalletUiMessages {
   approveRequest: string;
   walletFallbackName: string;
   connecting: string;
+  ledgerConnectOnDevice?: string;
   retrying: string;
   tryAgain: string;
   connectionCanceledTitle: string;

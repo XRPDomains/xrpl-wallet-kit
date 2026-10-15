@@ -21,6 +21,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "buffer": "^6.0.3",
     "@ledgerhq/hw-app-xrp": "^6.28.0",
     "@ledgerhq/hw-transport-webhid": "^6.28.0",
     "@ledgerhq/hw-transport-webusb": "^6.28.0",
