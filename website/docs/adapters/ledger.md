@@ -26,7 +26,7 @@ const adapter = createLedgerAdapter({
 | `derivationPath` | `string` | `44'/144'/0'/0/0` | Full custom derivation path (overrides `accountIndex`) |
 | `preferWebHID` | `boolean` | `true` | Prefer WebHID transport; fall back to WebUSB if unavailable |
 | `timeout` | `number` | `60000` | Timeout in ms for device operations (connect + sign) |
-| `autoOpenApp` | `boolean` | `true` | Request XRP directly on the hardware during explicit connection; next release, not npm 0.1.22 |
+| `autoOpenApp` | `boolean` | `true` | Request XRP directly on the hardware during explicit connection; available since 0.1.23 |
 | `onDeviceState` | `(state: LedgerDeviceState) => void` | — | Observe `OPENING_APP` / `READY` during the default connection flow |
 | `connectLedger` | `() => Promise<LedgerSession>` | — | Inject a custom connection flow (useful for custom account pickers) |
 | `icon` | `string` | — | Override the default Ledger icon |

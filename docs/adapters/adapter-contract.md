@@ -207,7 +207,7 @@ Do not expect `{ message }` at the top level. The message is under `error.messag
 
 `session_restored` means the manager has set an active session after reading stored state or recovering a pending return flow.
 
-Historical releases up to 0.1.22 could emit `stale: true` after legacy cached restoration. The next release removes that fallback: an unverifiable stored session produces `session_stale`, not `session_restored` or `connected`.
+Historical releases up to 0.1.22 could emit `stale: true` after legacy cached restoration. Since 0.1.23 that fallback is removed: an unverifiable stored session produces `session_stale`, not `session_restored` or `connected`.
 
 Recommended app behavior:
 

@@ -1,7 +1,7 @@
 # Vue 3
 
 `@xrpl-wallet-kit/vue` provides app-scoped state, composables and a wallet button.
-These bindings are implemented locally and await publication; they are not included in npm 0.1.22.
+These bindings are available since 0.1.23.
 
 ## Setup
 

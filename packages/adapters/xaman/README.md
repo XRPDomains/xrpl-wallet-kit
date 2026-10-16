@@ -1,6 +1,6 @@
 # @xrpl-wallet-kit/adapter-xaman
 
-## Browser authorization (next release)
+## Browser authorization (since 0.1.23)
 
 Browser logins use an independent OAuth state and a five-minute deadline. A
 same-origin return tab can complete the original pending login through local
@@ -9,8 +9,8 @@ userinfo endpoint; a URL or local-storage record alone is not proof of login.
 Cancellation prevents a late callback from activating an account. Other tabs
 without an explicit pending login do not connect automatically. Storage must be
 available for this flow. xApps and injected authentication retain their SDK path.
-These changes are not included in npm 0.1.22. Live mobile acceptance is still
-required before publication.
+These changes ship in 0.1.23. Live mobile acceptance remains pending; automated
+coverage does not establish compatibility with every mobile browser.
 
 Xaman adapter for XRPL Wallet Kit.
 

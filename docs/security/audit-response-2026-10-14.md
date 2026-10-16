@@ -1,6 +1,6 @@
 # Security audit response - 2026-10-14
 
-Changes remain local and are not in npm 0.1.22.
+These changes ship in 0.1.23; they are not in npm 0.1.22.
 
 1. Core no longer promotes a stored session when an adapter lacks passive
    `restoreSession`. Restoration also rejects changed address/adapter identity.

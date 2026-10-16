@@ -1,7 +1,7 @@
 # Nuxt
 
-Use the Vue plugin once per Nuxt application. The bindings below are implemented
-locally and await publication; they are not included in npm 0.1.22.
+Use the Vue plugin once per Nuxt application. The bindings below are available
+since 0.1.23.
 
 ## Provider
 

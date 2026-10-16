@@ -31,7 +31,7 @@ const kit = createWalletKit({
 ## Runtime Notes
 
 - Requires a browser with WebHID or WebUSB support.
-- Requires a connected, unlocked Ledger device with XRP installed. During explicit connection, `autoOpenApp` requests XRP directly on the hardware (default `true`); confirm on the device when prompted. It never launches or requires Ledger Live desktop. This option is implemented for the next release, not npm 0.1.22.
+- Requires a connected, unlocked Ledger device with XRP installed. During explicit connection, `autoOpenApp` requests XRP directly on the hardware (default `true`); confirm on the device when prompted. It never launches or requires Ledger Live desktop. This option is available since 0.1.23.
 - Already-open XRP is left alone. Another device app is closed before requesting XRP. App switches can disconnect USB temporarily: reconnection attempts use only the originally selected device handle, never another authorized Ledger. If browser permission/re-enumeration prevents recovery, open XRP manually and select the device again.
 - Hardware wallets are explicit user-presence devices. `restoreSession()` returns `null` and does not silently reconnect after refresh.
 - Default derivation path is `44'/144'/0'/0/0`.

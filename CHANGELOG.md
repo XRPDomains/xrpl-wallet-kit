@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.23
 
 - Ledger can request opening XRP on the hardware during explicit connection (`autoOpenApp`, default true), with selected-device-only reconnect attempts, cancellation and manual fallback. No Ledger Live desktop dependency or signing-flow change.
 

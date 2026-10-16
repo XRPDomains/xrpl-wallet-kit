@@ -150,7 +150,7 @@ app.post("/api/auth/verify", async (req, res) => {
 
 ## Message Format
 
-The helper above is implemented for the next release, not npm 0.1.22.
+The helper above is available since 0.1.23.
 `db.consumeIssuedChallenge` is application code: atomically consume an issued,
 unexpired challenge bound to this request's browser session and identity. Return
 false for unknown or already-used nonces, including simultaneous requests.

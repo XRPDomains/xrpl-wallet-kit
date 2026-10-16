@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/adapter-xaman",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "description": "Xaman adapter for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "xumm-sdk": "^1.11.2",
-    "@xrpl-wallet-kit/core": "0.1.22",
+    "@xrpl-wallet-kit/core": "0.1.23",
     "xumm": "^1.8.0"
   },
   "publishConfig": {

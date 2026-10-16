@@ -94,7 +94,7 @@ The dApp does not branch by wallet id. `manager.signMessage()` delegates to the 
 `validateAuthMessage` fails closed when `isNonceUsed` is missing. Use
 `noncePolicy: "format-only"` only for message inspection, never as authentication.
 Checking usage and marking it later is not atomic and cannot prevent parallel replay.
-Prefer the server helper below (not yet published in npm 0.1.22):
+Prefer the server helper below (available since 0.1.23):
 
 ```ts
 import { verifyWalletAuth } from '@xrpl-wallet-kit/auth';
