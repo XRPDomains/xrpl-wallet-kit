@@ -4,9 +4,15 @@ const latestUrl = 'https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/
 const releaseUrl = latestUrl.replace('@latest/', `@${version}/`)
 let pending: Promise<any> | null = null
 
+function hasReleaseFeatures(bundle: any): boolean {
+  return typeof bundle?.createGhostsigAdapter === 'function' &&
+    typeof bundle?.createXyraAdapter === 'function' &&
+    bundle?.XAHAU_NETWORKS?.some((network: any) => network.id === 'xahau-mainnet')
+}
+
 export async function loadWalletKit(): Promise<any> {
   const host = window as any
-  if (typeof host.XRPLWalletKit?.createGhostsigAdapter === 'function' &&
+  if (hasReleaseFeatures(host.XRPLWalletKit) &&
       [latestUrl, releaseUrl].includes(host.__XRPL_WALLET_KIT_WEBSITE_BUNDLE_URL__)) {
     return host.XRPLWalletKit
   }
@@ -15,17 +21,21 @@ export async function loadWalletKit(): Promise<any> {
 
   pending = (async () => {
     // Probe before execution: loading two SDK versions duplicates custom elements.
-    const hasGhostsig = await fetch(latestUrl)
-      .then(async response => response.ok && (await response.text()).includes('createGhostsigAdapter'))
+    const hasCurrentFeatures = await fetch(latestUrl)
+      .then(async response => {
+        if (!response.ok) return false
+        const source = await response.text()
+        return ['createGhostsigAdapter', 'createXyraAdapter', 'xahau-mainnet'].every(feature => source.includes(feature))
+      })
       .catch(() => false)
-    const url = hasGhostsig ? latestUrl : releaseUrl
+    const url = hasCurrentFeatures ? latestUrl : releaseUrl
     return new Promise((resolve, reject) => {
       const script = document.createElement('script')
       script.src = url
       script.onload = () => {
-        if (typeof host.XRPLWalletKit?.createGhostsigAdapter !== 'function') {
+        if (!hasReleaseFeatures(host.XRPLWalletKit)) {
           script.remove()
-          reject(new Error('XRPL Wallet Kit bundle is missing the GhostSig adapter'))
+          reject(new Error('XRPL Wallet Kit bundle is missing Xyra or Xahau support'))
           return
         }
         host.__XRPL_WALLET_KIT_WEBSITE_BUNDLE_URL__ = url

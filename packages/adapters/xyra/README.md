@@ -1,7 +1,7 @@
 # @xrpl-wallet-kit/adapter-xyra
 
 Experimental, standalone opt-in Xyra adapter, introduced in 0.1.20.
-The unreleased all-in-one client exports it and includes it by default for
+The all-in-one client (v0.2.0+) exports it and includes it by default for
 Xahau configurations; XRPL-only client defaults remain opt-in.
 Tracking: [issue #49](https://github.com/XRPDomains/xrpl-wallet-kit/issues/49).
 No live wallet approval or ledger acceptance has been performed by the agent.
@@ -26,8 +26,8 @@ console.log(signed.txBlob);
 Local previews can use source imports. The published package exports
 XyraAdapter, createXyraAdapter, XyraAdapterOptions and XYRA_ICON. No default
 XRPL-only client wallet list is changed. The React and vanilla local previews
-include Xyra in their wallet checkboxes, defaulting to mainnet; vanilla
-transaction forms default to sign-only. This does not enable it on CDN latest.
+include Xyra in their wallet checkboxes, defaulting to mainnet. Client/browser
+v0.2.0+ also export the adapter; XRPL configurations enable it explicitly.
 
 ## Protocol and SDK Review
 
@@ -43,7 +43,7 @@ timeouts/close monitoring lack deterministic cancellation cleanup.
 The adapter pins https://wallet.xyra.now and uses /connect and /sign, network
 xrpl-mainnet or xrpl-testnet, base64 JSON tx and explicit submit=true only for
 submission. It also sends the SDK's explicit SIGN submit message after 500ms.
-No arbitrary wallet URL, devnet or custom RPC is accepted. Unreleased Xahau
+No arbitrary wallet URL, devnet or custom RPC is accepted. Xahau
 mainnet/testnet support is opt-in via supportedChains and an injected protocol;
 the default configuration remains XRPL mainnet/testnet.
 
@@ -83,7 +83,7 @@ the ledger themselves. Submit failures preserve the hash and an explicit
 outcomeUnknown flag; verified non-submission is distinct from uncertainty.
 Do not automatically retry these errors.
 
-## Xahau (Unreleased)
+## Xahau (v0.2.0+)
 
 Inject `createXahauProtocol()` from the optional `@xrpl-wallet-kit/xahau` package
 into WalletManager's `protocols`, register its `XAHAU_NETWORKS`, and opt the

@@ -4,6 +4,10 @@ The Ledger adapter connects to a hardware Ledger device via WebHID (preferred) o
 
 ## Installation
 
+The [Xahau integration](/docs/configuration/xahau#wallets) in v0.2.0+ uses the
+XAH app on the device and requires explicit opt-in. The XRP app instructions
+below apply to XRPL, not Xahau. Transaction support depends on the device app.
+
 ```bash
 npm install @xrpl-wallet-kit/adapter-ledger
 ```

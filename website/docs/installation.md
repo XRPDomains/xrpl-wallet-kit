@@ -2,8 +2,7 @@
 
 ## Prerequisites
 
-Current published release: **v0.1.20**. Use matching versions for Wallet Kit
-packages when pinning dependencies.
+Use matching versions for Wallet Kit packages when pinning dependencies.
 
 - Node.js 18 or later
 - TypeScript 5.0 or later (if using TypeScript)
@@ -56,15 +55,23 @@ All available adapters:
 | `@xrpl-wallet-kit/adapter-xrpl-snap` | XRPL Snap (MetaMask) |
 | `@xrpl-wallet-kit/adapter-otsu` | Otsu Wallet |
 | `@xrpl-wallet-kit/adapter-ghostsig` | GhostSig (hosted popup, opt-in) |
+| `@xrpl-wallet-kit/adapter-xyra` | [Xyra](/docs/adapters/xyra) (hosted popup, opt-in) |
 
 The [GhostSig adapter](/docs/adapters/ghostsig) is published starting in v0.1.20.
 Install its XRPL peer dependency alongside it:
 
 ```sh
-npm install @xrpl-wallet-kit/core@0.1.20 @xrpl-wallet-kit/adapter-ghostsig@0.1.20 xrpl@^4
+npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-ghostsig xrpl@^4
 ```
 
 GhostSig is opt-in: the default client list and `wallets: "all"` exclude it.
+
+Install Xyra with core and the XRPL peer dependency, then follow the
+[Xyra quick start](/docs/adapters/xyra#quick-start):
+
+```sh
+npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-xyra xrpl@^4
+```
 
 ## All-in-One Client Package
 

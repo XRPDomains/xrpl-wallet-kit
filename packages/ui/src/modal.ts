@@ -856,7 +856,7 @@ class WalletPickerView {
     }
     private renderNetworkBadge() {
         const network = this.options.manager.getNetwork();
-        if (!network || network.networkType === "MAINNET" && (network.family ?? "xrpl") === "xrpl")
+        if (!network || network.networkType === "MAINNET" && ["xrpl", "xahau"].includes(network.family ?? "xrpl"))
             return "";
         const { className, label } = this.resolveNetworkBadgeStyle(network);
         const dot = `<span class="xwk-network-dot" aria-hidden="true"></span>`;

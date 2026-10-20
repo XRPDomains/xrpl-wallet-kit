@@ -15,8 +15,13 @@ An adapter is the only layer in XRPL Wallet Kit that talks directly to a wallet 
 | [XRPL Snap](/docs/adapters/xrpl-snap) | `@xrpl-wallet-kit/adapter-xrpl-snap` | MetaMask Snap | Browser |
 | [Otsu Wallet](/docs/adapters/otsu) | `@xrpl-wallet-kit/adapter-otsu` | Browser extension (MV3) | Browser |
 | [GhostSig](/docs/adapters/ghostsig) | `@xrpl-wallet-kit/adapter-ghostsig` | Hosted web / popup (opt-in) | Browser |
+| [Xyra](/docs/adapters/xyra) | `@xrpl-wallet-kit/adapter-xyra` | Hosted web / popup (opt-in) | Browser |
 
 ## Capability Matrix
+
+These capabilities describe XRPL integration. For Xahau support since v0.2.0 in
+Xaman, GemWallet, Xyra and opt-in Ledger, see the
+[Xahau wallet matrix](/docs/configuration/xahau#wallets).
 
 | Adapter | connect | disconnect | signMessage | signTx | signAndSubmit | signMessage proof type |
 |:---|:---:|:---:|:---:|:---:|:---:|:---|
@@ -29,6 +34,7 @@ An adapter is the only layer in XRPL Wallet Kit that talks directly to a wallet 
 | XRPL Snap | ✅ | — | ✅ | — | ✅ | `signedTx` (Payment blob) |
 | Otsu Wallet | ✅ | ✅ | ✅ | ✅ | ✅ | `signature` (compact) |
 | GhostSig | ✅ | ✅ | — | ✅ | ✅ | — |
+| Xyra | ✅ | ✅ | — | ✅ | ✅ | — |
 
 > **signMessage proof types:** `signature` = compact ECDSA/Ed25519 hex; `signedTx` = signed XRPL transaction blob. Read `signatureKind` on the result to know which you received.
 
@@ -39,8 +45,18 @@ factory exported by the client and browser bundle. It supports connect,
 disconnect, cached restore, sign-only, sign-and-submit, Payment and NFT offers;
 it does not support `signMessage()`. Enable it explicitly using
 `wallets: ["ghostsig"]` or a named adapter. Default wallet lists and
-`wallets: "all"` do not include it. Transactions require an explicit uint32
-`SourceTag` (`0` is valid). See its guide for validation and popup constraints.
+`wallets: "all"` do not include it. An omitted `SourceTag` defaults to `0`;
+explicit tags must be uint32. See its guide for popup constraints.
+
+### Xyra Opt-In
+
+[Xyra](/docs/adapters/xyra) supports XRPL mainnet/testnet connection,
+sign-only and sign-and-submit through a hosted popup. Add
+`createXyraAdapter()` explicitly to `adapters`; see its guide for installation
+and examples. It does not expose message signing or passive session restore.
+Use the named adapter package or `wallets: ["xyra"]` with client v0.2.0+.
+The browser bundle also exports `createXyraAdapter()`. XRPL-only default lists
+still require explicit Xyra selection; Xahau configurations include it by default.
 
 ## Recommended Setup
 
@@ -123,6 +139,7 @@ Restore behavior varies by wallet type:
 - **WalletConnect**: look up the stored session topic in the SignClient store; restore without re-approval if still valid.
 - **Hardware (Ledger)**: USB device must be re-connected and unlocked — no silent restore.
 - **GhostSig**: restore cached account state without a popup; this is not fresh authentication. The next signature verifies the stored address and key.
+- **Xyra**: reconnect from a user action; passive session restore is not available.
 
 ## Availability Detection
 

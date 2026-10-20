@@ -59,6 +59,20 @@
               <span class="tb-arrow" :class="{ open: !collapsed.wallets }">▾</span>
             </button>
             <div v-show="!collapsed.wallets" class="tb-group-bd">
+              <div class="tb-section">
+                <label class="tb-section-title" for="tb-chain">Chain</label>
+                <select id="tb-chain" v-model="selectedChain" class="tb-select">
+                  <option value="xrpl">XRPL</option>
+                  <option value="xahau">Xahau</option>
+                </select>
+              </div>
+              <div class="tb-section">
+                <label class="tb-section-title" for="tb-network">Network</label>
+                <select id="tb-network" v-model="selectedNetworkType" class="tb-select">
+                  <option value="mainnet">Mainnet</option>
+                  <option value="testnet">Testnet</option>
+                </select>
+              </div>
               <div class="tb-wallets-summary">
                 <span>{{ selectedWalletIds.length }} of {{ walletOptions.length }} shown</span>
                 <button
@@ -503,6 +517,7 @@ let kitBundle:      any = null
 let inlineObserver: MutationObserver | null = null
 let inlineObserverCleanup: (() => void) | null = null
 let previewManager: any = null
+let previewManagerKey = ''
 const previewFrames = new Set<number>()
 let previewUpdateFrame: number | null = null
 
@@ -571,8 +586,12 @@ const btnSizes = [
   { value: 'md', label: 'MD' },
   { value: 'lg', label: 'LG' },
 ]
-type WalletOptionId = 'xaman' | 'gemwallet' | 'crossmark' | 'dropfi' | 'xrplsnap' | 'walletconnect' | 'ghostsig'
-const walletOptions: Array<{ id: WalletOptionId; label: string }> = [
+type WalletOptionId = 'xaman' | 'gemwallet' | 'crossmark' | 'dropfi' | 'xrplsnap' | 'walletconnect' | 'ghostsig' | 'xyra' | 'ledger'
+const selectedChain = ref<'xrpl' | 'xahau'>('xrpl')
+const selectedNetworkType = ref<'mainnet' | 'testnet'>('mainnet')
+const selectedNetwork = computed(() => selectedChain.value === 'xahau'
+  ? `xahau-${selectedNetworkType.value}` : selectedNetworkType.value)
+const allWalletOptions: Array<{ id: WalletOptionId; label: string }> = [
   { id: 'xaman', label: 'Xaman' },
   { id: 'gemwallet', label: 'GemWallet' },
   { id: 'crossmark', label: 'Crossmark' },
@@ -580,8 +599,20 @@ const walletOptions: Array<{ id: WalletOptionId; label: string }> = [
   { id: 'xrplsnap', label: 'MetaMask' },
   { id: 'walletconnect', label: 'WalletConnect' },
   { id: 'ghostsig', label: 'GhostSig' },
+  { id: 'xyra', label: 'Xyra' },
+  { id: 'ledger', label: 'Ledger' },
 ]
-const selectedWalletIds = ref<WalletOptionId[]>(walletOptions.map((wallet) => wallet.id))
+const xahauWalletIds: WalletOptionId[] = ['xaman', 'gemwallet', 'xyra', 'ledger']
+const walletOptions = computed(() => selectedChain.value === 'xahau'
+  ? allWalletOptions.filter(wallet => xahauWalletIds.includes(wallet.id)) : allWalletOptions)
+const chainWallets = reactive<Record<'xrpl' | 'xahau', WalletOptionId[]>>({
+  xrpl: allWalletOptions.map(wallet => wallet.id),
+  xahau: [...xahauWalletIds],
+})
+const selectedWalletIds = computed({
+  get: () => chainWallets[selectedChain.value],
+  set: (ids: WalletOptionId[]) => { chainWallets[selectedChain.value] = ids },
+})
 
 function toggleWallet(id: WalletOptionId) {
   const selected = selectedWalletIds.value
@@ -589,14 +620,14 @@ function toggleWallet(id: WalletOptionId) {
     if (selected.length === 1) return
     selectedWalletIds.value = selected.filter((walletId) => walletId !== id)
   } else {
-    selectedWalletIds.value = walletOptions
+    selectedWalletIds.value = walletOptions.value
       .map((wallet) => wallet.id)
       .filter((walletId) => walletId === id || selected.includes(walletId))
   }
 }
 
 function selectAllWallets() {
-  selectedWalletIds.value = walletOptions.map((wallet) => wallet.id)
+  selectedWalletIds.value = walletOptions.value.map((wallet) => wallet.id)
 }
 const previewStates: Array<{ value: PreviewState; label: string }> = [
   { value: 'wallets',     label: 'Wallets' },
@@ -906,7 +937,8 @@ const codeSnippet = computed(() => {
     credentialLines.push('  walletConnectProjectId: "YOUR_WALLETCONNECT_PROJECT_ID",')
   }
   const credentials = credentialLines.length ? `\n${credentialLines.join('\n')}` : ''
-  const managerSnippet = `const manager = createWalletClient({\n  wallets: [\n${walletLines}\n  ],${credentials}\n})`
+  const feeConfig = selectedChain.value === 'xahau' ? '\n  preflight: { maxFeeDrops: "50000" },' : ''
+  const managerSnippet = `const manager = createWalletClient({\n  network: "${selectedNetwork.value}",\n  wallets: [\n${walletLines}\n  ],${credentials}${feeConfig}\n})`
   const modalSnippet = `const modal = new WalletModal({\n  manager,${themeModeLine}${themeNameLine}${layoutLine}${sizeLine}${themePart}\n})`
 
   const btnLines: string[] = []
@@ -938,46 +970,24 @@ async function loadKit(): Promise<void> {
 
 function buildMockManager() {
   if (!kitBundle) return null
-  const { WalletManager, createGemWalletAdapter, createCrossmarkAdapter, createDropFiAdapter,
-          createXrplSnapAdapter, createXamanAdapter, createWalletConnectAdapter, createGhostsigAdapter } = kitBundle
-
-  const adapters: any[] = []
-  if (selectedWalletIds.value.includes('xaman') && !previewManager?.getAdapter('xaman')) {
-    try { adapters.push(createXamanAdapter({ apiKey: '1c7dfba7-aadd-4b03-bafb-ca5c8f84bb4f' })) } catch {}
-  }
-  if (selectedWalletIds.value.includes('gemwallet') && !previewManager?.getAdapter('gemwallet')) {
-    try { adapters.push(createGemWalletAdapter()) } catch {}
-  }
-  if (selectedWalletIds.value.includes('crossmark') && !previewManager?.getAdapter('crossmark')) {
-    try { adapters.push(createCrossmarkAdapter()) } catch {}
-  }
-  if (selectedWalletIds.value.includes('dropfi') && !previewManager?.getAdapter('dropfi')) {
-    try { adapters.push(createDropFiAdapter()) } catch {}
-  }
-  if (selectedWalletIds.value.includes('xrplsnap') && !previewManager?.getAdapter('xrplsnap')) {
-    try { adapters.push(createXrplSnapAdapter()) } catch {}
-  }
-  if (selectedWalletIds.value.includes('walletconnect') && !previewManager?.getAdapter('walletconnect')) {
-    try {
-      adapters.push(createWalletConnectAdapter({ projectId: '7e0944cf9202885569eb41182016baed', useModal: true, modalMode: 'always' }))
-    } catch {}
-  }
-
-  if (selectedWalletIds.value.includes('ghostsig') && !previewManager?.getAdapter('ghostsig')) {
-    try { adapters.push(createGhostsigAdapter()) } catch {}
-  }
-
-  if (!previewManager) previewManager = new WalletManager({ adapters, network: 'mainnet' })
-  else adapters.forEach(adapter => previewManager.register(adapter))
-  const activeId = previewManager.getSession()?.adapterId
-  if (activeId && !selectedWalletIds.value.includes(activeId)) {
-    void previewManager.disconnect().then(queuePreview).catch((error: unknown) => {
-      console.warn('Theme Builder: failed to disconnect disabled wallet', error)
+  const key = `${selectedNetwork.value}:${selectedWalletIds.value.join(',')}`
+  if (previewManager && key === previewManagerKey) return previewManager
+  if (previewManager) {
+    void previewManager.disconnect().catch((error: unknown) => {
+      console.warn('Theme Builder: failed to disconnect previous preview', error)
     })
+    previewManager.destroy()
+    previewManager = null
   }
-  for (const id of previewManager.adapters.keys()) {
-    if (!selectedWalletIds.value.includes(id)) previewManager.adapters.delete(id)
-  }
+  previewManager = kitBundle.createWalletClient({
+    network: selectedNetwork.value,
+    wallets: [...selectedWalletIds.value],
+    xamanClientId: '1c7dfba7-aadd-4b03-bafb-ca5c8f84bb4f',
+    walletConnectProjectId: '7e0944cf9202885569eb41182016baed',
+    preflight: { maxFeeDrops: '50000' },
+    storage: 'memory',
+  })
+  previewManagerKey = key
   return previewManager
 }
 
@@ -1284,6 +1294,7 @@ function setupInlineObserver(container: HTMLElement, isMobile: boolean): Mutatio
 
 watch(config, () => { if (kitLoaded.value) queuePreview() }, { deep: true })
 watch(selectedWalletIds, () => { if (kitLoaded.value) queuePreview() }, { deep: true })
+watch(selectedNetwork, () => { if (kitLoaded.value) queuePreview() })
 watch(previewState, () => { if (kitLoaded.value) queuePreview() })
 watch(previewDevice, async () => {
   if (kitLoaded.value) {

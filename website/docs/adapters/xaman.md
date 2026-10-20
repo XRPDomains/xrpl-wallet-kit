@@ -4,6 +4,9 @@
 
 ## Installation
 
+For Xahau mainnet/testnet configuration and transaction examples in v0.2.0+,
+see the [Xahau guide](/docs/configuration/xahau). The examples below target XRPL.
+
 ```bash
 npm install @xrpl-wallet-kit/adapter-xaman
 ```

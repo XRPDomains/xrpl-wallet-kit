@@ -1,8 +1,35 @@
-# Xyra (Experimental)
+# Xyra Adapter
 
-Introduced in 0.1.20 as an experimental opt-in standalone npm adapter, not
-included in the default client or CDN bundle. Track acceptance in [issue #49](https://github.com/XRPDomains/xrpl-wallet-kit/issues/49).
-Official wallet documentation: [Xyra developers](https://www.xyra.now/developers).
+[Xyra](https://www.xyra.now/) is a hosted wallet. The adapter opens a popup for
+connection and transaction approval; no browser extension or WalletConnect
+project ID is required. XRPL mainnet and testnet are supported.
+
+## Installation
+
+For Xahau mainnet/testnet support in v0.2.0+, see the
+[Xahau guide](/docs/configuration/xahau). The examples below target XRPL.
+
+```sh
+npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-xyra xrpl@^4
+```
+
+## Quick Start
+
+```ts
+import { WalletManager } from "@xrpl-wallet-kit/core";
+import { createXyraAdapter } from "@xrpl-wallet-kit/adapter-xyra";
+
+const manager = new WalletManager({
+  network: "mainnet", // or "testnet"
+  adapters: [createXyraAdapter()],
+});
+
+// Call from a connect button's click handler.
+const { account } = await manager.connect("xyra");
+console.log(account.address);
+```
+
+With the selective client:
 
 ```ts
 import { createWalletClient } from "@xrpl-wallet-kit/client/selective";
@@ -10,52 +37,91 @@ import { createXyraAdapter } from "@xrpl-wallet-kit/adapter-xyra";
 
 const manager = createWalletClient({
   network: "mainnet",
-  adapters: [createXyraAdapter({ maxFeeDrops: "1000000" })]
+  adapters: [createXyraAdapter()],
 });
-await manager.connect("xyra"); // user gesture
-const result = await manager.signTransaction({
-  txJson: { TransactionType: "AccountSet", Account: manager.getAccount()!.address }
-});
-console.log(result.txBlob);
 ```
 
-The local React and vanilla previews expose Xyra through wallet checkboxes.
-Vanilla defaults to sign-only. This does not change default client wallets or
-the CDN bundle. Default: standard XRPL mainnet/testnet; devnet/custom RPC are
-rejected. Unreleased Xahau mainnet/testnet support requires opt-in
-`supportedChains` plus the optional injected protocol runtime.
-signMessage/payments/nftOffers are not advertised.
-No passive restore is available; reconnect requires fresh approval.
+Add the adapter explicitly. These examples use the named package and do not
+depend on Xyra being included in the published client or CDN default wallet list.
 
-The adapter checks exact popup origin/source, account-key binding, transaction
-signature/hash and requested intent. Only missing Fee/Sequence/LastLedgerSequence
-can be filled, with bounded fee and uint32 sequence/ledger fields. The protocol
-has no echoed request ID; fresh popup instances and one pending request provide
-local correlation. The published SDK is not loaded because its receiver and
-lifecycle do not satisfy these checks and its default import is not SSR-safe.
+Since v0.2.0, the full client also accepts `wallets: ["xyra"]`, and the browser
+bundle exports `XRPLWalletKit.createXyraAdapter()`. Xyra remains opt-in for XRPL
+and is included by default when configuring Xahau.
 
-**Submission caveat:** the live wallet currently returns broadcast results,
-not final ledger validation. The adapter refuses to present preliminary
-tesSUCCESS as confirmed success. Accepted broadcasts return `status: "submitted"`;
-wait for WalletManager's `tx_confirmed` event or check the ledger. Inspect the
-preserved hash/raw outcome before retrying an outcomeUnknown error. Sign-only
-returns a verified txBlob and rejects any submission report.
+## Options
 
-Normalized XRPL statuses are `signed`, `submitted` and `confirmed`; a validated
-wallet reply uses `confirmed`, with the original engine result kept in `raw`.
-Independent ledger confirmation remains preferable. Submit failures use
-`SUBMIT_FAILED`; a verified `submitted: false` reply reports
-`outcomeUnknown: false`, while unverifiable replies may remain uncertain.
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `timeoutMs` | `number` | `60000` | Connection and signing timeout, in milliseconds |
+| `maxFeeDrops` | `string` | `"1000000"` | Maximum accepted XRPL transaction fee, in drops (1 XRP by default) |
 
-Allow popups, preserve origin in Referrer-Policy, and use COOP
-same-origin-allow-popups if configured. no-referrer, noopener and noreferrer can
-break the flow or domain verification. Allow data: in img-src for the embedded
-official icon. Requests contain base64 transaction JSON in the popup URL;
-never put secrets in transaction metadata. Local availability detection is
-not proof of wallet or passkey readiness.
+Use a fee ceiling suitable for your application. The adapter rejects a signed
+transaction whose fee exceeds the configured ceiling.
 
-Safari/macOS and Safari/iOS popup behavior after asynchronous dApp preflight
-still requires live verification; Chrome tests do not establish compatibility.
+## Capabilities
 
-Live approval, signing, network switching, mobile and recovery acceptance are
-still pending. See the package README for the protocol review and fee limits.
+| Capability | Supported |
+|---|:---:|
+| connect / disconnect | Yes |
+| signTransaction (sign-only) | Yes |
+| signAndSubmit | Yes |
+| signMessage | No |
+| passive session restore | No |
+
+The default adapter accepts standard XRPL mainnet/testnet, not devnet or custom
+RPC definitions. Transactions use the generic `txJson` API; dedicated
+`payments` and `nftOffers` capability flags are not advertised. Batch acceptance
+is not yet verified.
+
+## Transactions
+
+Use `manager` and the connected `account` from Quick Start. Run each request
+from its own button click and replace the recipient address before signing.
+
+::: code-group
+
+```ts [Sign Only]
+const result = await manager.signTransaction({
+  txJson: {
+    TransactionType: "Payment",
+    Account: account.address,
+    Destination: "<recipient_address>",
+    Amount: "1000000", // 1 XRP in drops
+  },
+});
+console.log(result.txBlob); // Verified signed transaction; not submitted
+```
+
+```ts [Sign and Submit]
+const result = await manager.signAndSubmit({
+  txJson: {
+    TransactionType: "Payment",
+    Account: account.address,
+    Destination: "<recipient_address>",
+    Amount: "1000000", // 1 XRP in drops
+  },
+  submit: true,
+});
+console.log(result.hash, result.status);
+```
+
+:::
+
+Include `DestinationTag` if the recipient requires one. Submission on mainnet
+spends real funds and network fees. A preliminary `submitted` result is not
+ledger confirmation; wait for `tx_confirmed` or check the hash on the ledger.
+If submission times out, check the hash before retrying.
+
+## Browser Requirements
+
+- Use HTTPS or localhost and allow popups. Connect and sign from user actions.
+- Preserve the requesting origin with `Referrer-Policy: strict-origin-when-cross-origin`
+  or `origin`; avoid `no-referrer`, `noopener` and `noreferrer` for the wallet popup.
+- If setting COOP, use `Cross-Origin-Opener-Policy: same-origin-allow-popups`.
+- Allow `data:` in CSP `img-src` for the embedded wallet icon.
+- Reconnect after a page reload; disconnect clears local state, not wallet credentials.
+- Safari/iOS popup behavior after asynchronous preflight still needs live verification.
+
+Transaction JSON is sent in the popup URL; do not include secrets in transaction
+metadata. See [Xyra's developer documentation](https://www.xyra.now/developers)
+for the wallet protocol.

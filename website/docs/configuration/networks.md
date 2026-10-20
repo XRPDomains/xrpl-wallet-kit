@@ -1,6 +1,9 @@
 # Networks
 
-XRPL Wallet Kit supports mainnet, testnet, devnet, and any custom XRPL network. The active network is shown as a badge in the modal and used by adapters when resolving explorer links.
+XRPL Wallet Kit supports mainnet, testnet, devnet, and custom XRPL networks,
+subject to adapter network restrictions. Network presets determine explorer
+links and non-mainnet badges. For Xahau mainnet/testnet integration since v0.2.0,
+see [Xahau](/docs/configuration/xahau).
 
 ## Built-in Networks
 

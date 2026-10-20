@@ -3,7 +3,7 @@
 [GhostSig](https://ghostsig.dev/) is a hosted XRPL wallet. The adapter opens a
 popup for connection and transaction approval; no browser extension or
 WalletConnect project ID is required. Available starting in **v0.1.20** as an
-experimental, opt-in adapter.
+opt-in adapter.
 
 ## Installation
 

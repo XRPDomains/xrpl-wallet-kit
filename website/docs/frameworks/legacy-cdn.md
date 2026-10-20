@@ -243,6 +243,8 @@ ESM imports from esm.sh do not require a bundler, but they do need a browser tha
 
 ## See Also
 
+- [Xahau](/docs/configuration/xahau#browser-cdn) - automatic runtime loading, hosting and CSP requirements in v0.2.0+
+
 - [Quick Start](/docs/quick-start) — modern bundler setup
 - [Vanilla TypeScript guide](/docs/frameworks/vanilla) — Vite / webpack setup
 - [IIFE bundle reference](/docs/api/create-wallet-kit) — full API for `createWalletKit`

@@ -1,6 +1,6 @@
 # @xrpl-wallet-kit/xahau
 
-Unreleased, opt-in Xahau protocol runtime. Core/UI/adapters do not import this
+Xahau protocol runtime, available from v0.2.0. Core/UI/adapters do not import this
 package. Core/selective consumers keep Xahau as an explicit dependency.
 The all-in-one client installs it automatically and registers a lazy runtime
 when Xahau is configured; dApps using that client do not need the imports below.

@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/website",
-  "version": "0.1.23",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "vitepress dev",

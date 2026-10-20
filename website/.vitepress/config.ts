@@ -52,7 +52,7 @@ export default defineConfig({
       { text: "Theme Builder", link: "/docs/theme-builder" },
       { text: "API Reference", link: "/docs/api/wallet-manager" },
         {
-          text: "v0.1.23",
+          text: "v0.2.0",
         items: [
           {
             text: "Changelog",
@@ -94,6 +94,7 @@ export default defineConfig({
           { text: "Theming", link: "/docs/configuration/theming" },
           { text: "App Metadata", link: "/docs/configuration/metadata" },
           { text: "Networks", link: "/docs/configuration/networks" },
+          { text: "Xahau", link: "/docs/configuration/xahau" },
           { text: "Localization (i18n)", link: "/docs/configuration/i18n" },
           { text: "Connect Button", link: "/docs/configuration/connect-button" },
           { text: "Recent Transactions", link: "/docs/configuration/recent-transactions" },
@@ -123,7 +124,8 @@ export default defineConfig({
           { text: "DropFi", link: "/docs/adapters/dropfi" },
           { text: "XRPL Snap (MetaMask)", link: "/docs/adapters/xrpl-snap" },
           { text: "Otsu Wallet", link: "/docs/adapters/otsu" },
-          { text: "GhostSig (Experimental)", link: "/docs/adapters/ghostsig" },
+          { text: "GhostSig", link: "/docs/adapters/ghostsig" },
+          { text: "Xyra", link: "/docs/adapters/xyra" },
         ],
       },
       {

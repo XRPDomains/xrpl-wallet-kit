@@ -43,7 +43,13 @@ Adapters:
 - `@xrpl-wallet-kit/adapter-walletconnect`
 - `@xrpl-wallet-kit/adapter-xrpl-snap`
 - `@xrpl-wallet-kit/adapter-ledger`
-- `@xrpl-wallet-kit/adapter-ghostsig` (experimental opt-in workspace implementation; not yet published)
+- `@xrpl-wallet-kit/adapter-ghostsig` (opt-in hosted wallet)
+- `@xrpl-wallet-kit/adapter-xyra` (hosted wallet; opt-in on XRPL)
+
+Since v0.2.0, the all-in-one client supports `xahau-mainnet` and `xahau-testnet`
+with automatic protocol registration. Core/selective integrations can use
+`@xrpl-wallet-kit/xahau` explicitly. Xaman, GemWallet and Xyra are configured
+for Xahau; Ledger requires explicit opt-in and transaction-specific device testing.
 
 ## Architecture
 
