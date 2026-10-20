@@ -7,9 +7,15 @@ export * from "@xrpl-wallet-kit/adapter-ledger";
 export * from "@xrpl-wallet-kit/adapter-walletconnect";
 export * from "@xrpl-wallet-kit/adapter-xaman";
 export * from "@xrpl-wallet-kit/adapter-xrpl-snap";
+export * from "@xrpl-wallet-kit/adapter-xyra";
+export { XAHAU_MAINNET, XAHAU_TESTNET, XAHAU_NETWORKS } from "@xrpl-wallet-kit/xahau/lazy";
 export * from "@xrpl-wallet-kit/ui";
 
-import { WalletManager, createBrowserWalletStorage } from "@xrpl-wallet-kit/core";
+import { WalletManager, DEFAULT_XRPL_NETWORKS } from "@xrpl-wallet-kit/core";
+import { resolveClientStorage } from "./storage";
+import { createLazyXahauProtocol, XAHAU_NETWORKS } from "@xrpl-wallet-kit/xahau/lazy";
+import type { XahauRpcRequest } from "@xrpl-wallet-kit/xahau";
+import { createXyraAdapter } from "@xrpl-wallet-kit/adapter-xyra";
 import type { WalletAdapter, WalletAppMetadata, WalletEventHandler, WalletEventName, WalletEvents, WalletManagerConfig } from "@xrpl-wallet-kit/core";
 import { createCrossmarkAdapter } from "@xrpl-wallet-kit/adapter-crossmark";
 import { createDropFiAdapter } from "@xrpl-wallet-kit/adapter-dropfi";
@@ -39,6 +45,7 @@ export type WalletKitAdapterId =
   | "xrplsnap"
   | "xrpl-snap"
   | "ledger"
+  | "xyra"
   | "staticbit"
   | "bitget"
   | "joey"
@@ -73,6 +80,8 @@ export interface CreateWalletClientOptions extends Omit<WalletManagerConfig, "ad
   walletConnectSignMessageDestination?: string;
   xamanClientId?: string;
   ghostsig?: GhostsigAdapterOptions;
+  /** Optional trusted RPC transport (e.g. a same-origin proxy for browser CORS). */
+  xahau?: { request?: XahauRpcRequest };
   wallets?: "all" | WalletKitAdapterId[];
   ui?: WalletKitUiConfig;
 }
@@ -96,6 +105,7 @@ export interface WalletKitStateSnapshot<T extends WalletEventName = WalletEventN
 export type WalletKitStateSubscriber = (snapshot: WalletKitStateSnapshot) => void;
 
 export function createWalletClient(options: CreateWalletClientOptions): WalletManager {
+  const xahauEnabled = usesXahau(options);
   let manager: WalletManager | undefined;
   const adapters = options.adapters ?? createDefaultAdapters(options, (event) => {
     manager?.emitQr(event.adapterId, event.uri, event.deeplink);
@@ -103,8 +113,14 @@ export function createWalletClient(options: CreateWalletClientOptions): WalletMa
 
   manager = new WalletManager({
     ...withoutKitOnlyOptions(options),
+    ...(xahauEnabled ? {
+      networks: [...new Map([...XAHAU_NETWORKS, ...(options.networks ?? [])].map(network => [network.id, network])).values()],
+      protocols: options.protocols?.some(protocol => protocol.family === "xahau")
+        ? options.protocols : [...(options.protocols ?? []), createLazyXahauProtocol(options.xahau)]
+    } : {}),
     adapters,
-    storage: resolveStorage(options.storage)
+    storage: resolveClientStorage(options.storage, new Map([...DEFAULT_XRPL_NETWORKS, ...XAHAU_NETWORKS, ...(options.networks ?? [])]
+      .map(network => [network.id, network])).get(options.network ?? "mainnet") ?? DEFAULT_XRPL_NETWORKS[0])
   });
 
   return manager;
@@ -142,6 +158,7 @@ export function createWalletKit(options: CreateWalletKitOptions) {
     button,
     openModal: () => modal?.open(),
     closeModal: () => modal?.close(),
+    connect: manager.connect.bind(manager),
     disconnect: () => manager.disconnect(),
     switchNetwork: manager.switchNetwork.bind(manager),
     toast,
@@ -244,12 +261,14 @@ function resolveToastOptions(options: CreateWalletKitOptions, modalUi: Partial<O
 function createDefaultAdapters(options: CreateWalletClientOptions, onQr: (event: { adapterId: string; uri: string; deeplink?: string }) => void): WalletAdapter[] {
   const ids = options.wallets === "all" || !options.wallets ? undefined : new Set<string>(options.wallets);
   const adapters: WalletAdapter[] = [];
+  const chainOptions = usesXahau(options) ? { supportedChains: { families: ["xrpl", "xahau"] } } : {};
 
   if (shouldInclude(ids, "xaman") && options.xamanClientId) {
-    adapters.push(createXamanAdapter({ apiKey: options.xamanClientId, onQr }));
+    adapters.push(createXamanAdapter({ apiKey: options.xamanClientId, onQr, ...chainOptions }));
   }
 
-  if (shouldInclude(ids, "gemwallet")) adapters.push(createGemWalletAdapter());
+  if (shouldInclude(ids, "gemwallet")) adapters.push(createGemWalletAdapter(chainOptions));
+  if (shouldInclude(ids, "xyra") && (usesXahau(options) || ids?.has("xyra"))) adapters.push(createXyraAdapter(chainOptions));
   if (shouldInclude(ids, "crossmark")) adapters.push(createCrossmarkAdapter());
   if (shouldInclude(ids, "dropfi")) adapters.push(createDropFiAdapter());
   if (ids?.has("ghostsig")) adapters.push(createGhostsigAdapter(options.ghostsig));
@@ -270,15 +289,16 @@ function createDefaultAdapters(options: CreateWalletClientOptions, onQr: (event:
     }));
   }
 
-  if (shouldInclude(ids, "ledger")) adapters.push(createLedgerAdapter());
+  // Keep default Ledger XRPL-only until device/app-specific Xahau acceptance is recorded.
+  if (shouldInclude(ids, "ledger")) adapters.push(createLedgerAdapter(ids?.has("ledger") ? chainOptions : {}));
 
   return adapters;
 }
 
-function resolveStorage(storage: CreateWalletClientOptions["storage"]): WalletManagerConfig["storage"] | undefined {
-  if (storage === "localStorage") return createBrowserWalletStorage();
-  if (storage === "memory") return undefined;
-  return storage;
+function usesXahau(options: CreateWalletClientOptions): boolean {
+  return options.xahau !== undefined || XAHAU_NETWORKS.some(network => network.id === options.network)
+    || options.networks?.some(network => network.family === "xahau") === true
+    || options.protocols?.some(protocol => protocol.family === "xahau") === true;
 }
 
 function resolveModalOptions(options: CreateWalletKitOptions): { ui: Partial<Omit<WalletUiOptions, "manager" | "mount">>; autoOpen: boolean } {
@@ -424,6 +444,7 @@ function withoutKitOnlyOptions(options: CreateWalletClientOptions): WalletManage
     walletConnectSignMessageDestination: _walletConnectSignMessageDestination,
     xamanClientId: _xamanClientId,
     ghostsig: _ghostsig,
+    xahau: _xahau,
     wallets: _wallets,
     ui: _ui,
     ...managerConfig

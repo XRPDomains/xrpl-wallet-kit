@@ -29,6 +29,22 @@ async function setup(preflight?: TransactionPreflightPolicy) {
 }
 const txJson = { TransactionType: "Payment", Account: account.address };
 
+test("explicit submit rejection preserves known outcome and transaction hash", async () => {
+  const tracker = new WalletRequestTracker(() => undefined);
+  await assert.rejects(tracker.run("fixture", "sign-and-submit", { requestId: "rejected-submit" }, {}, async control => {
+    control.progress({ state: "opened" });
+    throw new WalletKitError(WalletKitErrorCode.SUBMIT_FAILED, "temMALFORMED", {
+      details: { outcomeUnknown: false, hash: "ABC", final: true }
+    });
+  }, () => ({ state: "submitted" })), (error: any) => {
+    assert.equal(error.details.outcomeUnknown, false);
+    assert.equal(error.details.hash, "ABC");
+    return true;
+  });
+  assert.equal(tracker.get("rejected-submit")?.outcomeUnknown, false);
+  assert.equal(tracker.get("rejected-submit")?.hash, "ABC");
+});
+
 test("request helper invokes synchronously, never dispatches pre-aborted/invalid requests, and consumes late failure", async () => {
   let calls = 0;
   const done = waitForWalletRequest(() => { calls++; return Promise.resolve(1); });

@@ -58,6 +58,17 @@ test("formatAuthMessage and parseAuthMessage round-trip required and optional fi
   assert.deepEqual(parseAuthMessage(formatAuthMessage(params)), params);
 });
 
+test("Xahau auth automatically binds the connected chain, without changing raw signing", async () => {
+  const manager = makeManager();
+  const connected = { ...account, network: { id: "xahau-mainnet", family: "xahau", name: "Xahau Mainnet", networkType: "MAINNET" as const, networkId: 21337 } };
+  manager.getAccount = () => connected;
+  const auth = createWalletAuth(manager, makeAuthAdapter());
+  try {
+    assert.equal(parseAuthMessage((await auth.signIn()).message).chainId, "xahau:21337");
+    await assert.rejects(auth.signIn({ chainId: "xrpl:0" }), /Auth chain differs/);
+  } finally { auth.destroy(); }
+});
+
 test("validateAuthMessage detects domain mismatch, expiration, old messages, and reused nonce", async () => {
   const message = formatAuthMessage({
     domain: "example.com",

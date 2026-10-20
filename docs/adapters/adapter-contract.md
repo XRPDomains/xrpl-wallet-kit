@@ -175,6 +175,36 @@ manager.on("tx_confirmed", ({ adapterId, account, hash, result, transaction }) =
 manager.on("tx_failed", ({ adapterId, account, hash, error, transaction }) => {});
 ```
 
+### Chain-Aware Network Events (Unreleased)
+
+Non-legacy networks also require an injected protocol that declares the same
+family, network ID, numeric NetworkID and network type. Sharing a family name
+alone does not authorize a protocol for another network. Providers still need
+to verify the actual account/network and signed result; metadata is not proof.
+
+An adapter declaring `capabilities.details.supportedChains` must return an
+authoritative `account.network` in connect/restore/recovery results, including
+any supplied session. It must also include the verified network when forwarding
+account or network changes to the manager:
+
+```ts
+manager.emitAccountChanged(adapterId, { address, network });
+manager.emitNetworkChanged(adapterId, network);
+```
+
+For chain-aware adapters, an event without network identity revokes the active
+session, cancels pending signing and emits an `error` with `NETWORK_MISMATCH`.
+An event for a network excluded by the adapter's declarations also revokes the
+session and emits `NETWORK_NOT_SUPPORTED`. Do not forward partial account events
+until the provider network has been verified; never fill it from an unverified
+cached/requested network merely to satisfy this contract. If the provider loses
+authorization, use `emitDisconnected(adapterId)`.
+
+Legacy adapters without `supportedChains` retain their optional-network event
+contract. Network support checks AND new criteria with legacy `supportedNetworks`;
+unsupported switch targets consistently return `NETWORK_NOT_SUPPORTED`, whereas
+an absent switch method remains `UNSUPPORTED_METHOD`.
+
 ### Error Event Shape
 
 The `error` event shape is:
@@ -239,6 +269,23 @@ assertWalletAdapter(createMyWalletAdapter());
 `validateWalletAdapter()` returns warnings and errors. Warnings do not block registration, but errors mean the adapter does not satisfy contract v1.
 
 ## Boundary Rules
+
+For any non-XRPL family, the manager requires a matching registered
+`WalletProtocol` before connecting, restoring, switching networks or signing.
+The adapter must consume the manager-supplied `protocolContext` for preparation,
+encoding and complete signed-result verification; a runtime being registered
+does not prove that a third-party adapter uses it correctly. Never fall back to
+the XRPL codec for an unfamiliar family. Native provider chain identifiers may
+still require explicit wallet-specific mappings.
+
+Trusted network presets declare these mappings in `providerHints`: `xaman` and
+`xyra` selectors, GemWallet `{ chain, network }`, and Ledger `ledgerApp` (`XRP`
+or `XAH`). Use core `getProviderHint(network, provider)` instead of deriving
+provider strings from the family name. Only known legacy XRPL preset IDs have
+a compatibility fallback. Missing or invalid hints fail before provider prompts.
+Hints are application configuration, not evidence of the wallet's active network;
+adapters must still verify the provider response. A new family also requires a
+matching protocol and explicit adapter chain configuration.
 
 Adapters must not:
 

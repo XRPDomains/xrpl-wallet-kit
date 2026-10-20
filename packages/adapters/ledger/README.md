@@ -31,8 +31,8 @@ const kit = createWalletKit({
 ## Runtime Notes
 
 - Requires a browser with WebHID or WebUSB support.
-- Requires a connected, unlocked Ledger device with XRP installed. During explicit connection, `autoOpenApp` requests XRP directly on the hardware (default `true`); confirm on the device when prompted. It never launches or requires Ledger Live desktop. This option is available since 0.1.23.
-- Already-open XRP is left alone. Another device app is closed before requesting XRP. App switches can disconnect USB temporarily: reconnection attempts use only the originally selected device handle, never another authorized Ledger. If browser permission/re-enumeration prevents recovery, open XRP manually and select the device again.
+- Requires a connected, unlocked Ledger with the selected app installed. During explicit connect, `autoOpenApp` (default `true`) requests XRP for XRPL or XAH (Xahau) for Xahau directly on the hardware; confirm on the device when prompted. It never launches Ledger Live desktop or installs an app. XRP auto-opening is available since 0.1.23; XAH auto-opening is unreleased.
+- An already-open matching app is left alone. Another device app is closed before requesting the selected app. App switches can disconnect USB temporarily: reconnection attempts use only the originally selected device handle, never another authorized Ledger. If recovery or OS app launch is unsupported, open the selected app manually and select the device again. No automatic XAH-to-XRP fallback occurs.
 - Hardware wallets are explicit user-presence devices. `restoreSession()` returns `null` and does not silently reconnect after refresh.
 - Default derivation path is `44'/144'/0'/0/0`.
 - `signTransaction()` signs without submit.
@@ -60,6 +60,14 @@ createLedgerAdapter({
 ```
 
 Use `connectLedger` in tests or custom integrations to inject a prebuilt Ledger session.
+
+For controlled Xahau compatibility testing with the XRP app, explicitly use
+`deviceApp: "XRP"`; default Xahau connections request `"XAH"`. Use
+`autoOpenApp: false` to manage the app manually. Connection metadata records
+`requestedDeviceApp`, not a claim of independently verified device app identity.
+Default client Ledger remains XRPL-only until explicitly opted into Xahau.
+Launching XAH successfully does not establish support for every transaction,
+Hook field, device or app version, and never enables blind signing.
 
 ## Testing
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- Auth challenges on non-XRPL networks include a chain ID. Server verification accepts `expectedChainId` and rejects non-XRPL challenges without a server-pinned chain; raw `signMessage` bytes are unchanged. Existing XRPL auth remains compatible.
+- Select injected protocols by family and declared network identity for connection and transaction lookup. All client localStorage sessions use family/network namespaces, with one-time identity-checked legacy XRPL session migration. Caller-provided storage is preserved.
+- Load the CDN Xahau codec on demand from a separate, version-matched runtime asset. Keep provider wire selectors in trusted network preset hints rather than adapter chain-name branches.
+- GemWallet XRPL sign-only now uses the provider's `signTransaction` API with blob verification. Its default 1,000,000-drop fee ceiling is configurable through `xrplMaxFeeDrops` or a request `maxFeeDrops`; when both are explicit, the lower applies. Submission routing is unchanged.
+- Compatibility: legacy `supportedNetworks` is enforced across connect/restore/sign and empty arrays deny all. A new `supportedChains` declaration does not widen a legacy allowlist. Direct Standard adapters must receive custom network mappings; manager discovery forwards the registered presets automatically.
+- Correct chain-sensitive amount validation and connection text; show Xahau Mainnet/Testnet labels rather than generic testnet or XRP labels. Unknown non-XRPL native assets no longer default to XRP. The product name remains XRPL Wallet Kit.
+
+- Add an optional Xahau protocol package and opt-in Xaman/GemWallet/Xyra/Ledger integration. The unified local console selects XRPL/Xahau mainnet/testnet and filters wallet lists; Xahau uses explicit fee ceilings, verified sign-only, then optional RPC submission. Device/provider live acceptance remains user-driven; no automatic release.
+- Xyra accepted broadcasts return `submitted` with a verified hash for manager ledger confirmation, not a false validated-success result or an unconditional unknown-outcome error.
+- Add declarative chain filters with deny-all empty lists and narrowing-only intersection. Manager connection, restoration, recovery, switching and signing enforce both legacy and new network restrictions; modal lists follow the active network.
+- Resolve Wallet Standard chain capabilities through registered network mappings rather than namespace prefixes. Chain-aware adapters must retain network identity in connection results and provider events; Xahau runtime/provider opt-in is explicit.
+
 ## 0.1.23
 
 - Ledger can request opening XRP on the hardware during explicit connection (`autoOpenApp`, default true), with selected-device-only reconnect attempts, cancellation and manual fallback. No Ledger Live desktop dependency or signing-flow change.

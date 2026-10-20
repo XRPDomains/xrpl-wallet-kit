@@ -4,6 +4,7 @@ export interface WalletAuthValidationOptions {
   expectedDomain?: string;
   expectedUri?: string;
   expectedAddress?: string;
+  expectedChainId?: string;
   now?: Date;
   maxAgeSeconds?: number;
   isNonceUsed?: (nonce: string) => boolean | Promise<boolean>;
@@ -95,6 +96,7 @@ export async function validateAuthMessage(message: string, options: WalletAuthVa
   if (options.expectedDomain && parsed.domain !== options.expectedDomain) errors.push("Domain does not match.");
   if (options.expectedUri && parsed.uri !== options.expectedUri) errors.push("URI does not match.");
   if (options.expectedAddress && parsed.address !== options.expectedAddress) errors.push("Address does not match.");
+  if (options.expectedChainId !== undefined && parsed.chainId !== options.expectedChainId) errors.push("Chain ID does not match.");
 
   if (parsed.expirationTime) {
     const expiresAt = Date.parse(parsed.expirationTime);

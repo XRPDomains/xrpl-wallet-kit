@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/core" },
+    { "path": "./packages/xahau" },
     { "path": "./packages/adapters/xaman" },
     { "path": "./packages/adapters/gemwallet" },
     { "path": "./packages/adapters/crossmark" },

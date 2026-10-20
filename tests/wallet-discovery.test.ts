@@ -25,6 +25,22 @@ function fixture(name = "Example") {
 }
 function manager() { return new WalletManager({ networks: [network], network: network.id, accountStatus: { enabled: false }, transactionConfirmation: { enabled: false }, logger: { level: "silent" } }); }
 
+test("Standard discovery forwards custom XRPL presets and missing network events revoke the session", async () => {
+  const custom = { ...network, id: "private-testnet", family: "xrpl" };
+  const kit = new WalletManager({ networks: [custom], network: custom.id, accountStatus: { enabled: false } });
+  const wallet = fixture("Custom network");
+  const registry = getWallets();
+  const unregister = registry.register(wallet.wallet);
+  const discovery = startWalletStandardDiscovery(kit, { registry });
+  try {
+    const adapter = discovery.getAdapters().find(adapter => adapter.wallet === wallet.wallet)!;
+    await kit.connect(adapter.metadata.id);
+    assert.equal(kit.getAccount()?.network?.id, custom.id);
+    kit.emitNetworkChanged(adapter.metadata.id);
+    assert.equal(kit.getSession(), null);
+  } finally { discovery.dispose(); unregister(); kit.destroy(); }
+});
+
 test("discovery handles pre-existing and late wallets, duplicate names and legacy coexistence without prompting", () => {
   const registry = getWallets(); const before = fixture("Same Name"); const after = fixture("Same Name");
   const removeBefore = registry.register(before.wallet);

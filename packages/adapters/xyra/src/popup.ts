@@ -8,7 +8,7 @@ export class XyraPopup {
   get pending() { return Boolean(this.stop); }
   cancel() { this.stop?.(); }
 
-  request(path: "connect" | "sign", params: Record<string, string>, options: WalletRequestOptions): Promise<Record<string, unknown>> {
+  request(path: "connect" | "sign", params: Record<string, string>, options: WalletRequestOptions, reservedWindow?: Window): Promise<Record<string, unknown>> {
     const failure = (message: string) => new WalletKitError(WalletKitErrorCode.INVALID_REQUEST, message);
     if (this.pending) return Promise.reject(failure("A Xyra popup request is already pending."));
     const timeout = options.timeoutMs ?? 60_000;
@@ -21,7 +21,10 @@ export class XyraPopup {
     Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
     const win = window;
     let popup: Window | null;
-    try { popup = win.open(url.href, `xyra-${id}`, "popup=yes,width=420,height=720,resizable=yes,scrollbars=yes"); }
+    try {
+      popup = reservedWindow ?? win.open(url.href, `xyra-${id}`, "popup=yes,width=420,height=720,resizable=yes,scrollbars=yes");
+      if (reservedWindow) reservedWindow.location.replace(url.href);
+    }
     catch { popup = null; }
     if (!popup || popup.closed) return Promise.reject(createWalletError.walletNotAvailable("Xyra", new Error("Popup blocked.")));
     const opened = popup;

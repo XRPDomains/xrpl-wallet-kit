@@ -1,4 +1,4 @@
-import { WalletKitError, WalletKitErrorCode } from "@xrpl-wallet-kit/core";
+import { WalletKitError, WalletKitErrorCode, getNetworkChainId, isLegacyNetwork } from "@xrpl-wallet-kit/core";
 import type { WalletAuth, WalletAuthAdapter, WalletAuthChangeHandler, WalletAuthManager, WalletAuthOptions, WalletAuthSignInResult, WalletAuthState } from "./types";
 import { isWalletAuthSignInResult } from "./types";
 
@@ -41,6 +41,11 @@ class WalletAuthController implements WalletAuth {
     const initialSession = this.manager.getSession();
     const account = this.manager.getAccount();
     if (!account) throw new Error("No active wallet session. Connect a wallet first.");
+    if (account.network && !isLegacyNetwork(account.network)) {
+      const chainId = getNetworkChainId(account.network);
+      if (merged.chainId !== undefined && merged.chainId !== chainId) throw new Error("Auth chain differs from the connected network.");
+      merged.chainId = chainId;
+    }
     if (!this.manager.getCapabilities()?.signMessage) {
       throw new Error("Active wallet adapter does not support message signing.");
     }

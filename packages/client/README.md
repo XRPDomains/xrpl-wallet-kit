@@ -67,6 +67,56 @@ const kit = createWalletKit({
 
 `walletConnect.mode: "default"` uses the official WalletConnect AppKit modal. Use `"list"` or `"group"` when you want XRPL Wallet Kit to render its custom wallet list and QR/deeplink panel.
 
+## Xahau
+
+The all-in-one client recognizes `xahau-mainnet` and `xahau-testnet` without
+separate protocol/network imports. Xaman (with `xamanClientId`), GemWallet and
+Xyra are enabled for those chains; the modal filters incompatible wallets.
+Default Ledger remains XRPL-only pending device/app-specific Xahau acceptance.
+For controlled Xahau device testing, explicitly include `"ledger"` in `wallets`
+or supply a chain-aware Ledger adapter. This opt-in is not proof of support for
+Invoke/HookParameters or any untested device/app; never enable blind signing
+to make a test pass.
+
+```ts
+import { createWalletKit } from "@xrpl-wallet-kit/client";
+
+const kit = createWalletKit({
+  network: "xahau-testnet",
+  xamanClientId: "YOUR_XAMAN_CLIENT_ID",
+  preflight: { maxFeeDrops: "50000" }, // application-selected ceiling, not a fee recommendation
+});
+
+// Invoke from a user action. This factory does not connect automatically.
+await kit.connect("xaman");
+const signed = await kit.signTransaction({
+  txJson: { TransactionType: "Payment", Destination: recipientAddress, Amount: "1000000" },
+});
+// To broadcast instead, call kit.signAndSubmit({ txJson: ... }) explicitly.
+```
+
+Supply a real classic recipient address. Xahau preparation fills Account,
+NetworkID, Sequence, Fee and expiry, and verifies the complete signed result.
+Global `preflight.maxFeeDrops`, request preflight caps and `request.maxFeeDrops`
+combine using the lowest ceiling; `preflight: false` does not remove the global
+protocol ceiling. Application preflight checks run on the input transaction;
+the protocol then estimates/enforces the actual fee before wallet approval.
+
+ESM consumers load the Xahau codec when first used for signing or transaction
+lookup, not when importing the client or connecting. The IIFE automatically loads
+`xrpl-wallet-kit-xahau.runtime.js` from its script directory on first Xahau use;
+self-host both files and allow that directory in `script-src`. Pin the package
+version so the main bundle and runtime match. XRPL-only defaults remain unchanged.
+To opt an initially XRPL client into both chains, pass `networks: [...XAHAU_NETWORKS]`
+using the lightweight preset export from this same client package. Explicit
+`adapters` and `protocols` remain caller-owned and are not rewritten.
+
+Direct RPC requires an endpoint accessible from the browser. If deployment
+CORS requires a proxy, pass `xahau: { request }`, a trusted
+`(network, method, params, signal) => Promise<result>` transport returning the
+unwrapped RPC result. Never proxy arbitrary wallet-provided URLs.
+The `client/selective` entry remains manual and does not import Xahau.
+
 ## Selecting Wallets
 
 ```ts
@@ -86,6 +136,7 @@ Available built-in ids:
 - `walletconnect`
 - `xrpl-snap` or `xrplsnap`
 - `ledger`
+- `xyra` (included by default for Xahau; opt-in for XRPL)
 - `otsu`
 
 `ledger` is included in `wallets: "all"` by default. Because it is a hardware wallet, it does not silently restore after reload; users must reconnect the device and open the XRP app.
@@ -133,6 +184,15 @@ createWalletKit({
 ```
 
 ## Related
+
+When `storage: "localStorage"` is used, all sessions are namespaced by configured
+family and network, including XRPL mainnet/testnet/devnet. An old XRPL session
+is copied once only when its complete registered network identity matches; normal
+wallet verification still applies. Logout prevents that legacy session from being
+imported again. Legacy data is not deleted and old transaction history is not
+automatically migrated. Separate apps on the same network should use their own
+storage, for example `createBrowserWalletStorage("my-app.xrpl.testnet.")`.
+An injected storage object is always used as supplied.
 
 - `@xrpl-wallet-kit/core` - headless manager and adapter contract
 - `@xrpl-wallet-kit/ui` - modal, button, inline picker, and toast

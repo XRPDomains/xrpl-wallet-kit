@@ -30,6 +30,19 @@
 - [ ] If an adapter intentionally omits `restoreSession()`, README explains that autoReconnect requires manual reconnect.
 - [ ] `WalletManager.autoReconnect()` emits `session_restored` and `connected` for the adapter when restore succeeds.
 
+## Chain-aware networks (unreleased foundation)
+
+- [ ] Test omitted criteria, explicit empty lists, empty filters and disjoint intersections; none can broaden support.
+- [ ] Test AND semantics for mixed `supportedNetworks` / `supportedChains`, including empty legacy lists.
+- [ ] Unsupported connect/restore/recovery/switch/sign operations do not invoke the provider.
+- [ ] Unsupported switch targets return `NETWORK_NOT_SUPPORTED` for legacy, new and combined declarations.
+- [ ] Chain-aware connect/restore/recovery results and supplied sessions include verified `account.network`.
+- [ ] Chain-aware account/network events include verified network identity; missing identity revokes the session with `NETWORK_MISMATCH`.
+- [ ] Unsupported network events revoke the session with `NETWORK_NOT_SUPPORTED`; pending signatures cannot complete afterward.
+- [ ] Provider authorization loss uses `emitDisconnected(adapterId)`; no fabricated network from requested/cached state.
+- [ ] Standard wallet chains map through registered presets, not prefix-derived families, and preserve exact network limits.
+- [ ] Modal re-filters on network change using the active account network or `manager.getNetwork()`.
+
 ## Signing flow
 
 - [ ] `signMessage()` works or capability is `false`.
@@ -47,6 +60,10 @@
 - [ ] Back from custom QR returns to the expected wallet list/group.
 
 ## Security
+
+- [ ] Non-XRPL connect fails before provider calls if its protocol runtime is missing.
+- [ ] Non-XRPL signing consumes `protocolContext`; no fallback to an XRPL codec.
+- [ ] Submit rejection preserves hash and known/provisional outcome through the manager request tracker.
 
 - [ ] No private key, seed, secret, API key, or WalletConnect projectId is hardcoded.
 - [ ] Adapter does not submit hidden transactions.

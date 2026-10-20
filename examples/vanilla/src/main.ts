@@ -1,4 +1,4 @@
-import { WalletManager, createBrowserWalletStorage, sanitizeWalletUrl } from "../../../packages/core/src";
+import { WalletManager, createBrowserWalletStorage, sanitizeWalletUrl, adapterSupportsNetwork, getNativeAsset, getNetworkChainId } from "../../../packages/core/src";
 import { Buffer } from "buffer";
 import { createWalletAuth, formatAuthMessage } from "../../../packages/auth/src";
 import { createDefaultWalletUiConfig, resolveWalletButtonOptions } from "../../../packages/ui/src";
@@ -31,6 +31,25 @@ const walletConnectMode = document.querySelector<HTMLSelectElement>("#walletconn
 const walletLayout = document.querySelector<HTMLSelectElement>("#wallet-layout")!;
 const uiTheme = document.querySelector<HTMLSelectElement>("#ui-theme")!;
 const networkSelect = document.querySelector<HTMLSelectElement>("#network")!;
+const chainSelect = document.querySelector<HTMLSelectElement>("#chain")!;
+const maxFeeInput = document.querySelector<HTMLInputElement>("#max-fee-drops")!;
+maxFeeInput.addEventListener("input", () => maxFeeInput.setCustomValidity(""));
+const genericTx = document.querySelector<HTMLTextAreaElement>("#generic-tx")!;
+const genericResult = document.querySelector<HTMLPreElement>("#generic-result")!;
+const genericButton = document.querySelector<HTMLButtonElement>("#generic-sign-button")!;
+const uriOperation = document.querySelector<HTMLSelectElement>("#uri-operation")!;
+const uriButton = document.querySelector<HTMLButtonElement>("#uri-submit-button")!;
+const uriResult = document.querySelector<HTMLPreElement>("#uri-result")!;
+const initialUrl = new URL(window.location.href);
+if (initialUrl.searchParams.get("chain") === "xahau") chainSelect.value = "xahau";
+const initialNetwork = initialUrl.searchParams.get("network");
+if (initialNetwork && ["mainnet", "testnet", "devnet"].includes(initialNetwork)) networkSelect.value = initialNetwork;
+if (chainSelect.value === "xahau" && networkSelect.value === "devnet") networkSelect.value = "testnet";
+function saveNetworkSelection() {
+  const url = new URL(window.location.href);
+  url.searchParams.set("chain", chainSelect.value); url.searchParams.set("network", networkSelect.value);
+  window.history.replaceState(window.history.state, "", url);
+}
 const walletList = document.querySelector<HTMLDivElement>("#wallet-list")!;
 const transactionMode = document.querySelector<HTMLSelectElement>("#transaction-mode")!;
 const paymentDestinationInput = document.querySelector<HTMLInputElement>("#payment-destination")!;
@@ -73,6 +92,115 @@ let walletToast: { mount(): void; destroy(): void } | undefined;
 let bootstrapRun = 0;
 const hiddenWalletIds = new Set<string>();
 let transactionPending = false;
+const chainSupport = { families: ["xrpl", "xahau"] };
+let activeWorkflow = "payment";
+const workflowTabs = [...document.querySelectorAll<HTMLButtonElement>("[data-workflow]")];
+
+function renderWorkspace() {
+  document.querySelector<HTMLElement>("#xahau-nft")!.hidden = chainSelect.value !== "xahau";
+  document.querySelector<HTMLElement>("#xrpl-nft")!.hidden = chainSelect.value === "xahau";
+  for (const tab of workflowTabs) tab.hidden = chainSelect.value === "xahau" && tab.hasAttribute("data-xrpl-only");
+  if (workflowTabs.find(tab => tab.dataset.workflow === activeWorkflow)?.hidden) activeWorkflow = "payment";
+  for (const tab of workflowTabs) {
+    const selected = tab.dataset.workflow === activeWorkflow;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+  }
+  document.querySelectorAll<HTMLElement>("[data-workflow-panel]").forEach(panel => {
+    panel.hidden = panel.dataset.workflowPanel !== activeWorkflow;
+  });
+  document.querySelectorAll<HTMLElement>("[data-workflow-group]").forEach(group => {
+    group.hidden = !group.dataset.workflowGroup!.split(" ").includes(activeWorkflow);
+  });
+  document.querySelector<HTMLElement>(".transaction-toolbar")!.hidden = !["payment", "json", "nft"].includes(activeWorkflow);
+}
+
+for (const tab of workflowTabs) {
+  tab.addEventListener("click", () => {
+    activeWorkflow = tab.dataset.workflow!;
+    renderWorkspace();
+  });
+  tab.addEventListener("keydown", event => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const visible = workflowTabs.filter(button => !button.hidden);
+    const index = visible.indexOf(tab);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? visible.length - 1
+      : (index + (event.key === "ArrowRight" ? 1 : -1) + visible.length) % visible.length;
+    visible[next].click();
+    visible[next].focus();
+  });
+}
+
+chainSelect.addEventListener("change", () => {
+  renderWorkspace();
+  const devnet = networkSelect.querySelector<HTMLOptionElement>('option[value="devnet"]')!;
+  devnet.disabled = chainSelect.value === "xahau";
+  if (devnet.disabled && networkSelect.value === "devnet") networkSelect.value = "testnet";
+  setDefaultSignMessage();
+  document.querySelector("#payment-unit")!.textContent = chainSelect.value === "xahau" ? "Amount XAH" : "Amount XRP";
+  document.querySelector<HTMLElement>("#batch-test")!.hidden = chainSelect.value === "xahau";
+  maxFeeInput.closest("label")!.hidden = chainSelect.value !== "xahau";
+  document.querySelector<HTMLOptionElement>('#generic-template option[value="Invoke"]')!.disabled = chainSelect.value !== "xahau";
+  saveNetworkSelection();
+  resetPreview().catch(error => log("bootstrap_error", { message: formatError(error) }));
+});
+const templates: Record<string, TransactionPayload> = {
+  Payment: { TransactionType: "Payment", Destination: "", Amount: "1" }, Invoke: { TransactionType: "Invoke", Destination: "" },
+  TrustSet: { TransactionType: "TrustSet", LimitAmount: { currency: "USD", issuer: "", value: "0" } },
+  OfferCreate: { TransactionType: "OfferCreate", TakerGets: "1", TakerPays: { currency: "USD", issuer: "", value: "1" } },
+  OfferCancel: { TransactionType: "OfferCancel", OfferSequence: 0 }, AccountSet: { TransactionType: "AccountSet" }
+};
+document.querySelector<HTMLSelectElement>("#generic-template")!.addEventListener("change", event => { genericTx.value = JSON.stringify(templates[(event.target as HTMLSelectElement).value], null, 2); });
+genericButton.addEventListener("click", () => {
+  try {
+    const txJson: unknown = JSON.parse(genericTx.value);
+    if (!txJson || typeof txJson !== "object" || Array.isArray(txJson)) throw new Error("Enter a transaction object");
+    void runTransaction(genericResult, "generic", { txJson: txJson as TransactionPayload, methodHint: "generic" }).catch(error => showTransactionError(genericResult, formatError(error)));
+  } catch (error) { showTransactionError(genericResult, formatError(error)); }
+});
+
+uriOperation.addEventListener("change", () => {
+  renderUriFields();
+  if (manager) renderTransactionState();
+});
+function renderUriFields() {
+  const type = uriOperation.value;
+  const visible = type === "URITokenMint" ? ["uri", "burnable"]
+    : type === "URITokenCreateSellOffer" ? ["id", "amount", "destination"]
+    : type === "URITokenBuy" ? ["id", "amount"] : ["id"];
+  document.querySelectorAll<HTMLElement>("[data-uri-field]").forEach(field => {
+    field.hidden = !visible.includes(field.dataset.uriField!);
+  });
+}
+uriButton.addEventListener("click", () => {
+  void submitUriToken().catch(error => showTransactionError(uriResult, formatError(error)));
+});
+
+async function submitUriToken() {
+  if (chainSelect.value !== "xahau") throw new Error("Select Xahau for URIToken.");
+  const input = (id: string) => document.querySelector<HTMLInputElement>(`#${id}`)!.value.trim();
+  const type = uriOperation.value;
+  const txJson: TransactionPayload = { TransactionType: type };
+  if (type === "URITokenMint") {
+    const uri = stringToHex(input("uri-value"));
+    if (!uri || uri.length > 512) throw new Error("URI must be 1-256 UTF-8 bytes.");
+    txJson.URI = uri;
+    if (document.querySelector<HTMLInputElement>("#uri-burnable")!.checked) txJson.Flags = 1;
+  } else {
+    const id = input("uri-token-id");
+    if (!/^[A-Fa-f0-9]{64}$/.test(id)) throw new Error("URITokenID must be 64 hex characters.");
+    txJson.URITokenID = id.toUpperCase();
+  }
+  if (["URITokenCreateSellOffer", "URITokenBuy"].includes(type)) {
+    const amount = input("uri-amount");
+    if (!/^(0|[1-9]\d*)$/.test(amount)) throw new Error("Amount must be integer drops.");
+    txJson.Amount = amount;
+  }
+  if (type === "URITokenCreateSellOffer" && input("uri-destination")) txJson.Destination = input("uri-destination");
+  await runTransaction(uriResult, type, { txJson, methodHint: "generic" });
+}
+document.querySelector("#cancel-request-button")!.addEventListener("click", () => { manager.getPendingRequests().forEach(request => manager.cancelRequest(request.id)); });
 
 transactionMode.addEventListener("change", () => renderTransactionState());
 
@@ -98,6 +226,7 @@ walletConnectMode.addEventListener("change", () => {
 });
 
 [networkSelect].forEach((control) => control.addEventListener("change", () => {
+  saveNetworkSelection();
   setDefaultSignMessage();
   resetPreview().catch((error) => {
     log("bootstrap_error", { message: formatError(error) });
@@ -157,8 +286,16 @@ authSignInButton.addEventListener("click", () => {
 });
 
 setDefaultSignMessage();
+renderWorkspace();
+renderUriFields();
+document.querySelector("#payment-unit")!.textContent = chainSelect.value === "xahau" ? "Amount XAH" : "Amount XRP";
+document.querySelector<HTMLElement>("#batch-test")!.hidden = chainSelect.value === "xahau";
+maxFeeInput.closest("label")!.hidden = chainSelect.value !== "xahau";
+document.querySelector<HTMLOptionElement>('#generic-template option[value="Invoke"]')!.disabled = chainSelect.value !== "xahau";
+networkSelect.querySelector<HTMLOptionElement>('option[value="devnet"]')!.disabled = chainSelect.value === "xahau";
 
 async function resetPreview() {
+  transactionPending = false;
   bootstrapRun += 1;
   reactPreview?.destroy();
   manager?.destroy();
@@ -194,6 +331,7 @@ async function bootstrap(run = bootstrapRun) {
     import("../../../packages/adapters/xaman/src"),
     import("../../../packages/adapters/xrpl-snap/src")
   ]);
+  if (run !== bootstrapRun) return;
 
   const WALLETCONNECT_METADATA = createWalletConnectMetadata(PREVIEW_CONFIG.metadata);
   const mode = getWalletConnectMode();
@@ -202,6 +340,7 @@ async function bootstrap(run = bootstrapRun) {
 
   if (PREVIEW_CONFIG.xamanClientId) {
     adapters.push(createXamanAdapter({
+      supportedChains: chainSupport,
       apiKey: PREVIEW_CONFIG.xamanClientId,
       onQr: ({ adapterId, uri, deeplink }) => manager.emitQr(adapterId, uri, deeplink)
     }));
@@ -209,23 +348,34 @@ async function bootstrap(run = bootstrapRun) {
     log("config_warning", { message: "VITE_XAMAN_CLIENT_ID is not set; Xaman preview adapter is disabled." });
   }
 
-  adapters.push(createGemWalletAdapter());
+  adapters.push(createGemWalletAdapter({ supportedChains: chainSupport }));
   adapters.push(createCrossmarkAdapter());
   adapters.push(createDropFiAdapter());
   adapters.push(createGhostsigAdapter());
-  adapters.push(createXyraAdapter());
+  adapters.push(createXyraAdapter({ supportedChains: chainSupport }));
   adapters.push(createOtsuAdapter());
   adapters.push(createXrplSnapAdapter({
     signMessageDestination: PREVIEW_CONFIG.walletConnectSignMessageDestination
   }));
 
+  const protocolModule = chainSelect.value === "xahau" ? await import("../../../packages/xahau/src") : undefined;
+  if (run !== bootstrapRun) return;
+  const protocols = protocolModule ? [protocolModule.createXahauProtocol({ request: async (network, method, params, signal) => {
+    const response = await fetch("/api/xahau/rpc", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ network: network.id, method, params: [params] }), signal });
+    const body = await response.json();
+    if (!response.ok || body.error || body.result?.error) throw new Error(body.result?.error_message ?? body.error ?? body.result?.error ?? "Xahau RPC failed");
+    return body.result;
+  } })] : [];
   manager = new WalletManager({
+    protocols,
+    networks: protocolModule ? [...protocolModule.XAHAU_NETWORKS] : undefined,
     metadata: PREVIEW_CONFIG.metadata,
     network: getSelectedNetwork(),
     batch: { adapterIds: BATCH_TEST_ADAPTERS },
-    autoReconnect: true,
+    autoReconnect: chainSelect.value === "xrpl",
+    accountStatus: { enabled: chainSelect.value === "xrpl" },
     persistTransactions: true,
-    storage: createBrowserWalletStorage("xwk.preview."),
+    storage: createBrowserWalletStorage(`xwk.preview.${getSelectedNetwork()}.`),
     adapters
   });
 
@@ -242,7 +392,7 @@ async function bootstrap(run = bootstrapRun) {
   } else {
     log("config_warning", { message: "VITE_WALLETCONNECT_PROJECT_ID is not set; WalletConnect preview adapters are disabled." });
   }
-  manager.register(createLedgerAdapter());
+  manager.register(createLedgerAdapter({ supportedChains: chainSupport }));
 
   const { createWalletToast } = await import("../../../packages/ui/src");
   if (run !== bootstrapRun) return;
@@ -304,6 +454,9 @@ bootstrap().catch((error) => {
 function renderSession() {
   const current = manager.getSession();
   session.textContent = current ? JSON.stringify(current, null, 2) : "No wallet connected.";
+  const status = document.querySelector<HTMLElement>("#session-status")!;
+  status.textContent = current ? `${current.wallet?.name ?? current.adapterId} · ${current.account.address}` : "Not connected";
+  status.dataset.connected = String(Boolean(current));
 }
 
 function renderTransactionState() {
@@ -312,11 +465,18 @@ function renderTransactionState() {
   const submit = transactionMode.value === "sign-and-submit";
   const supported = supportsTransactionMode(adapter, submit);
   const canSign = Boolean(current && supported && !transactionPending);
+  genericButton.disabled = !canSign;
+  uriButton.disabled = !canSign || chainSelect.value !== "xahau";
+  uriButton.textContent = uriOperation.value === "URITokenBuy"
+    ? (submit ? "Accept sell offer" : "Sign offer acceptance")
+    : (submit ? "Submit URIToken" : "Sign URIToken");
+  genericButton.textContent = submit ? "Sign and submit transaction" : "Sign transaction";
   transactionMode.disabled = transactionPending;
   paymentSubmitButton.disabled = !canSign;
   nftOfferSubmitButton.disabled = !canSign;
   nftAcceptSubmitButton.disabled = !canSign;
   nftBurnSubmitButton.disabled = !canSign;
+  if (chainSelect.value === "xahau") [nftOfferSubmitButton, nftAcceptSubmitButton, nftBurnSubmitButton].forEach(button => { button.disabled = true; });
   paymentSubmitButton.textContent = submit ? "Submit payment" : "Sign payment";
   nftOfferSubmitButton.textContent = submit ? "Create NFT offer" : "Sign NFT offer";
   nftAcceptSubmitButton.textContent = submit ? "Accept NFT offer" : "Sign NFT acceptance";
@@ -356,8 +516,9 @@ function renderSigningState() {
 function renderAuthState() {
   const current = manager.getSession();
   const adapter = manager.getAdapter();
-  const canSignMessage = Boolean(current && adapter?.capabilities.signMessage);
+  const canSignMessage = Boolean(current && adapter?.capabilities.signMessage && chainSelect.value !== "xahau");
   authSignInButton.disabled = !canSignMessage;
+  if (chainSelect.value === "xahau") { authResult.textContent = "Xahau authentication needs a chain-aware backend; the XRPL auth server is not used."; return; }
   if (!current) {
     authResult.textContent = "Connect a wallet to test auth sign-in.";
     return;
@@ -393,7 +554,7 @@ async function signInWithAuthServer() {
   let lastServerResponse: unknown;
   const auth = createWalletAuth(manager, {
     async getNonce() {
-      const response = await fetch("/api/auth/nonce", { credentials: "include" });
+      const response = await fetch(`/api/auth/nonce?chain=${encodeURIComponent(getNetworkChainId(manager.getNetwork()))}`, { credentials: "include" });
       const body = await response.json();
       lastServerResponse = body;
       if (!response.ok || !body?.nonce) throw new Error(`Nonce request failed: ${JSON.stringify(body, null, 2)}`);
@@ -419,7 +580,7 @@ async function signInWithAuthServer() {
   }, {
     domain: window.location.host,
     uri: window.location.origin,
-    chainId: getSelectedNetwork() === "mainnet" ? "xrpl:0" : `xrpl:${getSelectedNetwork()}`,
+    chainId: getNetworkChainId(manager.getNetwork()),
     statement: authStatementInput.value.trim() || "Sign in to XRPL Wallet Kit Preview",
     expiresIn: 10 * 60
   });
@@ -550,12 +711,16 @@ async function submitNftBurn() {
 type PreviewTransactionRequest = {
   txJson: TransactionPayload;
   walletPayload?: unknown;
-  methodHint: "payment" | "createNFTOffer" | "acceptNFTOffer" | "burnNFT";
+  methodHint: "payment" | "createNFTOffer" | "acceptNFTOffer" | "burnNFT" | "generic";
   submit: boolean;
 };
 
 async function runTransaction(target: HTMLPreElement, name: string, request: Omit<PreviewTransactionRequest, "submit">) {
   if (transactionPending) throw new Error("A transaction request is already pending.");
+  const account = manager.getAccount();
+  if (!account) throw new Error("Connect a wallet first");
+  if (request.txJson.Account !== undefined && request.txJson.Account !== account.address) throw new Error("Transaction Account differs from the connected wallet");
+  request = { ...request, txJson: { ...request.txJson, Account: account.address } };
   const requestPreview = createTransactionRequestPreview({ ...request, submit: transactionMode.value === "sign-and-submit" });
   showTransactionRequest(target, requestPreview.submit ? "Requesting signature and submit..." : "Requesting signature only (no submit)...", requestPreview);
   log(`${name}_request`, requestPreview);
@@ -573,6 +738,18 @@ async function runTransaction(target: HTMLPreElement, name: string, request: Omi
 }
 
 function createTransactionRequestPreview(request: PreviewTransactionRequest) {
+  if (chainSelect.value === "xahau") {
+    const maxFeeDrops = maxFeeInput.value.trim();
+    if (!/^[1-9]\d*$/.test(maxFeeDrops)) {
+      const message = "Enter a positive Xahau fee limit (drops).";
+      maxFeeInput.setCustomValidity(message);
+      maxFeeInput.reportValidity();
+      maxFeeInput.focus();
+      throw new Error(message);
+    }
+    maxFeeInput.setCustomValidity("");
+    return { txJson: request.txJson, methodHint: "generic" as const, submit: request.submit, maxFeeDrops };
+  }
   // Include GhostSig's source tag in the preview for every transaction form.
   if (manager.getSession()?.adapterId === "ghostsig" && request.txJson.SourceTag === undefined) {
     return { ...request, txJson: { ...request.txJson, SourceTag: 0 } };
@@ -626,15 +803,16 @@ function stringToHex(value: string) {
 }
 
 function xrpToDrops(value: string) {
-  if (!/^\d+(\.\d{1,6})?$/.test(value)) throw new Error("Amount XRP must be like 0.01, 0.1, or 1. Max 6 decimal places.");
+  const asset = getNativeAsset(manager.getNetwork());
+  if (!/^\d+(\.\d{1,6})?$/.test(value)) throw new Error(`Enter ${asset} with up to 6 decimal places.`);
   const [whole, fraction = ""] = value.split(".");
   const drops = `${whole}${fraction.padEnd(6, "0")}`.replace(/^0+(?=\d)/, "");
-  if (drops === "0") throw new Error("Amount XRP must be greater than 0.");
+  if (drops === "0") throw new Error(`${asset} amount must be positive.`);
   return drops;
 }
 
 function renderWalletList() {
-  const rows = manager.getWallets().map((wallet) => {
+  const rows = manager.getWallets().filter(wallet => adapterSupportsNetwork(manager.getAdapter(wallet.id)!, manager.getNetwork())).map((wallet) => {
     const row = document.createElement("label");
     row.className = "wallet-row";
     const checkbox = document.createElement("input");
@@ -657,7 +835,7 @@ function renderWalletList() {
     const name = document.createElement("strong");
     name.textContent = wallet.name;
     const detail = document.createElement("span");
-    detail.textContent = `${wallet.id} | ${wallet.type}`;
+    detail.textContent = `${wallet.id} | ${wallet.type}${chainSelect.value === "xahau" && wallet.id === "ledger" ? " | app/transaction dependent" : ""}`;
     info.append(name, detail);
     row.append(info);
     return row;
@@ -716,6 +894,7 @@ function getWalletConnectMode(): WalletConnectMode {
 
 function getSelectedNetwork() {
   const value = networkSelect.value;
+  if (chainSelect.value === "xahau") return value === "testnet" ? "xahau-testnet" : "xahau-mainnet";
   if (value === "testnet" || value === "devnet") return value;
   return "mainnet";
 }

@@ -95,6 +95,24 @@ test("Xyra rejects malformed accounts, blocked/closed popups, rejection and time
   assert.equal(b.listeners.size, 0);
 });
 
+test("Xyra normalizes validated submit and distinguishes verified non-submission from unknown outcomes", async t => {
+  const { b, adapter } = await connected(t);
+  const confirmed = adapter.signAndSubmit({ txJson: tx });
+  b.emit({ ...reply, submitted: true, submitResult: { validated: true, engine_result: "tesSUCCESS", ledger_index: 100 } });
+  assert.equal((await confirmed).status, "confirmed");
+  const notSubmitted = adapter.signAndSubmit({ txJson: tx });
+  b.emit(reply);
+  await assert.rejects(notSubmitted, (error: any) => {
+    assert.equal(error.code, "SUBMIT_FAILED");
+    assert.equal(error.details.outcomeUnknown, false);
+    assert.equal(error.details.hash, signed.hash);
+    return true;
+  });
+  const unknown = adapter.signAndSubmit({ txJson: tx });
+  b.emit({ ...reply, submitted: true });
+  await assert.rejects(unknown, (error: any) => error.code === "SUBMIT_FAILED" && error.details.outcomeUnknown === true);
+});
+
 test("Xyra cancellation and disconnect remove listeners and close popups", async t => {
   const { b, adapter } = await connected(t);
   const controller = new AbortController();
@@ -154,7 +172,9 @@ test("Xyra submit false returns blob; preliminary submission is not validated su
   const pending = adapter.signAndSubmit({ txJson: tx });
   assert.equal(b.popups.at(-1)!.url.searchParams.get("submit"), "true");
   b.emit({ ...reply, submitted: true, submitResult: { engine_result: "tesSUCCESS" } });
-  await assert.rejects(pending, error => Boolean((error as { details?: { hash?: string; outcomeUnknown?: boolean } }).details?.outcomeUnknown)
-    && (error as { details: { hash: string } }).details.hash === signed.hash);
+  const submitted = await pending;
+  assert.equal(submitted.status, "submitted");
+  assert.equal(submitted.hash, signed.hash);
+  assert.equal(submitted.txBlob, signed.tx_blob);
   assert.equal(b.listeners.size, 0);
 });

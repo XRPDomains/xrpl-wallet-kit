@@ -88,7 +88,7 @@ test("logout removes a recovery session even when its storage write completes la
   const storage = new DelayedStorage();
   const wallet = adapter("recover");
   wallet.canRecoverSession = async () => true;
-  wallet.recoverSession = async options => ({ session: {
+  wallet.recoverSession = async options => ({ account: { address: "rRecover", network: options.network }, session: {
     adapterId: "recover", connectedAt: 1, account: { address: "rRecover", network: options.network }
   } });
   const manager = new WalletManager({ adapters: [wallet], storage, autoReconnect: true, recoveryRetryDelaysMs: [0], accountStatus: { enabled: false } });

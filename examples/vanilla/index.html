@@ -9,32 +9,33 @@
     <main class="app">
       <section class="hero">
         <div>
-          <p class="eyebrow">Beta test console</p>
           <h1>XRPL Wallet Kit</h1>
-          <p>Connect wallets, sign messages, submit payments, and test NFT offer flows.</p>
+          <p>Local test console</p>
         </div>
         <div id="wallet-button"></div>
       </section>
 
+      <div class="console-layout">
+      <aside class="console-sidebar" aria-label="Wallet configuration">
       <section class="top-grid">
         <div class="panel connect-panel">
           <div class="panel-heading">
             <div>
-              <h2>Connect</h2>
-              <p>Current wallet session and account metadata.</p>
+              <h2>Session</h2>
             </div>
           </div>
-          <pre id="session">No wallet connected.</pre>
+          <p id="session-status" role="status">Not connected</p>
+          <details><summary>Account &amp; session data</summary><pre id="session">No wallet connected.</pre></details>
         </div>
 
         <div class="panel settings-panel">
           <div class="panel-heading">
             <div>
-              <h2>Test Settings</h2>
-              <p>Keep these simple while testing real wallet flows.</p>
+              <h2>Network</h2>
             </div>
           </div>
           <div class="controls">
+            <label><span>Chain</span><select id="chain"><option value="xrpl">XRPL</option><option value="xahau">Xahau</option></select></label>
             <label>
               <span>Network</span>
               <select id="network">
@@ -43,6 +44,9 @@
                 <option value="testnet">Testnet</option>
               </select>
             </label>
+          </div>
+          <details class="appearance-settings"><summary>UI settings</summary>
+          <div class="controls">
             <label>
               <span>Theme</span>
               <select id="ui-theme">
@@ -68,6 +72,7 @@
               </select>
             </label>
           </div>
+          </details>
         </div>
       </section>
 
@@ -77,12 +82,26 @@
         </div>
         <div id="wallet-list" class="wallet-list"></div>
       </section>
+      </aside>
 
-      <section class="panel">
+      <div class="console-workspace">
+        <div class="transaction-toolbar">
+          <label><span>Transaction mode</span><select id="transaction-mode"><option value="sign-only">Sign only (no submit)</option><option value="sign-and-submit" selected>Sign and submit</option></select></label>
+          <label><span>Maximum fee (drops)</span><input id="max-fee-drops" inputmode="numeric" value="50000" pattern="[1-9][0-9]*" required /></label>
+        </div>
+        <nav class="workflow-tabs" role="tablist" aria-label="Test operation">
+          <button id="tab-payment" type="button" role="tab" aria-controls="panel-payment" aria-selected="true" data-workflow="payment">Payment</button>
+          <button id="tab-json" type="button" role="tab" aria-controls="panel-json" aria-selected="false" tabindex="-1" data-workflow="json">Transaction JSON</button>
+          <button id="tab-nft" type="button" role="tab" aria-controls="panel-nft" aria-selected="false" tabindex="-1" data-workflow="nft">NFT</button>
+          <button id="tab-batch" type="button" role="tab" aria-controls="panel-batch" aria-selected="false" tabindex="-1" data-workflow="batch" data-xrpl-only>Batch</button>
+          <button id="tab-message" type="button" role="tab" aria-controls="panel-message" aria-selected="false" tabindex="-1" data-workflow="message">Message</button>
+          <button id="tab-auth" type="button" role="tab" aria-controls="panel-auth" aria-selected="false" tabindex="-1" data-workflow="auth" data-xrpl-only>Auth</button>
+        </nav>
+
+      <section class="panel" id="panel-message" role="tabpanel" aria-labelledby="tab-message" tabindex="0" data-workflow-panel="message" hidden>
         <div class="panel-heading">
           <div>
             <h2>Sign Message</h2>
-            <p>Uses the kit default proof transaction for compatible wallets.</p>
           </div>
         </div>
         <div class="lab">
@@ -98,11 +117,10 @@
         </div>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="panel-auth" role="tabpanel" aria-labelledby="tab-auth" tabindex="0" data-workflow-panel="auth" hidden>
         <div class="panel-heading">
           <div>
             <h2>Auth Sign-In Test</h2>
-            <p>Client signs, posts proof to the local server, and shows server verification logs.</p>
           </div>
         </div>
         <div class="lab">
@@ -117,39 +135,37 @@
         </div>
       </section>
 
-      <section class="panel">
-        <div class="panel-heading">
-          <div>
-            <h2>Transactions</h2>
-            <p>Payment, NFT offer, and NFT burn.</p>
-          </div>
-        </div>
-        <div class="controls">
-          <label>
-            <span>Transaction mode</span>
-            <select id="transaction-mode">
-              <option value="sign-only">Sign only (no submit)</option>
-              <option value="sign-and-submit">Sign and submit</option>
-            </select>
-          </label>
-        </div>
+      <section class="panel transaction-section" data-workflow-group="payment nft">
         <div class="lab-grid">
-          <div class="lab">
+          <div class="lab" id="panel-payment" role="tabpanel" aria-labelledby="tab-payment" tabindex="0" data-workflow-panel="payment">
             <h3>Payment</h3>
             <label>
               <span>Destination address</span>
               <input id="payment-destination" placeholder="r..." />
             </label>
             <label>
-              <span>Amount XRP</span>
+              <span id="payment-unit">Amount XRP</span>
               <input id="payment-amount" inputmode="decimal" value="0.01" />
             </label>
             <div class="lab-actions">
               <button id="payment-submit-button" type="button">Sign payment</button>
             </div>
-            <pre id="payment-result">Connect a wallet to test Payment signAndSubmit.</pre>
+            <div class="result-pane"><h3>Result</h3><pre id="payment-result">Connect a wallet to test Payment signAndSubmit.</pre></div>
           </div>
 
+          <div id="panel-nft" role="tabpanel" aria-labelledby="tab-nft" tabindex="0" data-workflow-panel="nft" hidden>
+          <div id="xahau-nft" class="lab" hidden>
+            <h3>URIToken</h3>
+            <label><span>Operation</span><select id="uri-operation"><option value="URITokenMint">Mint</option><option value="URITokenCreateSellOffer">Create sell offer</option><option value="URITokenBuy">Accept sell offer (Buy)</option><option value="URITokenCancelSellOffer">Cancel sell offer</option><option value="URITokenBurn">Burn</option></select></label>
+            <label data-uri-field="uri"><span>URI (text)</span><input id="uri-value" placeholder="ipfs://..." /></label>
+            <label data-uri-field="id" hidden><span>URITokenID</span><input id="uri-token-id" placeholder="64 hex characters" /></label>
+            <label data-uri-field="amount" hidden><span>Amount (drops)</span><input id="uri-amount" inputmode="numeric" value="10000" /></label>
+            <label data-uri-field="destination" hidden><span>Destination (optional)</span><input id="uri-destination" placeholder="r..." /></label>
+            <label class="uri-checkbox" data-uri-field="burnable"><input id="uri-burnable" type="checkbox" /><span>Issuer can burn</span></label>
+            <div class="lab-actions"><button id="uri-submit-button" type="button" disabled>Submit URIToken</button></div>
+            <h3>Result</h3><pre id="uri-result">No result yet.</pre>
+          </div>
+          <div id="xrpl-nft">
           <div class="lab">
             <h3>NFT Offer</h3>
             <label>
@@ -222,20 +238,28 @@
             </div>
             <pre id="nft-burn-result">Connect a wallet to test NFT Burn.</pre>
           </div>
-        </div>
-      </section>
-
-      <div id="batch-test"></div>
-
-      <section class="panel">
-        <div class="panel-heading">
-          <div>
-            <h2>Events / Raw Result</h2>
-            <p>Latest kit events are prepended here for debugging wallet behavior.</p>
+          </div>
           </div>
         </div>
-        <pre id="events"></pre>
       </section>
+
+      <section id="panel-batch" role="tabpanel" aria-labelledby="tab-batch" tabindex="0" data-workflow-panel="batch" hidden><div id="batch-test"></div></section>
+
+      <section class="panel" id="panel-json" role="tabpanel" aria-labelledby="tab-json" tabindex="0" data-workflow-panel="json" hidden>
+        <div class="panel-heading"><h2>Transaction JSON</h2></div>
+        <div class="controls"><label><span>Template</span><select id="generic-template"><option>Payment</option><option value="Invoke">Invoke</option><option>TrustSet</option><option>OfferCreate</option><option>OfferCancel</option><option>AccountSet</option></select></label></div>
+        <label><span>Unsigned transaction intent</span><textarea id="generic-tx" rows="9" spellcheck="false">{"TransactionType":"Payment","Destination":"","Amount":"1"}</textarea></label>
+        <div class="lab-actions"><button id="generic-sign-button" type="button">Sign transaction</button><button id="cancel-request-button" type="button" class="secondary-button">Cancel pending request</button></div>
+        <h3 class="result-heading">Result</h3>
+        <pre id="generic-result">Connect a wallet, then select a transaction template.</pre>
+      </section>
+
+      <details class="event-log">
+        <summary>Event log</summary>
+        <pre id="events"></pre>
+      </details>
+      </div>
+      </div>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

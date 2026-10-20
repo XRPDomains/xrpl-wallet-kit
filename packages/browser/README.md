@@ -12,6 +12,7 @@ The package publishes:
 
 - `dist/xrpl-wallet-kit.iife.js`
 - `dist/xrpl-wallet-kit.iife.min.js`
+- `dist/xrpl-wallet-kit-xahau.runtime.js` automatically loaded for Xahau operations
 - `dist/xrpl-wallet-kit-legacy-bridge.js` optional compatibility helper
 
 ## Basic HTML
@@ -42,6 +43,26 @@ The package publishes:
   kit.button.mount("#connect-wallet");
 </script>
 ```
+
+## Xahau Runtime
+
+XRPL-only pages do not download the Xahau codec. On first Xahau transaction
+preparation or lookup, the IIFE imports `xrpl-wallet-kit-xahau.runtime.js` from
+the directory of its original script URL, not from the page directory.
+Self-host both assets together or use a version-pinned CDN script URL. A mixed
+bundle/runtime version is rejected before wallet signing. Loading failures do
+not trigger automatic transaction retries.
+
+Allow the script directory in CSP `script-src`; `unsafe-eval` is not required.
+The runtime is an ES module, so cross-origin hosting must allow CORS. Load the
+IIFE with a regular external script tag so its URL can be captured; inline or
+eval-based embedding cannot resolve the Xahau asset. ESM applications should
+use the client package instead.
+
+After `build:browser`, run `npm run smoke:browser:xahau` with Playwright available
+(`PLAYWRIGHT_MODULE_PATH` and `PLAYWRIGHT_EXECUTABLE_PATH` can select an external
+installation). This checks lazy loading, signed Invoke, shared error types, CSP,
+missing assets and mismatched versions without contacting a ledger or wallet.
 
 ## Legacy Bridge
 

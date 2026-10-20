@@ -7,6 +7,7 @@ export interface LedgerAppTransport {
 }
 
 interface OpenAppOptions {
+  app?: "XRP" | "XAH";
   signal?: AbortSignal;
   timeoutMs: number;
   assertCurrent(): void;
@@ -15,27 +16,28 @@ interface OpenAppOptions {
   reopen(transport: LedgerAppTransport): Promise<LedgerAppTransport>;
 }
 
-const manual = () => new Error("Open the XRP app on your Ledger device, then connect again. Ledger Live desktop is not required.");
+const manual = (app: "XRP" | "XAH") => new Error(`Open ${app} on Ledger. Reconnect.`);
 const status = (error: unknown) => (error as { statusCode?: number } | null)?.statusCode;
 const unsupported = (error: unknown) => [0x6d00, 0x6e00, 0x6511, 0x650f, 0x6807].includes(status(error) ?? 0);
 const disconnected = (error: unknown) => status(error) === undefined && /disconnect|device.*lost|device.*not.*found/i.test(String(error));
 const isDashboard = (name: string) => ["BOLOS", "OLOS", "OLOS\0", "DASHBOARD"].includes(name);
 
-function appName(response: Uint8Array): string {
+function appName(response: Uint8Array, target: "XRP" | "XAH"): string {
   const length = response[1];
-  if (response[0] !== 1 || !length || length + 4 > response.length) throw manual();
+  if (response[0] !== 1 || !length || length + 4 > response.length) throw manual(target);
   return Buffer.from(response.subarray(2, length + 2)).toString("ascii").toUpperCase();
 }
 
 /** Ledger OS APDUs, not Ledger Live: B0/01 query, B0/A7 close, E0/D8 open. */
-export async function ensureLedgerXrpApp(initial: LedgerAppTransport, options: OpenAppOptions): Promise<LedgerAppTransport> {
+export async function ensureLedgerApp(initial: LedgerAppTransport, options: OpenAppOptions): Promise<LedgerAppTransport> {
+  const target = options.app ?? "XRP";
   if (!initial.send) return initial;
   let transport = initial;
   const deadline = Date.now() + options.timeoutMs;
   const active = () => {
     options.assertCurrent();
     if (options.signal?.aborted) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Ledger connection cancelled.");
-    if (Date.now() >= deadline) throw new WalletKitError(WalletKitErrorCode.REQUEST_TIMEOUT, "Ledger app opening timed out. Check your Ledger device.");
+    if (Date.now() >= deadline) throw new WalletKitError(WalletKitErrorCode.REQUEST_TIMEOUT, "Ledger timed out. Check device.");
   };
   const bounded = async <T>(operation: () => Promise<T>): Promise<T> => {
     active();
@@ -61,7 +63,7 @@ export async function ensureLedgerXrpApp(initial: LedgerAppTransport, options: O
     while (true) {
       active();
       try {
-        const name = appName(await send(0xb0, 0x01));
+        const name = appName(await send(0xb0, 0x01), target);
         if (name === expected || expected === "BOLOS" && isDashboard(name)) return;
       }
       catch (error) {
@@ -71,23 +73,23 @@ export async function ensureLedgerXrpApp(initial: LedgerAppTransport, options: O
           catch (reopenError) { active(); if (!disconnected(reopenError)) throw reopenError; }
         }
       }
-      if (Date.now() >= readyDeadline) throw manual();
+      if (Date.now() >= readyDeadline) throw manual(target);
       await bounded(() => new Promise<void>(resolve => setTimeout(resolve, 250)));
     }
   };
   let name: string;
-  try { name = appName(await send(0xb0, 0x01)); }
+  try { name = appName(await send(0xb0, 0x01), target); }
   catch (error) {
-    // Older apps may lack the OS query. Preserve the existing XRP connection path.
+    // Older apps may lack the OS query. Let the selected app's address API report readiness.
     if (unsupported(error)) return initial;
     throw error;
   }
-  if (name === "XRP") return transport;
+  if (name === target) return transport;
   options.onOpening();
   const switchApp = async (cla: number, ins: number, data?: Buffer) => {
     try { await send(cla, ins, data); }
     catch (error) {
-      if (unsupported(error)) throw manual();
+      if (unsupported(error)) throw manual(target);
       if (!disconnected(error)) throw error; // Never retry a rejection or locked-device error.
     }
   };
@@ -95,7 +97,10 @@ export async function ensureLedgerXrpApp(initial: LedgerAppTransport, options: O
     await switchApp(0xb0, 0xa7);
     await waitForApp("BOLOS");
   }
-  await switchApp(0xe0, 0xd8, Buffer.from("XRP", "ascii"));
-  await waitForApp("XRP");
+  await switchApp(0xe0, 0xd8, Buffer.from(target, "ascii"));
+  await waitForApp(target);
   return transport;
 }
+
+export const ensureLedgerXrpApp = (initial: LedgerAppTransport, options: OpenAppOptions) =>
+  ensureLedgerApp(initial, { ...options, app: "XRP" });

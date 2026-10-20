@@ -2,6 +2,8 @@ import { createServer, loadEnv, normalizePath } from "vite";
 import { randomBytes } from "node:crypto";
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { addXahauLabServer } from "./xahau-lab-server.mjs";
 
 const env = loadEnv("development", process.cwd(), "VITE_");
 const defineEnv = Object.fromEntries(
@@ -25,10 +27,13 @@ async function readJsonBody(req) {
 }
 
 function addAuthTestServer(server) {
+  const authNetworks = { "xrpl:0": "wss://xrplcluster.com", "xrpl:1": "wss://s.altnet.rippletest.net:51233", "xrpl:2": "wss://s.devnet.rippletest.net:51233" };
   server.middlewares.use("/api/auth/nonce", (req, res) => {
     if (req.method !== "GET") return sendJson(res, 405, { ok: false, error: "Method not allowed" });
+    const chainId = new URL(req.url, "http://localhost").searchParams.get("chain") ?? "xrpl:0";
+    if (!Object.hasOwn(authNetworks, chainId)) return sendJson(res, 400, { ok: false, error: "Auth demo supports XRPL networks only." });
     const nonce = randomBytes(24).toString("hex");
-    issuedNonces.set(nonce, { used: false, issuedAt: Date.now() });
+    issuedNonces.set(nonce, { used: false, issuedAt: Date.now(), chainId });
     console.log("[auth:nonce]", { nonce });
     sendJson(res, 200, { ok: true, nonce });
   });
@@ -68,6 +73,7 @@ function addAuthTestServer(server) {
         expectedDomain: req.headers.host,
         expectedUri: `http://${req.headers.host}`,
         expectedAddress: body.address,
+        expectedChainId: nonceState.chainId,
         now: new Date(),
         maxAgeSeconds: 10 * 60,
         isNonceUsed: nonce => !issuedNonces.has(nonce) || issuedNonces.get(nonce).used
@@ -78,7 +84,7 @@ function addAuthTestServer(server) {
       }
 
       const verifier = createXrplSignatureVerifier({
-        nodeUrl: "wss://xrplcluster.com"
+        nodeUrl: authNetworks[nonceState.chainId]
       });
       const verified = await verifier.verify({
         address: body.address,
@@ -113,12 +119,14 @@ function addAuthTestServer(server) {
 
 const server = await createServer({
   root: "examples/vanilla",
+  cacheDir: resolve(tmpdir(), "xrpl-wallet-kit-vite"),
   envDir: process.cwd(),
   define: defineEnv,
   resolve: {
     dedupe: ["react", "react-dom"],
     alias: [
       { find: /^@xrpl-wallet-kit\/core$/, replacement: resolve("packages/core/src/index.ts") },
+      { find: /^@xrpl-wallet-kit\/xahau$/, replacement: resolve("packages/xahau/src/index.ts") },
       { find: /^@xrpl-wallet-kit\/ui$/, replacement: resolve("packages/ui/src/index.ts") }
     ]
   },
@@ -129,7 +137,10 @@ const server = await createServer({
   },
   plugins: [react(), {
     name: "xwk-auth-test-server",
-    configureServer: addAuthTestServer
+    configureServer(server) {
+      addAuthTestServer(server); addXahauLabServer(server);
+      server.middlewares.use("/xahau.html", (_req, res) => { res.statusCode = 302; res.setHeader("location", "/"); res.end(); });
+    }
   }],
   clearScreen: false
 });

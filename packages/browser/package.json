@@ -26,10 +26,11 @@
     "README.md"
   ],
   "scripts": {
-    "build": "vite build --mode readable && vite build --mode minified && node -e \"require('node:fs').rmSync('tsconfig.tsbuildinfo',{force:true})\" && tsc -p tsconfig.json"
+    "build": "vite build --mode readable && vite build --mode minified && vite build --config vite.xahau.config.ts && node -e \"require('node:fs').rmSync('tsconfig.tsbuildinfo',{force:true})\" && tsc -p tsconfig.json"
   },
   "dependencies": {
     "@xrpl-wallet-kit/client": "0.1.23",
+    "@xrpl-wallet-kit/xahau": "0.1.23",
     "buffer": "^6.0.3"
   },
   "devDependencies": {

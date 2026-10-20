@@ -25,8 +25,8 @@ export class XamanBrowserAuth implements XamanPkceAuth {
   private popup?: Window | null;
   private readonly sessionKey: string;
 
-  constructor(private apiKey: string, private createSdk: (jwt: string) => XamanSdkLike = jwt => new XummSdkJwt(jwt) as unknown as XamanSdkLike) {
-    this.sessionKey = `${PREFIX}session.${apiKey}`;
+  constructor(private apiKey: string, private createSdk: (jwt: string) => XamanSdkLike = jwt => new XummSdkJwt(jwt) as unknown as XamanSdkLike, private forceNetwork?: string) {
+    this.sessionKey = `${PREFIX}session.${apiKey}${forceNetwork ? `.${forceNetwork}` : ""}`;
   }
 
   static supported(): boolean {
@@ -131,6 +131,7 @@ export class XamanBrowserAuth implements XamanPkceAuth {
     const url = new URL("/auth", ORIGIN);
     url.search = new URLSearchParams({ client_id: this.apiKey, redirect_uri: redirect.href,
       response_type: "token", scope: "XummPkce", state: this.state }).toString();
+    if (this.forceNetwork) url.searchParams.set("force_network", this.forceNetwork);
     return new Promise((resolve, reject) => {
       let resolving = false;
       const cleanup = () => {

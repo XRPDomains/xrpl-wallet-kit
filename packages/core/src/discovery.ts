@@ -5,6 +5,8 @@ import { BaseWalletAdapter } from "./adapter";
 import { assertWalletRequestActive } from "./request";
 import { createWalletError, WalletKitError, WalletKitErrorCode } from "./errors";
 import { normalizeSignTransactionResult } from "./result";
+import { DEFAULT_XRPL_NETWORKS } from "./networks";
+import { adapterSupportsNetwork, getNetworkFamily } from "./utils";
 import type { WalletManager } from "./manager";
 import type { ConnectOptions, SignAndSubmitRequest, SignTransactionRequest, WalletCapabilities, WalletMetadata, WalletNetwork, WalletSession } from "./types";
 
@@ -67,6 +69,7 @@ export interface WalletStandardAdapterOptions {
 }
 
 export class WalletStandardAdapter extends BaseWalletAdapter {
+  override adapterApiVersion = "1.2" as const;
   readonly metadata: WalletMetadata;
   private selected?: { address: string; network: WalletNetwork };
   private disposed = false;
@@ -74,9 +77,12 @@ export class WalletStandardAdapter extends BaseWalletAdapter {
   get capabilities(): WalletCapabilities {
     const sign = Boolean(signFeature(this.wallet));
     const submit = Boolean(submitFeature(this.wallet));
+    const networks = (this.options.networks ?? DEFAULT_XRPL_NETWORKS).filter(network =>
+      this.wallet.chains.some(item => chain(item) === chain(network.walletConnectChainId ?? "")));
     return { connect: true, disconnect: Boolean(feature(this.wallet, "standard:disconnect", "disconnect")),
       signTransaction: sign, signAndSubmit: submit,
-      details: { supportedNetworks: this.options.networks?.filter(network => this.wallet.chains.some(item => chain(item) === chain(network.walletConnectChainId ?? ""))).map(network => network.id),
+      details: { supportedNetworks: networks.map(network => network.id),
+        supportedChains: { networkIds: networks.map(network => network.id), families: [...new Set(networks.map(getNetworkFamily))] },
         transactionModes: [...(sign ? ["sign-only" as const] : []), ...(submit ? ["sign-and-submit" as const] : [])] } };
   }
   constructor(readonly wallet: Wallet, private options: WalletStandardAdapterOptions) {
@@ -151,8 +157,11 @@ export class WalletStandardAdapter extends BaseWalletAdapter {
     try { this.offChange(); } catch { /* A faulty provider cleanup cannot block disposal of other wallets. */ }
   }
   private requireNetwork(network?: WalletNetwork): WalletNetwork {
-    if (!network?.walletConnectChainId?.startsWith("xrpl:") || !this.wallet.chains.some(item => chain(item) === chain(network.walletConnectChainId!))) {
-      throw new WalletKitError(WalletKitErrorCode.NETWORK_NOT_SUPPORTED, "Requested network has no supported XRPL chain mapping.");
+    // XLS-72d uses xrpl: for both XRPL and Xahau (e.g. xrpl:21337).
+    // A future xahau: namespace needs an explicit protocol mapping, not prefix inference.
+    if (!network?.walletConnectChainId?.startsWith("xrpl:") || !adapterSupportsNetwork(this, network)
+      || !this.wallet.chains.some(item => chain(item) === chain(network.walletConnectChainId!))) {
+      throw new WalletKitError(WalletKitErrorCode.NETWORK_NOT_SUPPORTED, "Wallet has no mapping for the selected network.");
     }
     return network;
   }

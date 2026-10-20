@@ -1,8 +1,17 @@
 import type { WalletKitLogger, WalletKitLoggerOptions } from "./logger";
+import type { WalletProtocol, WalletProtocolContext } from "./protocol";
 import type { Transaction } from "xrpl";
 
 export type WalletNetworkId = "mainnet" | "testnet" | "devnet" | (string & {});
 export type WalletNetworkFamily = "xrpl" | (string & {});
+
+/** Trusted application/preset configuration, not wallet-reported proof of network identity. */
+export interface WalletProviderHints {
+  readonly xaman?: string;
+  readonly xyra?: string;
+  readonly gemwallet?: { readonly chain: string; readonly network: string };
+  readonly ledgerApp?: "XRP" | "XAH";
+}
 
 export interface WalletNetwork {
   id: WalletNetworkId;
@@ -18,10 +27,11 @@ export interface WalletNetwork {
   definitionsUrl?: string;
   explorerTxUrl?: string;
   explorerAccountUrl?: string;
+  providerHints?: WalletProviderHints;
 }
 
 export type WalletAdapterType = "mobile" | "extension" | "walletconnect" | "snap" | "hardware" | "embedded" | "web";
-export type WalletAdapterApiVersion = "1.0" | "1.1" | (string & {});
+export type WalletAdapterApiVersion = "1.0" | "1.1" | "1.2" | (string & {});
 
 export interface WalletCapabilities {
   connect: boolean;
@@ -39,8 +49,16 @@ export interface WalletCapabilities {
 
 export type WalletTransactionMode = "sign-only" | "sign-and-submit" | "multisign";
 
+/** Criteria are ANDed. An omitted list is unrestricted; an empty list denies all. */
+export interface WalletChainFilter {
+  readonly families?: readonly WalletNetworkFamily[];
+  readonly networkIds?: readonly WalletNetworkId[];
+  readonly networkTypes?: readonly WalletNetwork["networkType"][];
+}
+
 export interface WalletCapabilityDetails {
   supportedNetworks?: readonly WalletNetworkId[];
+  supportedChains?: WalletChainFilter;
   supportedTransactionTypes?: readonly string[];
   supportedMethods?: readonly string[];
   transactionModes?: readonly WalletTransactionMode[];
@@ -173,6 +191,7 @@ export interface AuthenticateResult {
 }
 
 export interface SignAndSubmitRequest<TTransaction extends TransactionPayload = TransactionPayload> extends WalletRequestOptions {
+  maxFeeDrops?: string;
   txJson: TTransaction;
   methodHint?: "payment" | "createNFTOffer" | "acceptNFTOffer" | "cancelNFTOffer" | "burnNFT" | "trustSet" | "setTrustline" | "generic";
   walletPayload?: unknown;
@@ -181,6 +200,7 @@ export interface SignAndSubmitRequest<TTransaction extends TransactionPayload = 
 }
 
 export interface SignTransactionRequest<TTransaction extends TransactionPayload = TransactionPayload> extends WalletRequestOptions {
+  maxFeeDrops?: string;
   txJson: TTransaction;
   methodHint?: SignAndSubmitRequest["methodHint"];
   walletPayload?: unknown;
@@ -209,7 +229,7 @@ export interface TransactionPreflightPolicy {
   networkId?: WalletNetworkId;
   allowedTransactionTypes?: readonly string[];
   deniedTransactionTypes?: readonly string[];
-  /** Integer drops. When configured, Fee must be present for a verifiable ceiling. */
+  /** Integer drops. XRPL requires Fee; registered non-XRPL protocols may estimate and verify it before approval. */
   maxFeeDrops?: string;
   /** A validated ledger index supplied by the application, not fetched implicitly. */
   validatedLedgerIndex?: number;
@@ -279,6 +299,8 @@ export interface AddWalletTransactionRequest {
 }
 
 export interface ConnectOptions extends WalletRequestOptions {
+  /** Supplied by the manager, never part of provider transaction JSON. */
+  protocolContext?: WalletProtocolContext;
   network?: WalletNetwork;
   walletId?: string;
 }
@@ -376,6 +398,7 @@ export interface StoredWalletSessionEnvelope {
 }
 
 export interface WalletManagerConfig {
+  protocols?: readonly WalletProtocol[];
   /** Experimental opt-in allowlist, not a declaration that a provider supports Batch. */
   batch?: { adapterIds: readonly string[] };
   preflight?: TransactionPreflightPolicy;

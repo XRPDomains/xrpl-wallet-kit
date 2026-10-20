@@ -1,15 +1,30 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Buffer } from "buffer";
-import { ensureLedgerXrpApp } from "../packages/adapters/ledger/src/device-app";
+import { ensureLedgerApp, ensureLedgerXrpApp } from "../packages/adapters/ledger/src/device-app";
 import type { LedgerAppTransport } from "../packages/adapters/ledger/src/device-app";
 import { LedgerAdapter, LedgerDeviceState } from "../packages/adapters/ledger/src/index";
+import { XAHAU_MAINNET } from "../packages/xahau/src/networks";
+import { createLazyXahauProtocol } from "../packages/xahau/src/lazy";
 
 function info(name: string) {
   return Buffer.concat([Buffer.from([1, name.length]), Buffer.from(name), Buffer.from([1, 49, 0x90, 0])]);
 }
+
+test("Ledger app instructions follow the requested chain even when the device SDK mentions XRP", async () => {
+  for (const target of ["XRP", "XAH"] as const) {
+    const adapter = new LedgerAdapter({ supportedChains: { families: ["xrpl", "xahau"] },
+      connectLedger: async () => { throw new Error("Please open the XRP app and reconnect"); } });
+    await assert.rejects(adapter.connect(target === "XAH" ? { network: XAHAU_MAINNET,
+      protocolContext: { network: XAHAU_MAINNET, protocol: createLazyXahauProtocol() } } : {}), (error: any) => {
+      assert.match(error.message, new RegExp(`Open ${target} on Ledger. Reconnect.`));
+      if (target === "XAH") assert.doesNotMatch(error.message, /Open XRP/);
+      return true;
+    });
+  }
+});
 const osError = (statusCode: number) => Object.assign(new Error(`Status ${statusCode.toString(16)}`), { statusCode });
-function fixture(initial = "BOLOS") {
+function fixture(initial = "BOLOS", target: "XRP" | "XAH" = "XRP") {
   let app = initial;
   let closeCount = 0;
   let opening = 0;
@@ -21,8 +36,8 @@ function fixture(initial = "BOLOS") {
       if (cla === 0xb0 && ins === 1) return info(app);
       if (cla === 0xb0 && ins === 0xa7) { app = "BOLOS"; return Buffer.from([0x90, 0]); }
       assert.equal(cla, 0xe0); assert.equal(ins, 0xd8);
-      assert.equal(data?.toString("ascii"), "XRP");
-      app = "XRP"; return Buffer.from([0x90, 0]);
+      assert.equal(data?.toString("ascii"), target);
+      app = target; return Buffer.from([0x90, 0]);
     }
   };
   const options: Parameters<typeof ensureLedgerXrpApp>[1] = { timeoutMs: 1000, assertCurrent() {}, onOpening() { opening++; },
@@ -42,6 +57,28 @@ test("Ledger does not switch apps when XRP is already open", async () => {
   await ensureLedgerXrpApp(f.transport, f.options);
   assert.deepEqual(f.calls, [[0xb0, 1, 0, 0]]);
   assert.equal(f.opening, 0);
+});
+
+test("Ledger Xahau launch requests XAH on the device, preserves an open XAH app and never falls back to XRP", async () => {
+  for (const initial of ["BOLOS", "XAH", "XRP"]) {
+    const f = fixture(initial, "XAH");
+    await ensureLedgerApp(f.transport, { ...f.options, app: "XAH" });
+    assert.equal(f.calls.some(call => call[1] === 0xd8), initial !== "XAH");
+  }
+  const f = fixture("BOLOS", "XAH");
+  f.transport.send = async (_cla, ins) => { if (ins === 1) return info("BOLOS"); throw osError(0x6807); };
+  await assert.rejects(ensureLedgerApp(f.transport, { ...f.options, app: "XAH" }), /Open XAH on Ledger/);
+});
+
+test("Ledger connection errors name the selected device app, with explicit XRP compatibility override", async () => {
+  for (const deviceApp of [undefined, "XRP"] as const) {
+    const adapter = new LedgerAdapter({ deviceApp, supportedChains: { families: ["xahau"] },
+      connectLedger: async () => { throw osError(0x6e00); } });
+    await assert.rejects(adapter.connect({ network: XAHAU_MAINNET,
+      protocolContext: { network: XAHAU_MAINNET, protocol: createLazyXahauProtocol() } }),
+    deviceApp === "XRP" ? /Open XRP on Ledger/ : /Open XAH on Ledger/);
+    await adapter.disconnect();
+  }
 });
 
 test("Ledger recognizes current and legacy OS dashboard names", async () => {
@@ -65,7 +102,7 @@ test("Ledger preserves manual legacy path and rejects unsupported launch with de
   assert.equal(await ensureLedgerXrpApp(f.transport, f.options), f.transport);
   assert.equal(f.opening, 0);
   f.transport.send = async (_cla, ins) => { if (ins === 1) return info("BOLOS"); throw osError(0x6807); };
-  await assert.rejects(ensureLedgerXrpApp(f.transport, f.options), /Open the XRP app on your Ledger device/);
+  await assert.rejects(ensureLedgerXrpApp(f.transport, f.options), /Open XRP on Ledger/);
 });
 
 for (const code of [0x6985, 0x6804]) {
@@ -150,25 +187,28 @@ test("Ledger default adapter opens the device app before XRP address retrieval, 
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   Object.defineProperty(globalThis, "navigator", { configurable: true, value: { hid: {} } });
   try {
-    for (const autoOpenApp of [true, false]) {
-      let app = autoOpenApp ? "BOLOS" : "XRP";
+    for (const target of ["XRP", "XAH"] as const) for (const autoOpenApp of [true, false]) {
+      let app: string = autoOpenApp ? "BOLOS" : target;
       let launches = 0;
       let closed = 0;
       const states: LedgerDeviceState[] = [];
       const address = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
       const transport = { close: async () => { closed++; }, decorateAppAPIMethods() {},
-        send: async (cla: number, ins: number) => {
+        send: async (cla: number, ins: number, _p1: number, _p2: number, data?: Buffer) => {
           if (cla === 0xb0 && ins === 1) return info(app);
-          if (cla === 0xe0 && ins === 0xd8) { launches++; app = "XRP"; return Buffer.from([0x90, 0]); }
-          assert.equal(app, "XRP");
+          if (cla === 0xe0 && ins === 0xd8) { assert.equal(data?.toString("ascii"), target); launches++; app = target; return Buffer.from([0x90, 0]); }
+          assert.equal(app, target);
           if (ins === 6) return Buffer.from([0, 2, 5, 2, 0x90, 0]);
           assert.equal(ins, 2);
           const publicKey = Buffer.from("02" + "11".repeat(32), "hex");
           return Buffer.concat([Buffer.from([33]), publicKey, Buffer.from([address.length]), Buffer.from(address), Buffer.from([0x90, 0])]);
         } };
-      const adapter = new LedgerAdapter({ autoOpenApp, onDeviceState: state => states.push(state) });
+      const adapter = new LedgerAdapter({ autoOpenApp, supportedChains: { families: ["xrpl", "xahau"] }, onDeviceState: state => states.push(state) });
       (adapter as unknown as { createTransport(): Promise<LedgerAppTransport> }).createTransport = async () => transport;
-      assert.equal((await adapter.connect({})).account.address, address);
+      const result = await adapter.connect(target === "XAH" ? { network: XAHAU_MAINNET,
+        protocolContext: { network: XAHAU_MAINNET, protocol: createLazyXahauProtocol() } } : {});
+      assert.equal(result.account.address, address);
+      assert.equal(result.session?.metadata?.requestedDeviceApp, target);
       assert.equal(launches, autoOpenApp ? 1 : 0);
       assert.deepEqual(states, autoOpenApp ? [LedgerDeviceState.OPENING_APP, LedgerDeviceState.READY] : [LedgerDeviceState.READY]);
       await adapter.disconnect();

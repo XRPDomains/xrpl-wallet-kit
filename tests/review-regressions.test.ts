@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { WalletManager, WalletKitErrorCode, type WalletAdapter, type WalletSession } from "../packages/core/src/index";
+import { WalletManager, WalletKitErrorCode, type WalletAdapter, type WalletSession } from "@xrpl-wallet-kit/core";
 import { createWalletAuth } from "../packages/auth/src/index";
 import { createDropFiAdapter } from "../packages/adapters/dropfi/src/index";
 import { createCrossmarkAdapter } from "../packages/adapters/crossmark/src/index";

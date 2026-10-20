@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createWalletError } from "@xrpl-wallet-kit/core";
 import { WalletKitErrorCode, type WalletMetadata, type WalletSession } from "../packages/core/src";
 import { WalletButton, WalletButtonController, WalletInline, XrplWalletInline } from "../packages/ui/src/index";
 import { WalletModal } from "../packages/ui/src/modal";
@@ -12,6 +13,7 @@ const manager = {
   cancelPendingConnection: async () => undefined,
   getNetwork: () => ({ id: "mainnet", name: "XRPL Mainnet", networkType: "MAINNET" }),
   getSession: () => null,
+  getAccount: () => null,
   getWallets: () => [],
   getAdapter: () => undefined
 };
@@ -92,6 +94,16 @@ test("WalletModal network badge avoids inline styles for strict CSP", () => {
   assert.doesNotMatch(badge, /style="/);
   assert.match(badge, /xwk-network-badge-testnet/);
   assert.match(styles, /\.xwk-network-badge-testnet/);
+});
+
+test("WalletModal labels Xahau mainnet and testnet explicitly", () => {
+  for (const networkType of ["MAINNET", "TESTNET"] as const) {
+    const name = networkType === "MAINNET" ? "Xahau Mainnet" : "Xahau Testnet";
+    const modal = new WalletModal({ manager: { ...manager, getNetwork: () => ({ id: name, name, family: "xahau", networkType }) } as never }) as unknown as { renderNetworkBadge(): string };
+    const badge = modal.renderNetworkBadge();
+    assert.match(badge, new RegExp(name));
+    assert.doesNotMatch(badge, /XRP/);
+  }
 });
 
 test("WalletModal uses subtle motion without animating modal dimensions", () => {
@@ -226,11 +238,42 @@ test("WalletModal clamps long adapter errors before display", () => {
   const wrappedTimeout = new Error("Failed to connect Girin Wallet: WalletConnect connection timed out. Please try again.");
   const styles = modal.renderStyles(lightTheme, "list", "default", "sm");
 
-  assert.equal(message, "Wallet request failed. Please try again.");
-  assert.equal(modal.getFriendlyErrorMessage(wrappedTimeout), "Wallet request timed out. Please try again.");
+  assert.equal(message, "Request failed. Try again.");
+  assert.equal(modal.getFriendlyErrorMessage(wrappedTimeout), "Timed out. Try again.");
   assert.equal(modal.isTimeoutError(wrappedTimeout, wrappedTimeout.message), true);
   assert.match(styles, /\.xwk-status\{[^}]*overflow-wrap:anywhere/);
   assert.match(styles, /\.xwk-qr-message span\{[^}]*overflow-wrap:anywhere/);
+});
+
+test("WalletModal uses concise shared prompts across wallets", () => {
+  const modal = new WalletModal({ manager: manager as never }) as unknown as {
+    getConnectStatusText(wallet: WalletMetadata, adapterId: string): string;
+  };
+  for (const [id, name, type, expected] of [
+    ["gemwallet", "GemWallet", "extension", "Connect in GemWallet popup."],
+    ["xaman", "Xaman", "mobile", "Open Xaman and approve."],
+    ["ghostsig", "GhostSig", "web", "Connect in GhostSig popup."],
+    ["ledger", "Ledger", "hardware", "Confirm on Ledger."]
+  ] as const) {
+    assert.equal(modal.getConnectStatusText({ id, name, type }, id), expected);
+  }
+});
+
+test("WalletModal localizes short errors without changing diagnostic details", () => {
+  const modal = new WalletModal({ manager: manager as never, language: "vi" }) as unknown as {
+    getFriendlyErrorMessage(error: unknown): string;
+  };
+  const error = createWalletError.networkMismatch("GemWallet", "XAHAU/Mainnet", "XRPL/Mainnet");
+  const original = error.message;
+  assert.equal(modal.getFriendlyErrorMessage(error), "Chuyển ví sang XAHAU/Mainnet.");
+  assert.equal(error.message, original);
+  assert.equal(error.details?.actual, "XRPL/Mainnet");
+  assert.equal(modal.getFriendlyErrorMessage(new Error("Xaman request timed out")), "Hết thời gian chờ. Thử lại.");
+  const custom = new WalletModal({
+    manager: manager as never,
+    messages: { requestTimedOut: "Please retry approval." }
+  }) as unknown as { getFriendlyErrorMessage(error: unknown): string };
+  assert.equal(custom.getFriendlyErrorMessage(new Error("GemWallet timed out")), "Please retry approval.");
 });
 
 test("WalletModal visual states use semantic theme tokens", () => {
@@ -369,7 +412,11 @@ test("WalletModal sorts the most recently connected wallet first", () => {
     { id: "joey", name: "Joey", type: "walletconnect", group: "WalletConnect" }
   ];
   const modal = new WalletModal({
-    manager: { ...manager, getWallets: () => wallets } as never,
+    manager: {
+      ...manager,
+      getWallets: () => wallets,
+      getAdapter: (id: string) => wallets.some((wallet) => wallet.id === id) ? { capabilities: {} } : undefined
+    } as never,
     themeMode: "light"
   }) as unknown as {
     recentWalletId?: string;

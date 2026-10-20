@@ -29,6 +29,11 @@ export interface WalletUiMessages {
   requestRejected: string;
   connectionTimedOutTitle: string;
   requestTimedOut: string;
+  walletUnavailable?: string;
+  actionUnsupported?: string;
+  networkMismatch?: string;
+  switchWalletNetwork?: (network: string) => string;
+  requestFailed?: string;
   connectionFailedTitle: string;
   helpScan: string;
   helpTryAgainNewRequest: string;

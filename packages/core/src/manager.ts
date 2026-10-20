@@ -9,6 +9,8 @@ import type { WalletKitLogger } from "./logger";
 import { DEFAULT_XRPL_NETWORKS, createNetworkRegistry, getHttpRpcUrl } from "./networks";
 import { normalizeSignTransactionResult, normalizeTxResult, pickPath } from "./result";
 import { MemoryWalletStorage } from "./storage";
+import { adapterSupportsNetwork, getNetworkFamily, getNetworkChainId, isLegacyNetwork } from "./utils";
+import type { WalletProtocol } from "./protocol";
 import { WalletTransactionStore } from "./tx-store";
 import type { AddWalletTransactionRequest, AuthenticateRequest, AuthenticateResult, ConnectOptions, SignatureKind, SignAndSubmitRequest, SignMessageRequest, SignMessageResult, SignTransactionRequest, SignTransactionResult, StoredWalletSessionEnvelope, TransactionPayload, WalletAccount, WalletAdapter, WalletAvailabilityMap, WalletCapabilities, WalletCapabilityDetails, WalletManagerConfig, WalletNetwork, WalletNetworkId, WalletSession, WalletStorage, WalletTransaction } from "./types";
 
@@ -191,16 +193,17 @@ export class WalletManager extends WalletEventEmitter {
   async switchNetwork(networkOrId: WalletNetwork | WalletNetworkId): Promise<WalletNetwork> {
     const adapter = this.requireActiveAdapter("switchNetwork");
     const network = typeof networkOrId === "string" ? this.getNetwork(networkOrId) : networkOrId;
-    const supportedNetworks = adapter.capabilities.details?.supportedNetworks;
-    if (supportedNetworks?.length && !supportedNetworks.includes(network.id)) {
-      throw createWalletError.unsupportedMethod(`switchNetwork(${network.id})`, adapter.metadata.name);
-    }
+    this.assertAdapterNetwork(adapter, network);
 
+    const session = this.activeSession;
+    const version = this.lifecycleVersion;
     const result = await adapter.switchNetwork!(network);
-    const selectedNetwork = result?.network ?? network;
-    if (selectedNetwork.id !== network.id) {
-      throw createWalletError.networkMismatch(adapter.metadata.name, String(network.id), String(selectedNetwork.id));
+    if (this.destroyed || version !== this.lifecycleVersion || this.activeSession?.adapterId !== session?.adapterId
+      || this.activeSession?.account.address !== session?.account.address) {
+      throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Wallet session changed during network selection.");
     }
+    const selectedNetwork = result?.network ?? network;
+    this.assertAccountNetwork(adapter, { address: this.getAccount()!.address, network: selectedNetwork }, network, "switchNetwork");
     this.emitNetworkChanged(adapter.metadata.id, selectedNetwork);
     await this.sessionMutation;
     return selectedNetwork;
@@ -236,6 +239,8 @@ export class WalletManager extends WalletEventEmitter {
       return null;
     }
     try {
+      this.assertAdapterNetwork(adapter, this.getNetwork());
+      if (session.account.network) this.assertAccountNetwork(adapter, session.account, this.getNetwork(), "stored session");
       if (adapter.restoreSession) {
         const restoredResult = await this.withTimeout(adapter.restoreSession(session), DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS);
         if (version !== this.lifecycleVersion) return null;
@@ -252,6 +257,7 @@ export class WalletManager extends WalletEventEmitter {
           if (version !== this.lifecycleVersion) return null;
           return null;
         }
+        this.assertAccountNetwork(adapter, restored.account, this.getNetwork(), "restoreSession account");
         this.assertSessionNetwork(adapter, restored.session, this.getNetwork(), "restoreSession");
         const enrichedSession = await this.enrichSession(this.withWalletMetadata(restored.session, adapter));
         if (version !== this.lifecycleVersion) return null;
@@ -279,7 +285,7 @@ export class WalletManager extends WalletEventEmitter {
 
   private async recoverPendingReturnSession(version: number): Promise<WalletSession | null> {
     const network = this.getNetwork();
-    const adaptersWithRecovery = [...this.adapters.values()].filter((adapter) => adapter.recoverSession);
+    const adaptersWithRecovery = [...this.adapters.values()].filter((adapter) => adapter.recoverSession && adapterSupportsNetwork(adapter, network));
     const recoverableAdapters: WalletAdapter[] = [];
     for (const adapter of adaptersWithRecovery) {
       try {
@@ -330,6 +336,7 @@ export class WalletManager extends WalletEventEmitter {
           }
           const recovered = recovery.value;
           if (!recovered?.session) continue;
+          this.assertAccountNetwork(adapter, recovered.account, network, "recoverSession account");
           this.assertSessionNetwork(adapter, recovered.session, network, "recoverSession");
           const enrichedSession = await this.enrichSession(this.withWalletMetadata(recovered.session, adapter));
           if (version !== this.lifecycleVersion) return null;
@@ -384,6 +391,7 @@ export class WalletManager extends WalletEventEmitter {
     this.invalidateRestoration();
     const adapter = this.requireAdapter(adapterId);
     const network = options.network ?? this.getNetwork();
+    this.assertAdapterNetwork(adapter, network);
     const controller = new AbortController();
     let candidate: WalletSession | undefined;
     let connected = false;
@@ -417,9 +425,13 @@ export class WalletManager extends WalletEventEmitter {
       }
       assertPending();
       const signal = controller.signal;
-      const result = await adapter.connect({ ...options, network, walletId: adapterId, signal });
+      this.assertAdapterNetwork(adapter, network);
+      const protocol = this.getProtocol(network);
+      const result = await adapter.connect({ ...options, network, walletId: adapterId, signal,
+        protocolContext: protocol ? { protocol, network } : undefined });
       assertPending();
       this.assertAccountNetwork(adapter, result.account, network, "connect");
+      if (result.session) this.assertSessionNetwork(adapter, result.session, network, "connect session");
       const session = await this.enrichSession(this.withWalletMetadata(result.session ?? { adapterId, account: { ...result.account, network }, connectedAt: Date.now() }, adapter));
       assertPending();
       candidate = session;
@@ -516,6 +528,7 @@ export class WalletManager extends WalletEventEmitter {
           control.progress({ state: "opened" });
           this.emit("signing", { adapterId: adapter.metadata.id, kind: "message" });
           assertWalletRequestActive(control.signal);
+          this.assertAdapterNetwork(adapter, this.getAccount()?.network ?? this.getNetwork());
           return this.normalizeSignMessageResult(adapter.metadata.id,
             await adapter.signMessage!({ ...request, account, signal: control.signal, requestId: control.requestId, onRequestProgress: control.progress }));
         }, () => ({ state: "signed" }));
@@ -538,6 +551,7 @@ export class WalletManager extends WalletEventEmitter {
       request.statement,
       "",
       `Address: ${account.address}`,
+      ...(!isLegacyNetwork(account.network ?? this.getNetwork()) ? [`Chain ID: ${getNetworkChainId(account.network ?? this.getNetwork())}`] : []),
       `Issued At: ${issuedAt.toISOString()}`,
       `Expires At: ${expiresAt.toISOString()}`
     ].join("\n");
@@ -590,7 +604,7 @@ export class WalletManager extends WalletEventEmitter {
     request: SignTransactionRequest | SignAndSubmitRequest,
     mode: TransactionPreflightContext["mode"] = "sign-only"
   ): Promise<TransactionPreflightReport> {
-    return (await this.evaluatePreflight(request, mode)).report;
+    return (await this.evaluatePreflight(this.resolveProtocolFee(request), mode)).report;
   }
 
   private async evaluatePreflight(request: SignTransactionRequest | SignAndSubmitRequest, mode: TransactionPreflightContext["mode"]) {
@@ -617,7 +631,11 @@ export class WalletManager extends WalletEventEmitter {
     } catch (cause) {
       throw new WalletKitError(WalletKitErrorCode.PREFLIGHT_FAILED, "Transaction preflight input could not be copied.", { cause });
     }
-    const report = await validateTransactionPreflight(context, policy);
+    // Non-XRPL runtimes estimate and enforce the resolved fee ceiling before wallet approval.
+    const protocolFee = !isLegacyNetwork(context.network) && request.maxFeeDrops !== undefined;
+    const report = await validateTransactionPreflight(context, {
+      ...policy, maxFeeDrops: protocolFee ? (context.txJson?.Fee === undefined ? undefined : request.maxFeeDrops) : policy.maxFeeDrops
+    });
     if (request.walletPayload !== undefined) {
       report.issues = [...report.issues, { code: "WALLET_PAYLOAD_NOT_VALIDATED", severity: "error", message: "Use txJson without walletPayload when preflight is enabled." }];
       report.allowed = false;
@@ -655,6 +673,18 @@ export class WalletManager extends WalletEventEmitter {
     return request.preflight !== false && (request.preflight !== undefined || this.config.preflight !== undefined);
   }
 
+  private resolveProtocolFee<T extends SignTransactionRequest | SignAndSubmitRequest>(request: T): T {
+    if (isLegacyNetwork(this.getAccount()?.network ?? this.getNetwork())) return request;
+    const caps = [this.config.preflight?.maxFeeDrops,
+      request.preflight && request.preflight.maxFeeDrops, request.maxFeeDrops]
+      .filter((cap): cap is string => cap !== undefined && cap !== false);
+    if (!caps.length || caps.some(cap => typeof cap !== "string" || !/^[1-9][0-9]{0,17}$/.test(cap))) {
+      throw new WalletKitError(WalletKitErrorCode.INVALID_REQUEST, "Set a positive fee limit (maxFeeDrops).");
+    }
+    const maxFeeDrops = caps.reduce((min, cap) => BigInt(cap) < BigInt(min) ? cap : min);
+    return { ...request, maxFeeDrops };
+  }
+
   private prepareBatchRequest<T extends SignTransactionRequest | SignAndSubmitRequest>(request: T, adapter: WalletAdapter): T {
     if (!request.txJson || typeof request.txJson !== "object" || Array.isArray(request.txJson)) return request;
     if (request.txJson.TransactionType !== "Batch") {
@@ -682,7 +712,7 @@ export class WalletManager extends WalletEventEmitter {
   async signAndSubmit<TTransaction extends TransactionPayload = TransactionPayload>(request: SignAndSubmitRequest<TTransaction>) {
     if (this.destroyed) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Wallet manager was destroyed.");
     const adapter = this.requireActiveAdapter("signAndSubmit");
-    request = this.prepareBatchRequest(request, adapter);
+    request = this.prepareBatchRequest(this.resolveProtocolFee(request), adapter);
     const batchIntent = request.txJson?.TransactionType === "Batch" ? structuredClone(request.txJson) : undefined;
     const batchSession = batchIntent ? this.activeSession : undefined;
     const submit = request.submit !== false;
@@ -703,6 +733,7 @@ export class WalletManager extends WalletEventEmitter {
           this.emit("signing", { adapterId: adapter.metadata.id, kind: "transaction" });
           prepared.assertCurrent(); assertWalletRequestActive(control.signal);
           if (batchIntent && this.activeSession !== batchSession) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Wallet session changed; prepare Batch again.");
+          this.assertAdapterNetwork(adapter, this.getAccount()?.network ?? this.getNetwork());
           return normalizeTxResult(await adapter.signAndSubmit!(prepared.request));
         }, result => ({ state: submit ? "submitted" : "signed", hash: result.hash }));
       if (this.destroyed) return result;
@@ -777,7 +808,8 @@ export class WalletManager extends WalletEventEmitter {
     if (this.destroyed) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Wallet manager was destroyed.");
     const adapter = this.getAdapter();
     if (!adapter) throw createWalletError.notConnected();
-    request = this.prepareBatchRequest(request, adapter);
+    this.assertAdapterNetwork(adapter, this.getAccount()?.network ?? this.getNetwork());
+    request = this.prepareBatchRequest(this.resolveProtocolFee(request), adapter);
     const batchSession = request.txJson?.TransactionType === "Batch" ? this.activeSession : undefined;
     const supportsSignOnlyFallback = typeof adapter.signAndSubmit === "function"
       && adapter.capabilities.details?.transactionModes?.includes("sign-only");
@@ -797,6 +829,7 @@ export class WalletManager extends WalletEventEmitter {
           this.emit("signing", { adapterId: adapter.metadata.id, kind: "transaction" });
           prepared.assertCurrent(); assertWalletRequestActive(control.signal);
           if (batchSession && this.activeSession !== batchSession) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Wallet session changed; prepare Batch again.");
+          this.assertAdapterNetwork(adapter, this.getAccount()?.network ?? this.getNetwork());
           const raw = typeof adapter.signTransaction === "function" ? await adapter.signTransaction(prepared.request)
             : await adapter.signAndSubmit!({ ...prepared.request, submit: false });
           return normalizeSignTransactionResult(raw);
@@ -812,7 +845,9 @@ export class WalletManager extends WalletEventEmitter {
 
   emitAccountChanged(adapterId: string, account: WalletAccount): void {
     if (this.destroyed) return;
-    if (this.activeSession?.adapterId === adapterId && this.activeSession.account.address !== account.address) this.requestTracker.cancelSigning();
+    if (!this.acceptNetworkEvent(adapterId, account.network)) return;
+    if (this.activeSession?.adapterId === adapterId && (this.activeSession.account.address !== account.address
+      || (account.network && !this.sameNetwork(this.activeSession.account.network, account.network)))) this.requestTracker.cancelSigning();
     const previousAccount = this.activeSession?.account;
     if (this.activeSession?.adapterId === adapterId) {
       this.activeSession = {
@@ -830,7 +865,8 @@ export class WalletManager extends WalletEventEmitter {
 
   emitNetworkChanged(adapterId: string, network?: WalletNetwork): void {
     if (this.destroyed) return;
-    if (this.activeSession?.adapterId === adapterId && this.activeSession.account.network?.id !== network?.id) this.requestTracker.cancelSigning();
+    if (!this.acceptNetworkEvent(adapterId, network)) return;
+    if (this.activeSession?.adapterId === adapterId && !this.sameNetwork(this.activeSession.account.network, network)) this.requestTracker.cancelSigning();
     const previousNetwork = this.activeSession?.account.network;
     if (this.activeSession?.adapterId === adapterId) {
       this.activeSession = {
@@ -949,14 +985,14 @@ export class WalletManager extends WalletEventEmitter {
       if (attempt > 0 && intervalMs > 0) await this.delay(intervalMs);
       if (controller?.signal.aborted) return;
       try {
-        const result = await this.lookupTransaction(transaction.hash, rpcUrl, controller?.signal);
+        const result = await this.lookupTransaction(transaction.hash, rpcUrl, controller?.signal, transaction.account?.network);
         if (controller?.signal.aborted) return;
         if (!result || !result.validated) continue;
         if (result.transactionResult === "tesSUCCESS") {
           const raw = result.raw as { result?: { TransactionType?: string; tx_json?: { TransactionType?: string } } };
           if (transaction.batch || raw.result?.TransactionType === "Batch" || raw.result?.tx_json?.TransactionType === "Batch") {
             const batch = await inspectBatchResult(transaction.hash, result, transaction.batch,
-              hash => this.lookupTransaction(hash, rpcUrl, controller?.signal));
+              hash => this.lookupTransaction(hash, rpcUrl, controller?.signal, transaction.account?.network));
             if (controller?.signal.aborted) return;
             if (batch.status === "unknown") {
               transaction = { ...transaction, batch };
@@ -995,8 +1031,9 @@ export class WalletManager extends WalletEventEmitter {
     }
   }
 
-  private async lookupTransaction(hash: string, rpcUrl: string, signal?: AbortSignal): Promise<{ validated: boolean; transactionResult?: string; raw: unknown } | null> {
-    const response = await this.fetchJsonRpc(rpcUrl, {
+  private async lookupTransaction(hash: string, rpcUrl: string, signal?: AbortSignal, network?: WalletNetwork): Promise<{ validated: boolean; transactionResult?: string; raw: unknown } | null> {
+    const runtime = network ? this.getProtocol(network) : undefined;
+    const response = runtime?.lookupTransaction && network ? { result: await runtime.lookupTransaction(hash, network, signal) } : await this.fetchJsonRpc(rpcUrl, {
       method: "tx",
       params: [{ transaction: hash, binary: false }]
     }, signal, this.config.transactionConfirmation?.timeoutMs ?? DEFAULT_TX_CONFIRMATION_TIMEOUT_MS);
@@ -1085,6 +1122,7 @@ export class WalletManager extends WalletEventEmitter {
   private requireActiveAdapter(method: keyof WalletAdapter): WalletAdapter {
     const adapter = this.getAdapter();
     if (!adapter) throw createWalletError.notConnected();
+    this.assertAdapterNetwork(adapter, this.getAccount()?.network ?? this.getNetwork());
     if (typeof adapter[method] !== "function") throw createWalletError.unsupportedMethod(String(method), adapter.metadata.name);
     return adapter;
   }
@@ -1162,11 +1200,21 @@ export class WalletManager extends WalletEventEmitter {
   }
 
   private assertAccountNetwork(adapter: WalletAdapter, account: WalletAccount, expected: WalletNetwork, source: string): void {
+    this.assertAdapterNetwork(adapter, expected);
     const actualNetwork = account.network;
     const actualId = actualNetwork?.id;
     const actualType = actualNetwork?.networkType ?? account.networkType;
     const expectedId = expected.id;
     const expectedType = expected.networkType;
+
+    if (!actualNetwork && adapter.capabilities.details?.supportedChains !== undefined) {
+      throw createWalletError.networkMismatch(adapter.metadata.name, String(expectedId), "unknown");
+    }
+
+    if (actualNetwork && (getNetworkFamily(actualNetwork) !== getNetworkFamily(expected)
+      || actualNetwork.networkId !== expected.networkId)) {
+      throw createWalletError.networkMismatch(adapter.metadata.name, String(expectedId), String(actualId));
+    }
 
     if (actualId && actualId !== expectedId) {
       throw createWalletError.networkMismatch(adapter.metadata.name, String(expectedId), String(actualId), new Error(`${source} returned a different network id`));
@@ -1174,6 +1222,38 @@ export class WalletManager extends WalletEventEmitter {
     if (actualType && actualType !== expectedType) {
       throw createWalletError.networkMismatch(adapter.metadata.name, expectedType, actualType, new Error(`${source} returned a different network type`));
     }
+  }
+
+  private assertAdapterNetwork(adapter: WalletAdapter, network: WalletNetwork): void {
+    if (!adapterSupportsNetwork(adapter, network)) throw createWalletError.networkNotSupported(adapter.metadata.name, network.id);
+    const family = getNetworkFamily(network);
+    if (!isLegacyNetwork(network) && !this.getProtocol(network)) {
+      throw createWalletError.networkNotSupported(adapter.metadata.name, network.id,
+        new Error(`A protocol runtime is required for ${family}`));
+    }
+  }
+
+  private getProtocol(network: WalletNetwork): WalletProtocol | undefined {
+    return this.config.protocols?.find(protocol => protocol.family === getNetworkFamily(network)
+      && protocol.networks.some(candidate => this.sameNetwork(candidate, network)));
+  }
+
+  private sameNetwork(left?: WalletNetwork, right?: WalletNetwork): boolean {
+    if (!left || !right) return left === right;
+    return left.id === right.id && getNetworkFamily(left) === getNetworkFamily(right)
+      && left.networkId === right.networkId && left.networkType === right.networkType;
+  }
+
+  private acceptNetworkEvent(adapterId: string, network?: WalletNetwork): boolean {
+    const adapter = this.getAdapter(adapterId);
+    if (!adapter) return false;
+    if (network ? adapterSupportsNetwork(adapter, network) : adapter.capabilities.details?.supportedChains === undefined) return true;
+    this.emitDisconnected(adapterId);
+    const error = network ? createWalletError.networkNotSupported(adapter.metadata.name, network.id)
+      : createWalletError.networkMismatch(adapter.metadata.name, "declared network", "unknown");
+    this.emitSafely("error", { adapterId, error },
+      error => this.logger.warn("Network observer failed", error));
+    return false;
   }
 
   private normalizeConnectionError(adapter: WalletAdapter, error: unknown) {

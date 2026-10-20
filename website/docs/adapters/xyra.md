@@ -21,8 +21,10 @@ console.log(result.txBlob);
 
 The local React and vanilla previews expose Xyra through wallet checkboxes.
 Vanilla defaults to sign-only. This does not change default client wallets or
-the CDN bundle. Standard XRPL mainnet/testnet only; devnet, Xahau and custom RPC
-configurations are rejected. signMessage/payments/nftOffers are not advertised.
+the CDN bundle. Default: standard XRPL mainnet/testnet; devnet/custom RPC are
+rejected. Unreleased Xahau mainnet/testnet support requires opt-in
+`supportedChains` plus the optional injected protocol runtime.
+signMessage/payments/nftOffers are not advertised.
 No passive restore is available; reconnect requires fresh approval.
 
 The adapter checks exact popup origin/source, account-key binding, transaction
@@ -34,9 +36,16 @@ lifecycle do not satisfy these checks and its default import is not SSR-safe.
 
 **Submission caveat:** the live wallet currently returns broadcast results,
 not final ledger validation. The adapter refuses to present preliminary
-tesSUCCESS as confirmed success; inspect the preserved hash/raw outcome before
-retrying an outcomeUnknown error. Live validated submission acceptance remains
-open. Sign-only returns a verified txBlob and rejects any submission report.
+tesSUCCESS as confirmed success. Accepted broadcasts return `status: "submitted"`;
+wait for WalletManager's `tx_confirmed` event or check the ledger. Inspect the
+preserved hash/raw outcome before retrying an outcomeUnknown error. Sign-only
+returns a verified txBlob and rejects any submission report.
+
+Normalized XRPL statuses are `signed`, `submitted` and `confirmed`; a validated
+wallet reply uses `confirmed`, with the original engine result kept in `raw`.
+Independent ledger confirmation remains preferable. Submit failures use
+`SUBMIT_FAILED`; a verified `submitted: false` reply reports
+`outcomeUnknown: false`, while unverifiable replies may remain uncertain.
 
 Allow popups, preserve origin in Referrer-Policy, and use COOP
 same-origin-allow-popups if configured. no-referrer, noopener and noreferrer can
@@ -44,6 +53,9 @@ break the flow or domain verification. Allow data: in img-src for the embedded
 official icon. Requests contain base64 transaction JSON in the popup URL;
 never put secrets in transaction metadata. Local availability detection is
 not proof of wallet or passkey readiness.
+
+Safari/macOS and Safari/iOS popup behavior after asynchronous dApp preflight
+still requires live verification; Chrome tests do not establish compatibility.
 
 Live approval, signing, network switching, mobile and recovery acceptance are
 still pending. See the package README for the protocol review and fee limits.

@@ -27,7 +27,7 @@ class Adapter extends BaseWalletAdapter {
 
 async function setup(preflight?: TransactionPreflightPolicy) {
   const adapter = new Adapter();
-  const manager = new WalletManager({ adapters: [adapter], network: network.id, preflight, logger: { level: "silent" } });
+  const manager = new WalletManager({ adapters: [adapter], networks: [network], network: network.id, preflight, logger: { level: "silent" } });
   await manager.connect(adapter.metadata.id);
   return { adapter, manager };
 }

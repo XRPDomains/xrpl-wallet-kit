@@ -7,6 +7,24 @@ import { createXrplSignatureVerifier } from "../packages/auth/src/verifiers/inde
 const owner = Wallet.generate();
 const other = Wallet.generate();
 const message = "nonce-bound challenge";
+test("server auth pins the chain before proof verification or nonce consumption", async () => {
+  let consumed = 0;
+  let verified = 0;
+  const options = { expectedDomain: "dapp.example", expectedUri: "https://dapp.example", expectedChainId: "xahau:21337",
+    verifier: { verify: async () => { verified++; return true; } }, consumeNonce: () => { consumed++; return true; } };
+  const base = { domain: "dapp.example", uri: "https://dapp.example", address: owner.address,
+    nonce: "issued", version: "1", issuedAt: new Date().toISOString() };
+  for (const chainId of [undefined, "xrpl:0", "xahau:21338"]) {
+    const params = { address: owner.address, message: formatAuthMessage({ ...base, chainId }), signatureKind: "signature" as const, proof: "mock" };
+    assert.equal(await verifyWalletAuth(params, options), false);
+  }
+  assert.equal(consumed, 0);
+  assert.equal(verified, 0);
+  const params = { address: owner.address, message: formatAuthMessage({ ...base, chainId: "xahau:21337" }), signatureKind: "signature" as const, proof: "mock" };
+  assert.equal(await verifyWalletAuth(params, { ...options, expectedChainId: undefined }), false);
+  assert.equal(await verifyWalletAuth(params, options), true);
+  assert.equal(consumed, 1);
+});
 const tx = { TransactionType: "AccountSet" as const, Account: owner.address, Fee: "12", Sequence: 1,
   Memos: [{ Memo: { MemoData: Buffer.from(message).toString("hex").toUpperCase() } }] };
 

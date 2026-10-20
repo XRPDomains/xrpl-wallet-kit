@@ -129,7 +129,10 @@ export class WalletRequestTracker {
     const state: WalletRequestState = error.code === WalletKitErrorCode.REQUEST_TIMEOUT || error.code === WalletKitErrorCode.REQUEST_EXPIRED
       ? "expired" : error.code === WalletKitErrorCode.REQUEST_CANCELLED || error.code === WalletKitErrorCode.SIGN_REJECTED
         || error.code === WalletKitErrorCode.CONNECTION_REJECTED || /reject|cancel|denied|closed/i.test(error.message) ? "cancelled" : "failed";
-    this.update(entry, { state, pending: false, outcomeUnknown: entry.dispatched && entry.request.kind === "sign-and-submit" });
+    const outcomeUnknown = typeof error.details?.outcomeUnknown === "boolean" ? error.details.outcomeUnknown
+      : entry.dispatched && entry.request.kind === "sign-and-submit";
+    const hash = typeof error.details?.hash === "string" ? error.details.hash : entry.request.hash;
+    this.update(entry, { state, pending: false, outcomeUnknown, hash });
     entry.controller.abort(error);
   }
   private update(entry: Entry, patch: Partial<WalletRequest>): void {

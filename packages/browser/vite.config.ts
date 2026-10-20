@@ -33,11 +33,18 @@ function prependBundleBanner(): Plugin {
   };
 }
 
+function assertLazyXahau(): Plugin {
+  return { name: "assert-lazy-xahau", generateBundle() {
+    const leaked = [...this.getModuleIds()].filter(id => /(?:xahau-binary-codec|xahau-address-codec)[/\\]|packages[/\\]xahau[/\\](?:src|dist)[/\\]index\.[jt]s$/.test(id));
+    if (leaked.length) this.error(`Xahau runtime leaked into the base IIFE: ${leaked.join(", ")}`);
+  } };
+}
+
 export default defineConfig(({ mode }) => {
   const minified = mode === "minified";
 
   return {
-    plugins: [emitLegacyBridge(), prependBundleBanner()],
+    plugins: [emitLegacyBridge(), prependBundleBanner(), assertLazyXahau()],
     build: {
       outDir: "dist",
       emptyOutDir: !minified,
@@ -56,12 +63,14 @@ export default defineConfig(({ mode }) => {
           })
         ],
         output: {
+          inlineDynamicImports: true,
           extend: true
         }
       }
     },
     resolve: {
       alias: {
+        "@xrpl-wallet-kit/xahau/lazy": resolve(__dirname, "src/xahau-lazy.ts"),
         "@xrpl-wallet-kit/client": resolve(__dirname, "../client/src/index.ts"),
         "@xrpl-wallet-kit/core": resolve(__dirname, "../core/src/index.ts"),
         "@xrpl-wallet-kit/ui": resolve(__dirname, "../ui/src/index.ts"),
@@ -75,6 +84,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     define: {
+      __XWK_BROWSER_VERSION__: JSON.stringify(packageJson.version),
       "process.env": {}
     }
   };

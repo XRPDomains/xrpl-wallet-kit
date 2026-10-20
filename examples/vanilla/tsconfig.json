@@ -1,0 +1,1 @@
+{ "extends": "../../packages/core/tsconfig.json", "compilerOptions": { "rootDir": "../..", "composite": false, "declaration": false, "declarationMap": false, "noEmit": true, "jsx": "react-jsx", "esModuleInterop": true, "types": ["node", "vite/client"] }, "include": ["src"] }

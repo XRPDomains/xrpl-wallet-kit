@@ -1,7 +1,8 @@
 # @xrpl-wallet-kit/adapter-xyra
 
 Experimental, standalone opt-in Xyra adapter, introduced in 0.1.20.
-Not included in the default client or CDN bundle.
+The unreleased all-in-one client exports it and includes it by default for
+Xahau configurations; XRPL-only client defaults remain opt-in.
 Tracking: [issue #49](https://github.com/XRPDomains/xrpl-wallet-kit/issues/49).
 No live wallet approval or ledger acceptance has been performed by the agent.
 
@@ -24,7 +25,7 @@ console.log(signed.txBlob);
 
 Local previews can use source imports. The published package exports
 XyraAdapter, createXyraAdapter, XyraAdapterOptions and XYRA_ICON. No default
-client/browser wallet list is changed. The React and vanilla local previews
+XRPL-only client wallet list is changed. The React and vanilla local previews
 include Xyra in their wallet checkboxes, defaulting to mainnet; vanilla
 transaction forms default to sign-only. This does not enable it on CDN latest.
 
@@ -42,7 +43,9 @@ timeouts/close monitoring lack deterministic cancellation cleanup.
 The adapter pins https://wallet.xyra.now and uses /connect and /sign, network
 xrpl-mainnet or xrpl-testnet, base64 JSON tx and explicit submit=true only for
 submission. It also sends the SDK's explicit SIGN submit message after 500ms.
-No arbitrary wallet URL, devnet, custom RPC or Xahau configuration is accepted.
+No arbitrary wallet URL, devnet or custom RPC is accepted. Unreleased Xahau
+mainnet/testnet support is opt-in via supportedChains and an injected protocol;
+the default configuration remains XRPL mainnet/testnet.
 
 Live connect/sign page bundles were inspected on 2026-10-06 (wallet Next build
 _6oC_6dfbFar35mjXeVRD). Replies use CONNECT_RESPONSE and SIGN_RESPONSE. The
@@ -73,12 +76,22 @@ verified txBlob. Unexpected submission reports fail closed with raw outcome.
 
 The reviewed live wallet broadcasts with the submit RPC and returns preliminary
 engine_result, not validated ledger confirmation. A preliminary tesSUCCESS or
-submitted=true is NOT final success. The adapter keeps hash/raw data in
-WalletKitError.details with outcomeUnknown=true and instructs the caller to
-inspect the ledger before retrying. Success requires a reported validated
-tesSUCCESS and positive ledger_index; this is still a wallet report, not
-independent ledger attestation. Live validated-result support or independent
-confirmation remains unfinished. Do not automatically retry these errors.
+submitted=true is NOT final success. Accepted broadcasts return status
+`submitted` with the verified hash/blob. WalletManager tracks that hash through
+its ledger confirmation flow; consumers must wait for `tx_confirmed` or check
+the ledger themselves. Submit failures preserve the hash and an explicit
+outcomeUnknown flag; verified non-submission is distinct from uncertainty.
+Do not automatically retry these errors.
+
+## Xahau (Unreleased)
+
+Inject `createXahauProtocol()` from the optional `@xrpl-wallet-kit/xahau` package
+into WalletManager's `protocols`, register its `XAHAU_NETWORKS`, and opt the
+adapter in with `supportedChains: { families: ["xrpl", "xahau"] }`.
+Pass an explicit `maxFeeDrops` on every Xahau transaction request. Xahau uses
+sign-only in the wallet followed by verified RPC submission only when requested;
+no wallet-side broadcast can bypass the fee check. The unified local console at
+5173 offers both chains and both mainnet/testnet. No npm release is implied.
 
 ## Browser Requirements
 
@@ -88,6 +101,19 @@ in the referrer: strict-origin-when-cross-origin or origin works; no-referrer
 and noreferrer prevent the wallet's domain verification. If COOP is configured,
 use same-origin-allow-popups, not same-origin. Do not use noopener/noreferrer.
 isAvailable only checks browser APIs, not wallet readiness or passkey support.
+
+Safari/iOS popup activation after asynchronous manager preflight still requires
+live acceptance. The adapter reserves a blank popup before its own RPC work,
+but this does not guarantee activation survives earlier application checks.
+Chrome or mocked popup tests are not evidence of Safari compatibility.
+
+XRPL submit results normalize to `signed`, `submitted` or `confirmed`; the
+wallet's validated engine result remains in `raw`. `confirmed` here reflects
+the verified reply's provider-reported validation, not an independent RPC
+lookup. The manager's transaction tracking performs its own confirmation.
+Submission errors use `SUBMIT_FAILED` with the verified transaction hash.
+A verified `submitted: false` reply has `outcomeUnknown: false`; a malformed
+or unverifiable reply after a submit request still has an uncertain outcome.
 
 Blocked/closed popup, rejection, timeout, AbortSignal and local disconnect
 remove listeners/timers and close the popup. Cancellation after explicit submit

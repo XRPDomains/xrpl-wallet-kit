@@ -10,6 +10,7 @@ export const XRPL_MAINNET: WalletNetwork = {
   rpcUrl: "wss://xrplcluster.com",
   httpRpcUrl: "https://xrpl.ws",
   walletConnectChainId: "xrpl:0",
+  providerHints: { xaman: "MAINNET", xyra: "xrpl-mainnet", gemwallet: { chain: "XRPL", network: "Mainnet" }, ledgerApp: "XRP" },
   explorerTxUrl: "https://livenet.xrpl.org/transactions/{hash}",
   explorerAccountUrl: "https://livenet.xrpl.org/accounts/{address}"
 };
@@ -24,6 +25,7 @@ export const XRPL_TESTNET: WalletNetwork = {
   rpcUrl: "wss://s.altnet.rippletest.net:51233",
   httpRpcUrl: "https://s.altnet.rippletest.net:51234",
   walletConnectChainId: "xrpl:1",
+  providerHints: { xaman: "TESTNET", xyra: "xrpl-testnet", gemwallet: { chain: "XRPL", network: "Testnet" }, ledgerApp: "XRP" },
   explorerTxUrl: "https://testnet.xrpl.org/transactions/{hash}",
   explorerAccountUrl: "https://testnet.xrpl.org/accounts/{address}"
 };
@@ -38,6 +40,7 @@ export const XRPL_DEVNET: WalletNetwork = {
   rpcUrl: "wss://s.devnet.rippletest.net:51233",
   httpRpcUrl: "https://s.devnet.rippletest.net:51234",
   walletConnectChainId: "xrpl:2",
+  providerHints: { xaman: "DEVNET", gemwallet: { chain: "XRPL", network: "Devnet" }, ledgerApp: "XRP" },
   explorerTxUrl: "https://devnet.xrpl.org/transactions/{hash}",
   explorerAccountUrl: "https://devnet.xrpl.org/accounts/{address}"
 };
@@ -58,7 +61,7 @@ export class NetworkRegistry {
 
   resolve(id: WalletNetworkId = "mainnet"): WalletNetwork {
     const network = this.networks.get(id);
-    if (!network) throw new Error(`XRPL network is not registered: ${id}`);
+    if (!network) throw new Error(`Network is not registered: ${id}`);
     return network;
   }
 
@@ -81,7 +84,7 @@ export function resolveNetwork(networks: readonly WalletNetwork[] | NetworkRegis
 }
 
 export function getNativeAsset(network?: WalletNetwork): string {
-  return network?.nativeAsset ?? "XRP";
+  return network?.nativeAsset ?? ((network?.family ?? "xrpl") === "xrpl" ? "XRP" : "native token");
 }
 
 export function getHttpRpcUrl(networkOrUrl?: WalletNetwork | string): string | undefined {

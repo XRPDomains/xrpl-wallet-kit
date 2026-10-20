@@ -1,5 +1,6 @@
-import { BaseWalletAdapter, createWalletError, validateMultisignTransaction, WalletKitError, WalletKitErrorCode } from "@xrpl-wallet-kit/core";
-import { ensureLedgerXrpApp } from "./device-app";
+import { BaseWalletAdapter, createWalletError, validateMultisignTransaction, WalletKitError, WalletKitErrorCode, getProviderHint, isLegacyNetwork, adapterSupportsNetwork, prepareProtocolTransaction } from "@xrpl-wallet-kit/core";
+import type { WalletChainFilter, WalletProtocolContext } from "@xrpl-wallet-kit/core";
+import { ensureLedgerApp } from "./device-app";
 import type { LedgerAppTransport } from "./device-app";
 import type {
   ConnectOptions,
@@ -37,13 +38,16 @@ export enum LedgerDeviceState {
 }
 
 export interface LedgerAdapterOptions {
+  supportedChains?: WalletChainFilter;
   connectLedger?: () => Promise<LedgerSession>;
   accountIndex?: number;
   derivationPath?: string;
   preferWebHID?: boolean;
   timeout?: number;
-  /** Request XRP on the hardware device during explicit connect. Default true. */
+  /** Request the chain's app on the hardware device during explicit connect. Default true. */
   autoOpenApp?: boolean;
+  /** Defaults to XAH on Xahau, XRP on XRPL. Override only for controlled device compatibility testing. */
+  deviceApp?: "XRP" | "XAH";
   onDeviceState?: (state: LedgerDeviceState) => void;
   icon?: string;
 }
@@ -95,9 +99,14 @@ export class LedgerAdapter extends BaseWalletAdapter {
   private derivationPath: string;
   private connectionGeneration = 0;
   private connectionAbort?: AbortController;
+  private protocolContext?: WalletProtocolContext;
 
   constructor(private options: LedgerAdapterOptions = {}) {
     super();
+    if (options.supportedChains) {
+      this.adapterApiVersion = "1.2";
+      this.capabilities.details = { supportedChains: structuredClone(options.supportedChains), transactionModes: ["sign-only", "sign-and-submit"] };
+    }
     this.derivationPath = options.derivationPath ?? getDerivationPath(options.accountIndex ?? DEFAULT_ACCOUNT_INDEX);
     this.metadata = {
       id: "ledger",
@@ -114,6 +123,10 @@ export class LedgerAdapter extends BaseWalletAdapter {
   }
 
   async connect(options: ConnectOptions): Promise<ConnectResult> {
+    if (options.network && !adapterSupportsNetwork(this, options.network)) throw createWalletError.networkNotSupported("Ledger", options.network.id);
+    if (options.network && !isLegacyNetwork(options.network) && !options.protocolContext) throw createWalletError.networkNotSupported("Ledger (runtime required)", options.network.id);
+    this.protocolContext = options.network && !isLegacyNetwork(options.network) ? options.protocolContext : undefined;
+    if (options.network && !isLegacyNetwork(options.network)) getProviderHint(options.network, "ledgerApp");
     this.connectionAbort?.abort();
     const controller = new AbortController();
     this.connectionAbort = controller;
@@ -149,7 +162,8 @@ export class LedgerAdapter extends BaseWalletAdapter {
           connectedAt: Date.now(),
           metadata: {
             derivationPath: this.session.derivationPath ?? this.derivationPath,
-            appVersion: this.session.appVersion
+            appVersion: this.session.appVersion,
+            requestedDeviceApp: this.getDeviceApp()
           }
         }
       };
@@ -168,6 +182,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
   }
 
   async disconnect(): Promise<void> {
+    this.protocolContext = undefined;
     this.connectionAbort?.abort();
     this.connectionGeneration++;
     this.session = undefined;
@@ -176,6 +191,11 @@ export class LedgerAdapter extends BaseWalletAdapter {
   }
 
   async signAndSubmit(request: SignAndSubmitRequest): Promise<TxResult> {
+    const context = this.protocolContext;
+    if (context) {
+      const result = await this.signTransaction(request);
+      return request.submit === false ? { ...result, status: "signed" } : context.protocol.submit(result.txBlob!, context.network, request);
+    }
     if (!this.session) throw createWalletError.notConnected();
     if (this.isMultisignTransaction(request.txJson)) {
       throw createWalletError.unsupportedMethod("multisign submission", this.metadata.name);
@@ -195,6 +215,29 @@ export class LedgerAdapter extends BaseWalletAdapter {
 
   async signTransaction(request: SignTransactionRequest): Promise<SignTransactionResult> {
     if (!this.session) throw createWalletError.notConnected();
+    const context = this.protocolContext;
+    if (context) {
+      const generation = this.connectionGeneration;
+      const session = this.session;
+      const account = { address: session.address, publicKey: session.publicKey, network: context.network };
+      const tx = await prepareProtocolTransaction(context, request, account);
+      const current = () => {
+        if (generation !== this.connectionGeneration || this.session !== session || request.signal?.aborted) throw createWalletError.notConnected();
+      };
+      current();
+      let blob: string | undefined;
+      if (this.xrp) {
+        const signature = await this.signOnDevice(tx as Record<string, unknown>, context.protocol.encode(tx), "Confirm Xahau transaction on Ledger.");
+        current();
+        blob = context.protocol.encode({ ...tx, TxnSignature: signature.toUpperCase() });
+      } else blob = (await session.signTransaction(tx, false)).txBlob;
+      current();
+      if (!blob) throw createWalletError.signFailed(new Error("Ledger returned no signed blob"));
+      const verified = context.protocol.verify(blob, tx, account, context.network, request);
+      await context.protocol.prepare(tx, account, context.network, request);
+      current();
+      return { txBlob: verified.txBlob, signed: true, raw: { hash: verified.hash, appVersion: session.appVersion } };
+    }
     const multisign = this.isMultisignTransaction(request.txJson);
     const result = multisign
       ? await this.signMultisignTransaction(request.txJson)
@@ -227,7 +270,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
         const path = getDerivationPath(index);
         const account = await this.withTimeout(
           xrp.getAddress(path, false, false),
-          "Ledger account lookup timeout. Please check your Ledger device."
+          "Ledger lookup timed out. Check device."
         );
         if (generation !== this.connectionGeneration) throw createWalletError.notConnected();
         accounts.push({
@@ -258,7 +301,8 @@ export class LedgerAdapter extends BaseWalletAdapter {
       };
       assertCurrent();
       if (this.options.autoOpenApp !== false) {
-        transport = await ensureLedgerXrpApp(transport, {
+        transport = await ensureLedgerApp(transport, {
+          app: this.getDeviceApp(),
           signal: options.signal, timeoutMs: options.timeoutMs ?? this.options.timeout ?? DEFAULT_TIMEOUT, assertCurrent,
           onOpening: () => {
             this.options.onDeviceState?.(LedgerDeviceState.OPENING_APP);
@@ -273,10 +317,10 @@ export class LedgerAdapter extends BaseWalletAdapter {
       const xrp = new Xrp(transport);
       const account = await this.withTimeout(
         xrp.getAddress(this.derivationPath, false, false),
-        "Ledger connection timeout. Please check your Ledger device."
+        "Ledger timed out. Check device."
       );
 
-      if (!account.address) throw new Error("Ledger did not return an XRPL address");
+      if (!account.address) throw new Error("Ledger did not return an address");
 
       // App version is diagnostic only; older apps may not implement this APDU.
       let appVersion: string | undefined;
@@ -310,13 +354,13 @@ export class LedgerAdapter extends BaseWalletAdapter {
 
   private async reopenSameDevice(previous: LedgerTransport): Promise<LedgerTransport> {
     const native = previous as LedgerTransport & { device?: unknown; constructor: { open?: (device: unknown) => Promise<LedgerTransport> } };
-    if (!native.device || !native.constructor.open) throw new Error("Open XRP on your Ledger device and select it again in the browser.");
+    if (!native.device || !native.constructor.open) throw new Error(`Open ${this.getDeviceApp()}. Reselect Ledger.`);
     return native.constructor.open(native.device);
   }
 
   private async signWithDefaultLedger(tx: unknown, submit = true): Promise<LedgerSignResult> {
     if (!this.xrp || !this.session) throw createWalletError.notConnected();
-    if (!this.network) throw createWalletError.connectionFailed(this.metadata.name, new Error("XRPL network is required for Ledger signing"));
+    if (!this.network) throw createWalletError.connectionFailed(this.metadata.name, new Error("Select a network for Ledger signing"));
     if (this.isMultisignTransaction(tx)) {
       throw createWalletError.unsupportedMethod("XRPL multisigning through the single-sign path", this.metadata.name);
     }
@@ -357,7 +401,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
       const signingBlob = encode(txForSigning as never).toUpperCase();
       assertCurrent();
       const signature = await this.signOnDevice(txForSigning, signingBlob,
-        "Ledger signing timeout. Please confirm the transaction on your Ledger device.");
+      "Signing timed out. Check Ledger.");
 
       assertCurrent();
       this.verifyDeviceSignature(encodeForSigning(txForSigning as never), signature, publicKey, verifyKeypairSignature);
@@ -402,7 +446,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
 
   private async signMultisignWithDefaultLedger(tx: unknown): Promise<LedgerSignResult> {
     if (!this.xrp || !this.session) throw createWalletError.notConnected();
-    if (!this.network) throw createWalletError.connectionFailed(this.metadata.name, new Error("XRPL network is required for Ledger signing"));
+    if (!this.network) throw createWalletError.connectionFailed(this.metadata.name, new Error("Select a network for Ledger signing"));
 
     const session = this.session;
     const device = this.xrp;
@@ -421,7 +465,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
     const signingBlob = encode(prepared as never).toUpperCase();
     assertCurrent();
     const signature = await this.signOnDevice(prepared, signingBlob,
-      "Ledger multisigning timeout. Please confirm the transaction on your Ledger device.");
+      "Multisign timed out. Check Ledger.");
     assertCurrent();
     this.verifyDeviceSignature(encodeForMultiSigning(prepared as never, session.address), signature, publicKey, verifyKeypairSignature);
 
@@ -504,7 +548,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
 
   private mapConnectionError(error: unknown): Error {
     if (isWalletKitErrorLike(error)) return error;
-    const parsed = parseLedgerError(error);
+    const parsed = parseLedgerError(error, this.getDeviceApp());
     if (parsed.timeout) return createWalletError.requestTimeout(parsed.message, error);
     if (parsed.rejected) return createWalletError.connectionRejected(this.metadata.name, error);
     if (parsed.state === LedgerDeviceState.NOT_CONNECTED) {
@@ -515,7 +559,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
 
   private mapSigningError(error: unknown): Error {
     if (isWalletKitErrorLike(error)) return error;
-    const parsed = parseLedgerError(error);
+    const parsed = parseLedgerError(error, this.getDeviceApp());
     if (parsed.timeout) return createWalletError.requestTimeout(parsed.message, error);
     if (parsed.rejected) return createWalletError.signRejected(error);
     return createWalletError.signFailed(new Error(parsed.message));
@@ -539,6 +583,10 @@ export class LedgerAdapter extends BaseWalletAdapter {
   private isMultisignTransaction(tx: unknown): boolean {
     const txJson = asRecord(tx);
     return txJson.SigningPubKey === "" || Array.isArray(txJson.Signers);
+  }
+
+  private getDeviceApp(): "XRP" | "XAH" {
+    return this.options.deviceApp ?? (this.network ? getProviderHint(this.network, "ledgerApp") : "XRP");
   }
 }
 
@@ -576,7 +624,7 @@ function getLedgerBrowserSupport(): { supported: boolean; webHID: boolean; webUS
   };
 }
 
-function parseLedgerError(error: unknown): LedgerErrorInfo {
+function parseLedgerError(error: unknown, app: "XRP" | "XAH" = "XRP"): LedgerErrorInfo {
   const message = getLedgerErrorMessage(error);
   const statusCode = getLedgerStatusCode(error);
   const lower = message.toLowerCase();
@@ -588,14 +636,15 @@ function parseLedgerError(error: unknown): LedgerErrorInfo {
     return { state: LedgerDeviceState.UNKNOWN, message: message || "Ledger request timed out", rejected: false, timeout: true };
   }
   if (statusCode === 0x6804 || /locked|pin/.test(lower)) {
-    return { state: LedgerDeviceState.LOCKED, message: "Ledger is locked. Please unlock your Ledger device.", rejected: false, timeout: false };
+    return { state: LedgerDeviceState.LOCKED, message: "Unlock your Ledger.", rejected: false, timeout: false };
   }
-  if ([0x6e00, 0x6511, 0x650f].includes(statusCode ?? 0) || /app.*open|xrp.*app|cla_not_supported/.test(lower)) {
-    return { state: LedgerDeviceState.APP_NOT_OPEN, message: /connect again|select.*again/.test(lower)
-      ? message : "Please open the XRP app on your Ledger device.", rejected: false, timeout: false };
+  if ([0x6e00, 0x6511, 0x650f].includes(statusCode ?? 0) || /app.*open|(?:xrp|xah|xahau).*app|open (?:the )?(?:xrp|xah)|cla_not_supported/.test(lower)) {
+    return { state: LedgerDeviceState.APP_NOT_OPEN, message: /select.*again|reselect/.test(lower)
+      ? `Open ${app}. Reselect Ledger.` : /connect again|reconnect/.test(lower)
+        ? `Open ${app} on Ledger. Reconnect.` : `Open ${app} on Ledger.`, rejected: false, timeout: false };
   }
   if (/no device|device.*not found|disconnected|cannot open device|transport/i.test(message)) {
-    return { state: LedgerDeviceState.NOT_CONNECTED, message: "Ledger device not found. Please connect and unlock your Ledger device.", rejected: false, timeout: false };
+    return { state: LedgerDeviceState.NOT_CONNECTED, message: "Connect and unlock Ledger.", rejected: false, timeout: false };
   }
 
   return { state: LedgerDeviceState.UNKNOWN, message: message || "Unknown Ledger error", rejected: false, timeout: false };

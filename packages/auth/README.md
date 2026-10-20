@@ -224,3 +224,16 @@ async function signInWithWalletKit(manager) {
 ```
 
 Do not verify signatures in browser-only legacy code. The nonce must be generated, stored, validated, and invalidated by the server.
+
+## Chain Binding
+
+Non-XRPL `createWalletAuth` challenges automatically include the connected chain,
+for example `xahau:21337` or `xahau:21338`; a conflicting client `chainId` is rejected.
+Raw `signMessage` is unchanged and is not itself an authentication/session result.
+Configure `expectedChainId` on the server alongside `expectedDomain`, `expectedUri`,
+the proof verifier and atomic `consumeNonce`. Never derive the expected chain from
+the incoming request. Missing/mismatched chain IDs fail before consuming a nonce.
+Non-XRPL challenges without a server-pinned expected chain are rejected.
+Legacy XRPL challenges remain supported; pin `expectedChainId: "xrpl:0"` when
+chain separation is required. This does not add a Xahau proof codec to the XRPL
+verifier; supply a verifier compatible with the wallet's returned proof format.

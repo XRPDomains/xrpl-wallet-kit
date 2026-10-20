@@ -1020,7 +1020,7 @@ test("WalletManager rejects network switches outside adapter capability metadata
   });
 
   await manager.connect("mock", { network });
-  await assert.rejects(() => manager.switchNetwork("testnet"), { code: WalletKitErrorCode.UNSUPPORTED_METHOD });
+  await assert.rejects(() => manager.switchNetwork("testnet"), { code: WalletKitErrorCode.NETWORK_NOT_SUPPORTED });
   assert.equal(manager.getSession()?.account.network?.id, "mainnet");
 });
 
@@ -1167,6 +1167,7 @@ test("NetworkRegistry resolves native asset, HTTP RPC, explorer, and mainnet ide
 
   assert.equal(registry.resolve("xahau-mainnet").name, "Xahau Mainnet");
   assert.equal(getNativeAsset(xahau), "XAH");
+  assert.equal(getNativeAsset({ ...xahau, family: "xahau", nativeAsset: undefined }), "native token");
   assert.equal(getHttpRpcUrl(xahau), "https://xahau.network");
   assert.equal(getExplorerAccountUrl(xahau, "rTest"), "https://explorer.xahau.network/accounts/rTest");
   assert.equal(getExplorerTxUrl(xahau, "ABC/123"), "https://explorer.xahau.network/tx/ABC%2F123");

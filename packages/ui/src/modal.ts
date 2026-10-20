@@ -1,6 +1,6 @@
 import QRCodeStyling from "qr-code-styling";
 import QRCode from "qrcode";
-import { WalletKitError, WalletKitErrorCode, getErrorMessage, isWalletKitError, sanitizeWalletUrl } from "@xrpl-wallet-kit/core";
+import { WalletKitError, WalletKitErrorCode, adapterSupportsNetwork, getErrorMessage, isWalletKitError, sanitizeWalletUrl } from "@xrpl-wallet-kit/core";
 import type { WalletAdapter, WalletMetadata, WalletNetwork, WalletSession } from "@xrpl-wallet-kit/core";
 import { resolveWalletUiOptions } from "./config";
 import { resolveWalletUiMessages } from "./locales";
@@ -83,6 +83,10 @@ class WalletPickerView {
         }), options.manager.on("connected", ({ adapterId, session }) => this.handleConnected(adapterId, session ?? options.manager.getSession())), options.manager.on("error", ({ adapterId, error }) => this.setError(error, adapterId)));
         this.offEvents.push(options.manager.on("walletsChanged", () => {
             if (this.root?.dataset.xwkView === "list") void this.refreshAvailability();
+        }));
+        this.offEvents.push(options.manager.on("networkChanged", () => {
+            this.activeGroupId = undefined;
+            if (this.root?.dataset.xwkView === "list") this.renderView("list");
         }));
         if (typeof document !== "undefined") void this.refreshAvailability();
     }
@@ -513,7 +517,12 @@ class WalletPickerView {
             : [];
     }
     private getWallets(): WalletMetadata[] {
-        const wallets = this.options.manager.getWallets();
+        const manager = this.options.manager;
+        const network = manager.getAccount()?.network ?? manager.getNetwork();
+        const wallets = manager.getWallets().filter(wallet => {
+            const adapter = manager.getAdapter(wallet.id);
+            return adapter !== undefined && adapterSupportsNetwork(adapter, network);
+        });
         const walletOrder = this.options.wallets;
         const orderedWallets = walletOrder !== undefined
             ? (() => {
@@ -783,42 +792,46 @@ class WalletPickerView {
         return /timeout|timed out/i.test(message);
     }
     private getFriendlyErrorMessage(error: unknown): string {
+        const messages = this.messages();
         if (isWalletKitError(error)) {
             switch (error.code) {
                 case WalletKitErrorCode.CONNECTION_REJECTED:
-                    return "Connection was rejected in the wallet.";
                 case WalletKitErrorCode.SIGN_REJECTED:
-                    return "Request was rejected in the wallet.";
+                    return messages.requestRejected;
                 case WalletKitErrorCode.REQUEST_TIMEOUT:
-                    return "Wallet request timed out. Please try again.";
+                    return messages.requestTimedOut;
                 case WalletKitErrorCode.WALLET_NOT_INSTALLED:
                 case WalletKitErrorCode.WALLET_NOT_AVAILABLE:
-                    return "Wallet is not available in this browser.";
+                    return messages.walletUnavailable ?? "Wallet unavailable here.";
                 case WalletKitErrorCode.UNSUPPORTED_METHOD:
-                    return "This wallet does not support the requested action.";
-                case WalletKitErrorCode.NETWORK_MISMATCH:
-                    return "Wallet network does not match this dApp.";
+                    return messages.actionUnsupported ?? "Action not supported.";
+                case WalletKitErrorCode.NETWORK_MISMATCH: {
+                    const expected = error.details?.expected;
+                    return typeof expected === "string"
+                        ? this.formatDisplayErrorMessage(messages.switchWalletNetwork?.(expected) ?? `Switch wallet to ${expected}.`)
+                        : messages.networkMismatch ?? "Check wallet network.";
+                }
                 default:
                     return this.formatDisplayErrorMessage(error.message);
             }
         }
         const message = getErrorMessage(error);
         if (/reject|denied|cancelled|canceled|closed|proposal expired|expired/i.test(message))
-            return "Request was rejected in the wallet.";
+            return messages.requestRejected;
         if (/timeout|timed out/i.test(message))
-            return "Wallet request timed out. Please try again.";
+            return messages.requestTimedOut;
         if (/not installed|provider is not available|not available/i.test(message))
-            return "Wallet is not available in this browser.";
+            return messages.walletUnavailable ?? "Wallet unavailable here.";
         return this.formatDisplayErrorMessage(message);
     }
     private formatDisplayErrorMessage(message: string): string {
-        const normalized = message.replace(/\s+/g, " ").trim();
+        const normalized = message.replace(/^Failed to connect [^:]{1,80}:\s*/i, "").replace(/\s+/g, " ").trim();
         if (!normalized)
-            return "Wallet request failed. Please try again.";
+            return this.messages().requestFailed ?? "Request failed. Try again.";
         if (normalized.length <= 180 && !/^\[?\{/.test(normalized))
             return normalized;
         if (/^\[?\{/.test(normalized))
-            return "Wallet request failed. Please try again.";
+            return this.messages().requestFailed ?? "Request failed. Try again.";
         return `${normalized.slice(0, 177).trimEnd()}...`;
     }
     private renderShellAttributes(className: string) {
@@ -843,7 +856,7 @@ class WalletPickerView {
     }
     private renderNetworkBadge() {
         const network = this.options.manager.getNetwork();
-        if (!network || network.networkType === "MAINNET")
+        if (!network || network.networkType === "MAINNET" && (network.family ?? "xrpl") === "xrpl")
             return "";
         const { className, label } = this.resolveNetworkBadgeStyle(network);
         const dot = `<span class="xwk-network-dot" aria-hidden="true"></span>`;
@@ -854,6 +867,10 @@ class WalletPickerView {
         const id = String(network.id ?? "").toLowerCase();
         const name = String(network.name ?? "").toLowerCase();
         const isEvm = family.includes("evm") || id.includes("evm") || name.includes("evm");
+        if (family !== "xrpl" && !isEvm) {
+            return { label: network.name || family.toUpperCase(),
+                className: network.networkType === "TESTNET" ? "xwk-network-badge-testnet" : "xwk-network-badge-custom" };
+        }
         if (isEvm) {
             return {
                 label: "XRPL EVM",

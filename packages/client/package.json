@@ -26,6 +26,8 @@
   },
   "dependencies": {
     "@xrpl-wallet-kit/core": "0.1.23",
+    "@xrpl-wallet-kit/xahau": "0.1.23",
+    "@xrpl-wallet-kit/adapter-xyra": "0.1.23",
     "@xrpl-wallet-kit/adapter-crossmark": "0.1.23",
     "@xrpl-wallet-kit/adapter-dropfi": "0.1.23",
     "@xrpl-wallet-kit/adapter-ghostsig": "0.1.23",
