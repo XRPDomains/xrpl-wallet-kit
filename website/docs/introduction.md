@@ -1,6 +1,6 @@
 # Introduction
 
-**XRPL Wallet Kit** is a framework-agnostic wallet adapter toolkit for building XRPL browser dApps. It provides a unified API across all major XRPL wallets, a headless DOM-based UI, and optional prebuilt components — so you can ship a wallet connection flow in minutes, not days.
+**XRPL Wallet Kit** is a framework-agnostic wallet adapter toolkit for building XRPL and Xahau browser dApps. It provides a unified connection and transaction API, a headless core, and optional DOM-based UI components.
 
 ## Why XRPL Wallet Kit?
 
@@ -51,7 +51,7 @@ uses a chain-filtered subset with its own transaction scope and wallet configura
 | GemWallet | `adapter-gemwallet` | Browser Extension | ✅ | ✅ | ✅ |
 | WalletConnect | `adapter-walletconnect` | Multi-wallet QR | ✅ | ✅ | ✅ |
 | Crossmark | `adapter-crossmark` | Browser Extension | ✅ | ✅ | ✅ |
-| Ledger | `adapter-ledger` | Hardware (USB/HID) | ✅ | ✅ | — |
+| Ledger | `adapter-ledger` | Hardware (USB/HID) | ✅ | ✅ | ✅ |
 | DropFi | `adapter-dropfi` | Extension + Mobile App | ✅ | ✅ | ✅ |
 | XRPL Snap | `adapter-xrpl-snap` | MetaMask Snap | ✅ | ✅ | ✅ |
 | Otsu Wallet | `adapter-otsu` | Browser Extension | ✅ | ✅ | ✅ |
@@ -71,12 +71,13 @@ see the [capability matrix](/docs/adapters/overview#capability-matrix) for messa
 
 ## Package Overview
 
-| Package | Size (gzip) | Description |
-|---|---|---|
-| `@xrpl-wallet-kit/core` | ~5.7 KB | Headless core, WalletManager, types |
-| `@xrpl-wallet-kit/ui` | ~12 KB | DOM modal, connect button |
-| `@xrpl-wallet-kit/client` | umbrella | core + ui + all adapters |
-| `@xrpl-wallet-kit/browser` | 528 KB | IIFE bundle for plain HTML |
+| Package | Description |
+|---|---|
+| `@xrpl-wallet-kit/core` | Headless core, WalletManager, types |
+| `@xrpl-wallet-kit/ui` | DOM modal, connect button |
+| `@xrpl-wallet-kit/client` | All-in-one client with adapters and automatic Xahau configuration |
+| `@xrpl-wallet-kit/browser` | IIFE bundle for plain HTML, with a separately loaded Xahau runtime |
+| `@xrpl-wallet-kit/xahau` | Xahau protocol and network presets for core/selective integration |
 
 ::: tip
 For production apps using a bundler (Vite, webpack), import from individual packages so tree-shaking removes unused adapters.  
@@ -101,7 +102,7 @@ XRPL Wallet Kit has no React dependency. The headless core works with any JavaSc
 Version **0.1.21** adds opt-in, single-account **All-or-Nothing Batch**
 preparation, inner-transaction preflight and per-operation confirmation tracking.
 Applications can group 2-8 operations while retaining the existing signing API.
-Wallet acceptance still needs live testing. See [Batch Transactions](/docs/configuration/batch)
+Enable compatible wallets explicitly. See [Batch Transactions](/docs/configuration/batch)
 for scope, examples and integration requirements.
 
 ## Next Steps
@@ -109,4 +110,5 @@ for scope, examples and integration requirements.
 - [Installation](/docs/installation) — install the packages
 - [Quick Start](/docs/quick-start) — connect your first wallet in 5 minutes
 - [Adapters](/docs/adapters/overview) — pick the wallets you want to support
+- [Xahau](/docs/configuration/xahau) — configure Xahau wallets, payments, Hooks and URITokens
 - [Theming](/docs/configuration/theming) — customize colors, fonts, and layout

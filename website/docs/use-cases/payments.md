@@ -2,6 +2,9 @@
 
 XRPL's core strength is fast, low-fee payments settling in 3–5 seconds. The `Payment` transaction handles XRP transfers, IOU token payments, and cross-currency conversions with on-ledger path-finding — all signed through the wallet kit.
 
+This guide targets XRPL. For native XAH payments and Payment with HookParameters,
+use the [Xahau guide](/docs/configuration/xahau#payment).
+
 ## XRP Payment
 
 For multi-recipient payments or a payment plus a platform fee, see

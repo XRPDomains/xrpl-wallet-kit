@@ -120,15 +120,3 @@ When multiple browser wallets are installed, the adapter prefers MetaMask from `
 **`signMessage` fails with "method not found"?** Your installed Snap version may not support the default method. Override `signMessageMethods` with methods supported by your Snap version.
 
 **`signAndSubmit` returns null/undefined?** Check that the Snap's `xrpl_signAndSubmit` method is available in the installed version. Verify by calling `wallet_getSnaps` in MetaMask to see installed Snap capabilities.
-
-## Manual Test Checklist
-
-- [ ] MetaMask detected — `window.ethereum` present, Snaps supported
-- [ ] First connect — Snap installation popup shown, approved, address returned
-- [ ] Second connect (Snap already installed) — connection popup shown, address returned
-- [ ] `signAndSubmit` — MetaMask popup shows txn, hash returned after approval
-- [ ] `signMessage` — MetaMask popup shows 1-drop Payment, `signatureKind: "signedTx"` returned
-- [ ] Page reload — `autoReconnect()` restores session via stored address
-- [ ] MetaMask not installed — modal shows install link to metamask.io
-- [ ] Snap install rejected — adapter throws readable error
-- [ ] Rejection — user cancels in MetaMask, adapter throws readable error

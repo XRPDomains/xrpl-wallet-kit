@@ -247,7 +247,7 @@
 
       <section class="panel" id="panel-json" role="tabpanel" aria-labelledby="tab-json" tabindex="0" data-workflow-panel="json" hidden>
         <div class="panel-heading"><h2>Transaction JSON</h2></div>
-        <div class="controls"><label><span>Template</span><select id="generic-template"><option>Payment</option><option value="Invoke">Invoke</option><option>TrustSet</option><option>OfferCreate</option><option>OfferCancel</option><option>AccountSet</option></select></label></div>
+        <div class="controls"><label><span>Template</span><select id="generic-template"><option>Payment</option><option value="Invoke">Invoke</option><option value="InvokeMainnetNoop">Invoke - Mainnet smoke test</option><option>TrustSet</option><option>OfferCreate</option><option>OfferCancel</option><option>AccountSet</option></select></label></div>
         <label><span>Unsigned transaction intent</span><textarea id="generic-tx" rows="9" spellcheck="false">{"TransactionType":"Payment","Destination":"","Amount":"1"}</textarea></label>
         <div class="lab-actions"><button id="generic-sign-button" type="button">Sign transaction</button><button id="cancel-request-button" type="button" class="secondary-button">Cancel pending request</button></div>
         <h3 class="result-heading">Result</h3>

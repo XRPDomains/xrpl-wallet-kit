@@ -2,6 +2,10 @@
 
 XRPL supports native NFTs (XLS-20) without smart contracts. Minting, listing, and trading happen directly on-ledger via dedicated transaction types — giving your marketplace low-fee, instant-finality trades.
 
+This guide uses XRPL `NFToken*` transactions. For Xahau, use the
+[URIToken examples](/docs/configuration/xahau#nfts-uritokens), including
+`URITokenBuy` to accept a sell offer.
+
 ## Supported Transactions
 
 - `NFTokenMint` — create a new NFT with optional royalty and metadata URI

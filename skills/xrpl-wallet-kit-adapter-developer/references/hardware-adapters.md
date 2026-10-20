@@ -30,6 +30,11 @@ A good hardware `connect()` flow:
 5. Return normalized `account.address`, optional `publicKey`, and `session.metadata.derivationPath`.
 6. Clean up transport if connection fails.
 
+Resolve the hardware app from the network's `providerHints.ledgerApp`: XRP for
+XRPL, XAH for Xahau. Auto-open requests target the hardware, not Ledger Live.
+Do not request blind signing to bypass unsupported transaction fields. For
+Xahau signing and registration, also read `chain-support.md`.
+
 Default XRPL derivation path:
 
 ```text
@@ -45,18 +50,23 @@ For XRPL Ledger-style transaction signing:
 1. Ensure an active hardware session exists.
 2. Autofill transaction fields through XRPL RPC if needed.
 3. Set `Account` to the connected address when missing.
-4. Remove `TxnSignature` and `Signers` before signing.
+4. Reject already-signed input (`TxnSignature` or `Signers`); do not silently remove signatures.
 5. Set `SigningPubKey` to the hardware public key for normal signing.
-6. Encode the transaction to a signing blob.
+6. Serialize using the device SDK's expected input; verify signatures over the canonical signing preimage, not an arbitrary serialized blob.
 7. Ask the hardware device to sign.
 8. Rebuild the signed transaction with `TxnSignature`.
 9. Return a signed-only result for `submit:false`, or submit and return hash/status for `submit:true`.
+
+For non-XRPL families, replace XRPL autofill/codec/submission with the configured
+protocol's prepare/encode/verify/submit flow. Verify the signature before returning
+the signed blob or submitting. Never run both protocol preparation and XRPL autofill.
 
 For `submit:false`, return enough data for downstream code:
 
 ```ts
 {
   signed: true,
+  txBlob,
   raw: {
     txBlob,
     signedTx
@@ -79,7 +89,7 @@ Map common hardware states to user-friendly errors:
 - device not connected: wallet not available;
 - browser does not support WebHID/WebUSB: wallet not available;
 - device locked: connection failed with unlock instructions;
-- app not open: connection failed with "open the XRP app";
+- app not open: concise instruction naming the selected chain's hardware app;
 - user rejected on device: rejected/canceled error;
 - operation timeout: timeout error.
 
@@ -90,7 +100,7 @@ Preserve the original provider error as cause/raw where possible.
 - Browser without WebHID/WebUSB returns unavailable state.
 - Ledger disconnected returns a friendly missing-device error.
 - Ledger locked returns unlock instructions.
-- Ledger connected but XRP app closed returns "open XRP app".
+- With the required device app closed, auto-open or manual instructions name XRP/XAH correctly.
 - Connect succeeds with expected address/public key.
 - Disconnect closes transport and clears session.
 - Refresh does not silently reconnect as active hardware wallet.

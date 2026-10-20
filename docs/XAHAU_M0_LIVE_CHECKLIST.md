@@ -205,3 +205,21 @@ Gate release van can integration/browser/SSR/regression va review rieng.
   (native signature). Xyra/Ledger chua co message API trong adapter hien tai.
   Day la raw signing, khong phai xac nhan chain-bound auth; tab Auth va Batch
   van chua bat tren Xahau. Maintainer chu dong test trong console 5173.
+
+## 11. Invoke Mainnet Live Acceptance (2026-10-21)
+
+- Maintainer reported successful live Invoke calls on Xahau Mainnet with all
+  four adapters: Xaman, GemWallet, Xyra and Ledger. This supersedes the open
+  Invoke acceptance status in section 9 for this tested flow only.
+- The local console provides `Invoke - Mainnet smoke test`, targeting
+  `rH8M9qWfWspxY93sDNEd43cVabpf29msLV` with `TEST=wallet-kit` in HookParameters.
+  Before the maintainer's test, unsigned RPC simulation returned `tesSUCCESS`,
+  Hook return text `Transaction accepted for no reason`, zero emits and zero
+  Hook state changes. Simulation is separate evidence, not a signed live result.
+- Transaction hashes, per-wallet signing modes, wallet/app versions and browser
+  details were not supplied; do not invent those records or mark both modes passed.
+- This confirms the maintainer-reported basic Invoke flow, not arbitrary Hooks,
+  business-parameter semantics, state writes, emitted transactions, SetHook,
+  multisign, blind-signing safety or Safari/iOS compatibility.
+- No adapter capability/default changes, automated signing, builds, commit,
+  push or publication are triggered by recording this result.

@@ -49,6 +49,8 @@ The package publishes:
 XRPL-only pages do not download the Xahau codec. On first Xahau transaction
 preparation or lookup, the IIFE imports `xrpl-wallet-kit-xahau.runtime.js` from
 the directory of its original script URL, not from the page directory.
+This standalone ESM asset is fully minified, including whitespace, despite
+having no `.min.js` suffix.
 Self-host both assets together or use a version-pinned CDN script URL. A mixed
 bundle/runtime version is rejected before wallet signing. Loading failures do
 not trigger automatic transaction retries.

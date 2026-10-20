@@ -123,14 +123,3 @@ await manager.autoReconnect();
 **Mobile deep link not working?** Xaman must be installed on the device. If not installed, the browser redirects to the App Store / Google Play.
 
 **`recoverSession` not completing?** The pending-recovery marker expires after 3 minutes. If the user takes longer than that to return from Xaman, a fresh QR scan is required.
-
-## Manual Test Checklist
-
-- [ ] Connect on desktop — QR displays, scan with Xaman, address returned
-- [ ] Connect on mobile — deep link opens Xaman, approval returns address
-- [ ] `signAndSubmit` — push notification sent, txn confirmed on ledger, hash returned
-- [ ] `signMessage` — push notification sent, `proof`/`txBlob` returned, `signatureKind: "signedTx"`
-- [ ] Page reload — `autoReconnect()` restores session without re-approval
-- [ ] Mobile return recovery — deep link flow, marker present, `recoverSession` completes
-- [ ] Rejection — user taps Reject in Xaman, adapter throws with correct error code
-- [ ] Expired payload — wait for timeout, adapter throws with readable message

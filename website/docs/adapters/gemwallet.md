@@ -44,7 +44,7 @@ The adapter waits up to 2.5 seconds for the extension to hydrate before reportin
 | payments | ✅ |
 | sessionRestore | ✅ |
 | disconnect | ❌ |
-| signTransaction | ❌ |
+| signTransaction | ✅ when exposed by the provider |
 
 ## Message Signing
 
@@ -94,38 +94,43 @@ await manager.signAndSubmit({
 });
 ```
 
-`signAndSubmit` always submits the transaction to the XRPL network — GemWallet handles autofill and submission internally.
+For sign-only requests, use the generic transaction API:
+
+```ts
+const signed = await manager.signTransaction({
+  txJson: {
+    TransactionType: "Payment",
+    Account: session.account.address,
+    Destination: "<recipient_address>",
+    Amount: "1000000", // 1 XRP
+  },
+});
+console.log(signed.txBlob); // Not broadcast
+```
+
+Check `manager.can("signTransaction")` when using a custom or older provider.
+On XRPL, normal sign-and-submit requests use GemWallet's transaction methods.
+On Xahau, the kit prepares and verifies the generic transaction before RPC
+submission; use the [Xahau configuration and examples](/docs/configuration/xahau).
 
 ## Session Restore / Mobile Return Recovery
 
-**Session restore**: on page reload, the adapter calls `getAddress()` via the GemWallet provider. If the returned address matches the stored session address, the session is silently restored.
+**XRPL session restore**: on page reload, the adapter calls `getAddress()` via the GemWallet provider. If the returned address matches the stored session address, the session is silently restored. Xahau requires an explicit reconnect after reload.
 
 There is no mobile return / deeplink recovery — GemWallet is a desktop browser extension only.
 
 ## Known Limitations
 
 - No `disconnect()` — GemWallet does not expose a provider-level disconnect method. The session is cleared from the kit's internal storage only.
-- No `signTransaction` (sign without submitting) — `signAndSubmit` is the only signing path.
+- Sign-only requires the provider's `signTransaction` method; unsupported providers return `UNSUPPORTED_METHOD`.
 - Payment and TrustSet fields are automatically converted to GemWallet's camelCase format; other transaction types are passed as-is.
 
 ## Troubleshooting
 
 **Extension not detected?** Verify GemWallet is installed and the extension is enabled for the current site (check browser extension permissions / site access).
 
-**"Installed" badge not showing?** The adapter waits up to 2.5 s for the extension to inject. A very slow extension load may miss this window — try a hard reload.
+**"Installed" badge not showing?** Allow the extension access to the current site. Keep the wallet list open briefly while detection refreshes; the badge indicates availability, not a connected session.
 
 **User rejected the request?** The adapter throws a `WalletError` with code `CONNECTION_REJECTED`. The connect modal shows a user-friendly error and a retry option.
 
 **Transaction failed to infer method?** Pass `methodHint` explicitly if the auto-detection picks the wrong GemWallet API for your transaction type.
-
-## Manual Test Checklist
-
-- [ ] Extension detected — "Installed" badge shows in the modal
-- [ ] Connect — GemWallet popup appears, address returned on approval
-- [ ] `signAndSubmit` Payment — GemWallet popup shows, transaction confirmed, hash returned
-- [ ] `signAndSubmit` TrustSet — correct GemWallet `setTrustline` popup shown
-- [ ] `signAndSubmit` NFT offer — correct GemWallet NFT popup shown
-- [ ] `signMessage` — compact signature returned, `signatureKind: "signature"`
-- [ ] Page reload — `autoReconnect()` restores session without popup
-- [ ] Extension not installed — modal shows install link to gemwallet.app
-- [ ] Rejection — user clicks Cancel, adapter throws readable error

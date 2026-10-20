@@ -79,13 +79,14 @@ Ledger **does not support** arbitrary message signing. There is no `signMessage`
 
 The adapter autofills the transaction via an `xrpl.js` client connection, then sends it to the Ledger for signing. The user must confirm the transaction on the device screen.
 
-Starting in **0.1.21**, the default signing flow verifies the device signature
+The default signing flow verifies the device signature
 locally before returning or submitting it. It preserves RPC errors, rejects
 already-signed input, and stops submission if the Ledger session changes.
 Single-sign requests set `tfFullyCanonicalSig` for compatibility with XRP app
 2.3.2 while preserving transaction-specific flags. For NFT transactions, use an
 up-to-date XRP app; the transaction types supported depend on that app version.
-Batch support on Ledger is not confirmed.
+Generic signing does not imply Batch support; see the
+[Batch compatibility requirements](/docs/configuration/batch#wallet-compatibility).
 
 ```ts
 // Sign-only (no broadcast)
@@ -160,20 +161,3 @@ Session restore always returns `null`. Hardware wallets require a fresh device p
 **User rejected the transaction?** The adapter throws a `WalletError` with code `SIGN_REJECTED` when the user presses the Reject button on the Ledger.
 
 **Browser not supported?** Chrome and Edge support WebHID/WebUSB. Firefox has limited WebUSB support. Safari does not support either transport.
-
-## Manual Test Checklist
-
-The maintainer reported successful live testing of the documented transaction
-commands on 2026-10-13 in their setup. This does not certify every XRP app,
-firmware or network; Ledger Batch support remains unconfirmed.
-
-- [ ] Browser compatibility check — `navigator.hid` or `navigator.usb` present
-- [ ] Connect — device picker shows, Ledger address returned after approval
-- [ ] `signTransaction` — user confirms on Ledger, `txBlob` returned (no broadcast)
-- [ ] `signAndSubmit` — user confirms on Ledger, transaction confirmed on ledger, hash returned
-- [ ] `getAccounts(5)` — first 5 BIP44 derivation paths returned
-- [ ] Page reload — no auto-restore (user must reconnect manually)
-- [ ] Ledger locked — error message "Ledger is locked" shown
-- [ ] XRP app not open — error message "Please open the XRP app" shown
-- [ ] Timeout — user doesn't confirm in time, readable timeout error shown
-- [ ] Rejection — user presses Reject on Ledger, adapter throws `SIGN_REJECTED`

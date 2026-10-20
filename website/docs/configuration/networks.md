@@ -58,6 +58,10 @@ The modal displays a colored network badge when the connected network is not mai
 - **Devnet** — orange badge: `DEVNET`
 - **Custom** — shows the `id` value
 
+The modal footer identifies the selected chain and network, for example
+`XRPL Wallet Kit · XRPL Mainnet` or `XRPL Wallet Kit · Xahau Mainnet`, without
+adding a separate mainnet badge. Testnet and devnet retain a visible network badge.
+
 ## Switching Networks
 
 Since `0.1.17`, the manager exposes a unified network-switching API. It only invokes adapters that explicitly advertise `switchNetwork: true` and rejects targets outside the adapter's `supportedNetworks` metadata.

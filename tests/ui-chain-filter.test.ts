@@ -16,11 +16,11 @@ test("modal filters by active network, respects wallet order and refreshes on ne
   // Exercise list selection and the event subscription without constructing a browser DOM.
   const modal = new WalletModal({ manager: kit, wallets: ["legacy", "multi"] }) as unknown as {
     getWallets(): WalletMetadata[];
-    root: { dataset: { xwkView: string } };
+    root: { dataset: { xwkView: string }; querySelector(selector: string): null };
     renderView(view: string): void;
   };
   assert.deepEqual(modal.getWallets().map(wallet => wallet.id), ["legacy", "multi"]);
-  modal.root = { dataset: { xwkView: "list" } };
+  modal.root = { dataset: { xwkView: "list" }, querySelector: () => null };
   const rendered: string[][] = [];
   modal.renderView = () => { rendered.push(modal.getWallets().map(wallet => wallet.id)); };
   kit.emitNetworkChanged("multi", xahau);

@@ -754,3 +754,11 @@ size reduction. Runtime transfer is deferred until needed, not removed.
 Dependency audit policy passed with existing exceptions, not a clean audit:
 root reports seven low and three high dependency findings (including elliptic
 and node-forge); website reports zero. No blanket dependency upgrade was applied.
+
+## 23. Invoke Mainnet Live Update (2026-10-21)
+
+The maintainer reported basic Invoke on Xahau Mainnet passing with Xaman,
+GemWallet, Xyra and Ledger. See `XAHAU_M0_LIVE_CHECKLIST.md`, section 11, for
+the tested console preset, separate unsigned-simulation evidence and remaining
+scope limitations. Earlier open Invoke gates are historical for this tested
+flow; they are not evidence that arbitrary Hook logic or every signing mode passed.

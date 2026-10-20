@@ -1,4 +1,4 @@
 interface:
   display_name: "XRPL Wallet Kit Adapter Developer"
-  short_description: "Implement or review XRPL Wallet Kit adapters."
-  default_prompt: "Use $xrpl-wallet-kit-adapter-developer to implement or review an adapter against the local core contract, with scoped validation and concise integration docs."
+  short_description: "Implement XRPL and Xahau wallet adapters."
+  default_prompt: "Use $xrpl-wallet-kit-adapter-developer to implement or review an adapter against the local core contract, including chain support and protocol-aware signing where applicable, with scoped validation and concise integration docs."

@@ -339,6 +339,7 @@
 
         <!-- Preview column -->
         <div class="tb-preview-col">
+          <p v-if="loadError" role="alert">{{ loadError }}</p>
           <div class="tb-preview-bar">
             <div class="tb-state-toggle" aria-label="Preview wallet state">
               <button
@@ -509,6 +510,7 @@ const previewState = ref<PreviewState>('wallets')
 const activePreset  = ref<string>('default')
 const copied        = ref(false)
 const kitLoaded     = ref(false)
+const loadError     = ref('')
 const mountRef      = ref<HTMLElement | null>(null)
 
 let modalInstance:  any = null
@@ -1311,6 +1313,7 @@ onMounted(async () => {
     await loadKit()
     renderPreview()
   } catch (e) {
+    loadError.value = 'Wallet preview could not load. Please reload the page.'
     console.warn('Theme Builder: XRPL Wallet Kit not available', e)
   }
 })

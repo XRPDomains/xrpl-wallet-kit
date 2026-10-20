@@ -48,8 +48,8 @@ The adapter looks for `window.xrpl` with `isOtsu === true`. This discriminator p
 | signTransaction | ✅ |
 | signAndSubmit | ✅ |
 | sessionRestore | ✅ |
-| payments | ⚠️ pending live testing |
-| nftOffers | ⚠️ pending live testing |
+| payments | Not advertised; use generic `txJson` |
+| nftOffers | Not advertised; use generic `txJson` |
 
 ## Message Signing
 
@@ -99,7 +99,7 @@ There is no mobile return / deeplink recovery — Otsu is a desktop browser exte
 
 ## Known Limitations
 
-- `payments` and `nftOffers` capabilities are not yet confirmed with live Otsu transaction tests. Enable them in your adapter options once Payment and NFT offer payloads have been validated end-to-end.
+- Dedicated `payments` and `nftOffers` capability flags are not advertised. Use the generic transaction API with fields supported by the wallet.
 - Scopes must be declared at connect time — no incremental scope elevation after the initial connection.
 - The Otsu Wallet is an early-stage project. The provider API may change in future releases.
 
@@ -112,21 +112,3 @@ There is no mobile return / deeplink recovery — Otsu is a desktop browser exte
 **Scope permission denied?** If the user denies a scope at connection time, the adapter throws a `CONNECTION_REJECTED` error. Request only the minimum scopes needed (`["read"]` for address-only flows).
 
 **`signAndSubmit` failed?** Ensure the `sign` and `submit` scopes were approved at connect time. Without those scopes, Otsu will reject signing requests.
-
-## Monorepo Integration Notes
-
-This adapter is an official monorepo package at `packages/adapters/otsu/`. The placeholder icon in the source should be replaced with the official Otsu Wallet logo before publishing. Obtain the logo from the `assets/` folder of the [otsu-wallet GitHub repository](https://github.com/RomThpt/otsu-wallet) and convert it to a `data:image/...;base64` URL.
-
-## Manual Test Checklist
-
-- [ ] Extension detected — `window.xrpl.isOtsu === true`
-- [ ] Connect with default scopes — Otsu popup shows all 4 scopes, address returned
-- [ ] Connect with `scopes: ["read"]` — Otsu popup shows read-only scope
-- [ ] `signAndSubmit` — Otsu popup shows txn with simulation/risk info, hash returned
-- [ ] `signTransaction` — Otsu popup shows txn, `txBlob` returned without broadcast
-- [ ] `signMessage` — Otsu popup shows message, compact signature returned, `signatureKind: "signature"`
-- [ ] Page reload — `autoReconnect()` restores session via `isConnected()` + address match
-- [ ] Disconnect — `provider.disconnect()` called, session cleared
-- [ ] Extension not installed — modal shows install link to GitHub
-- [ ] Scope denied — user unchecks scopes, adapter throws `CONNECTION_REJECTED`
-- [ ] Rejection — user cancels popup, adapter throws readable error

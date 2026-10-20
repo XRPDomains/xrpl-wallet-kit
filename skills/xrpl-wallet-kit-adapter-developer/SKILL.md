@@ -1,6 +1,6 @@
 ---
 name: xrpl-wallet-kit-adapter-developer
-description: Implement, review, or scaffold an XRPL Wallet Kit adapter using wallet provider APIs, documentation, or SDKs. Align capabilities, signing results, lifecycle, exports, and integration docs with the local core contract.
+description: Implement, review, or scaffold XRPL Wallet Kit adapters for XRPL and Xahau using wallet provider APIs or SDKs. Align chain support, protocol-aware signing, capabilities, lifecycle, exports, and integration docs with the local core contract.
 ---
 
 # XRPL Wallet Kit Adapter Developer
@@ -19,6 +19,7 @@ Use this guide when the task involves:
 - adding a WalletConnect wallet definition;
 - integrating injected extension APIs, mobile/deeplink SDKs, hardware wallets, or Snap-style providers.
 - integrating hosted web wallets using popup messaging.
+- adding or reviewing chain support, including Xahau, in an existing adapter.
 
 ## Required Project Context
 
@@ -45,7 +46,7 @@ If working outside this repository, require the adapter package to depend on `@x
    - hardware transport;
    - Snap or embedded provider.
    - hosted web/popup wallet (`type: "web"`).
-3. Identify provider capabilities before coding.
+3. Identify provider capabilities and chain/network support before coding. For Xahau or another non-XRPL family, read `references/chain-support.md` before implementation.
 4. Implement the smallest adapter that accurately maps provider behavior into `WalletAdapter`.
 5. Add package exports and TypeScript declarations.
 6. Add focused tests or a preview example when behavior is non-trivial.
@@ -103,7 +104,7 @@ If reviewing a contribution, call `validateWalletAdapter(adapter)` and inspect w
 
 Set capabilities conservatively:
 
-- `connect`: true only if the adapter can return a usable XRPL account address.
+- `connect`: true only if the adapter can return a valid account address on the requested chain/network.
 - `disconnect`: true only if cleanup is implemented or session cleanup is meaningful.
 - `signMessage`: true only if the wallet supports message proof or an agreed transaction-style message proof.
 - `signTransaction`: true only if the wallet can sign without submit.
@@ -130,7 +131,7 @@ Use `createWalletError` from `@xrpl-wallet-kit/core` where possible.
 - Use provider SDKs directly; do not inject CDN scripts from the adapter unless the provider requires a documented loader.
 - Use structured provider APIs instead of string parsing when possible.
 - Normalize account metadata into `WalletAccount`.
-- Include `network` when known; otherwise rely on `WalletManager` default network enrichment.
+- Include the verified provider network. Legacy XRPL-only adapters may rely on manager enrichment; chain-aware adapters must not infer provider chain support from the dApp's selected network alone.
 - Return `session.wallet` metadata if the adapter can provide it.
 - Honor `ConnectOptions.signal` when the provider or SDK exposes an abort/cancel API. If the provider cannot be aborted externally, `cancelPendingConnection()` must still clear local timers, markers, popups, and pending proposal references.
 - Use injected `WalletStorage` or core storage helpers for redirect/mobile recovery markers. Do not call `window.localStorage` directly in new adapter code.
@@ -191,6 +192,7 @@ Read these only when needed:
 - `references/adapter-checklist.md` when reviewing or approving an adapter.
 - `references/scaffold.md` when creating a new official adapter package inside this monorepo.
 - `references/hardware-adapters.md` when implementing Ledger, Trezor, or any USB/HID/hardware transport adapter.
+- `references/chain-support.md` when declaring chain support or implementing Xahau/protocol-aware connection, signing and submission.
 - `references/walletconnect-wallet.md` when adding a new WalletConnect wallet definition to `wallets.ts`.
 - `references/test-template.md` when writing unit tests for a new adapter (Node test runner + tsx).
 

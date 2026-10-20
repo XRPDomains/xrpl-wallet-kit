@@ -190,7 +190,6 @@ Burning permanently destroys the NFT. See the
 
 ## Integration Notes
 
-- The maintainer reported successful live testing of the documented transaction commands on 2026-10-13 in their setup. Batch acceptance requires separate testing.
 - Connect and signing popups request 560 x 720 px and remain resizable; browsers may adjust dimensions or open a tab on mobile.
 - Open connection and signing popups from a user action, using HTTPS or localhost.
 - Omitted or `undefined` `SourceTag` defaults to `0`; explicit tags must be uint32.

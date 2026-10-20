@@ -41,8 +41,7 @@ const manager = createWalletClient({
 });
 ```
 
-Add the adapter explicitly. These examples use the named package and do not
-depend on Xyra being included in the published client or CDN default wallet list.
+Add the adapter explicitly when using core or the selective client.
 
 Since v0.2.0, the full client also accepts `wallets: ["xyra"]`, and the browser
 bundle exports `XRPLWalletKit.createXyraAdapter()`. Xyra remains opt-in for XRPL
@@ -70,8 +69,8 @@ transaction whose fee exceeds the configured ceiling.
 
 The default adapter accepts standard XRPL mainnet/testnet, not devnet or custom
 RPC definitions. Transactions use the generic `txJson` API; dedicated
-`payments` and `nftOffers` capability flags are not advertised. Batch acceptance
-is not yet verified.
+`payments` and `nftOffers` capability flags are not advertised. Do not infer
+Batch support from generic transaction signing.
 
 ## Transactions
 
@@ -120,7 +119,6 @@ If submission times out, check the hash before retrying.
 - If setting COOP, use `Cross-Origin-Opener-Policy: same-origin-allow-popups`.
 - Allow `data:` in CSP `img-src` for the embedded wallet icon.
 - Reconnect after a page reload; disconnect clears local state, not wallet credentials.
-- Safari/iOS popup behavior after asynchronous preflight still needs live verification.
 
 Transaction JSON is sent in the popup URL; do not include secrets in transaction
 metadata. See [Xyra's developer documentation](https://www.xyra.now/developers)

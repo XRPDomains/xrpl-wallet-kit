@@ -144,28 +144,6 @@ This works identically for both the Chrome extension and the mobile in-app brows
 
 **`isConnected()` returns false on reload?** The extension may not have hydrated yet. The adapter's session restore path runs after a short delay. If the issue is consistent, file a bug on the DropFi extension repository.
 
-## Manual Test Checklist
-
-**Extension (Desktop)**
-- [ ] Extension detected — `window.__xwk_dropfi` or `window.dropfi` present
-- [ ] Connect — DropFi popup appears, address returned on approval
-- [ ] `signAndSubmit` Payment — DropFi popup shows txn, hash returned
-- [ ] `signAndSubmit` NFT offer — DropFi popup shows NFT txn, hash returned
-- [ ] `signMessage` — compact signature and public key returned, `signatureKind: "signature"`
-- [ ] `switchNetwork("testnet")` — provider switches and session network is updated
-- [ ] Page reload — session restored via `isConnected()` + address match
-- [ ] Extension not installed — modal shows install link to dropfi.app
-- [ ] Rejection — user dismisses popup, adapter throws `CONNECTION_REJECTED`
-
-**Mobile App (iOS / Android)**
-- [ ] Open DApp inside DropFi in-app browser — `window.xrpl.isDropFi` is `true`
-- [ ] Connect — native approval sheet shown, address returned
-- [ ] `signAndSubmit` Payment — native signing sheet shown, hash returned
-- [ ] `signMessage` — compact signature and public key returned
-- [ ] `switchNetwork("testnet")` — native wallet switches and session network is updated
-- [ ] Page reload in WebView — session restored without re-approval
-- [ ] Open DApp in external browser (Safari/Chrome) — provider not detected (expected)
-
 ## References
 
 - [DropFi Extension](https://www.dropfi.app/docs/dropfi-extension)

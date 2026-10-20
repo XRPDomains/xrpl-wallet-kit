@@ -2,6 +2,7 @@ import { version } from '../../../packages/browser/package.json'
 
 const latestUrl = 'https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js'
 const releaseUrl = latestUrl.replace('@latest/', `@${version}/`)
+const fallbackUrl = `https://unpkg.com/@xrpl-wallet-kit/browser@${version}/dist/xrpl-wallet-kit.iife.min.js`
 let pending: Promise<any> | null = null
 
 function hasReleaseFeatures(bundle: any): boolean {
@@ -13,7 +14,7 @@ function hasReleaseFeatures(bundle: any): boolean {
 export async function loadWalletKit(): Promise<any> {
   const host = window as any
   if (hasReleaseFeatures(host.XRPLWalletKit) &&
-      [latestUrl, releaseUrl].includes(host.__XRPL_WALLET_KIT_WEBSITE_BUNDLE_URL__)) {
+      [latestUrl, releaseUrl, fallbackUrl].includes(host.__XRPL_WALLET_KIT_WEBSITE_BUNDLE_URL__)) {
     return host.XRPLWalletKit
   }
   if (pending) return pending
@@ -29,7 +30,7 @@ export async function loadWalletKit(): Promise<any> {
       })
       .catch(() => false)
     const url = hasCurrentFeatures ? latestUrl : releaseUrl
-    return new Promise((resolve, reject) => {
+    const loadScript = (url: string) => new Promise((resolve, reject) => {
       const script = document.createElement('script')
       script.src = url
       script.onload = () => {
@@ -43,10 +44,17 @@ export async function loadWalletKit(): Promise<any> {
       }
       script.onerror = () => {
         script.remove()
-        reject(new Error('Failed to load XRPL Wallet Kit'))
+        reject(new Error(`Failed to load XRPL Wallet Kit: ${url}. Check Network/CSP or content blockers.`))
       }
       document.head.appendChild(script)
     })
+    try {
+      return await loadScript(url)
+    } catch (error) {
+      // Never execute another SDK after partial execution or a feature mismatch.
+      if (host.XRPLWalletKit) throw error
+      return loadScript(fallbackUrl)
+    }
   })()
   try {
     return await pending

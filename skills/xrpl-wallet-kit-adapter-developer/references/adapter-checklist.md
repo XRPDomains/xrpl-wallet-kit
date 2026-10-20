@@ -47,6 +47,19 @@
 - Provider-specific payload conversions are documented.
 - No private key or seed flow is introduced.
 
+## Chain Support
+
+- Read `chain-support.md` for Xahau or other non-XRPL integration.
+- `supportedChains` reflects implemented provider support; legacy network filters remain consistent.
+- Non-XRPL paths require `protocolContext` and never fall back to XRPL codec/autofill.
+- Provider chain/network is verified; missing information or rejection is not treated as a match.
+- Chain-aware network/account events include a network; missing or unsupported networks invalidate the session.
+- Sign-only returns a verified blob without broadcast; requested submission uses the configured protocol.
+- Fee limits, explicit expiry, signed fields and unknown submit outcomes are preserved.
+- Message signing, NFT flags and successful connection do not imply chain-bound auth or arbitrary transaction support.
+- Native asset, explorers, messages and Ledger app follow the configured network.
+- Xahau docs distinguish automatic full-client setup from explicit core/selective protocol registration.
+
 ## Mobile And WalletConnect
 
 - QR/deeplink URI is emitted through adapter/manager events.

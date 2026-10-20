@@ -26,7 +26,7 @@ Xaman, GemWallet, Xyra and opt-in Ledger, see the
 | Adapter | connect | disconnect | signMessage | signTx | signAndSubmit | signMessage proof type |
 |:---|:---:|:---:|:---:|:---:|:---:|:---|
 | Xaman | ✅ | ✅ | ✅ | — | ✅ | `signedTx` (SignIn blob) |
-| GemWallet | ✅ | — | ✅ | — | ✅ | `signature` (compact) |
+| GemWallet | ✅ | — | ✅ | ✅* | ✅ | `signature` (compact) |
 | WalletConnect | ✅ | ✅ | ✅ | ✅ | ✅ | `signedTx` (Payment blob) |
 | Crossmark | ✅ | ✅ | ✅ | ✅ | ✅ | `signature` (compact) |
 | Ledger | ✅ | ✅ | — | ✅ | ✅ | — |
@@ -37,6 +37,10 @@ Xaman, GemWallet, Xyra and opt-in Ledger, see the
 | Xyra | ✅ | ✅ | — | ✅ | ✅ | — |
 
 > **signMessage proof types:** `signature` = compact ECDSA/Ed25519 hex; `signedTx` = signed XRPL transaction blob. Read `signatureKind` on the result to know which you received.
+
+\* GemWallet sign-only requires a provider with `signTransaction`. Xaman exposes
+sign-only through the manager's declared transaction-mode fallback rather than
+a separate adapter method. Use `manager.can()` for the active wallet's capabilities.
 
 ### GhostSig Opt-In
 
@@ -132,6 +136,9 @@ await manager.autoReconnect();
 ```
 
 Restore behavior varies by wallet type:
+
+These restore paths describe XRPL sessions. For Xahau, reconnect explicitly
+after a reload; see [Xahau connection behavior](/docs/configuration/xahau#connection-and-message-signing).
 
 - **Browser extensions** (GemWallet, Crossmark, Otsu): check whether the extension still reports the same active address — passive, no popup.
 - **DropFi**: same passive check via `isConnected()` — works identically for both the Chrome extension and the mobile in-app browser.

@@ -28,8 +28,8 @@ Batch does not guarantee lower fees and cannot include off-chain backend work.
 
 ## 1. Enable a Wallet Explicitly
 
-The following examples target the development source, not the current npm release.
-Use a Batch-capable `xrpl.js` version; local validation uses **4.7.0**.
+Use Wallet Kit **0.1.21 or later** and a Batch-capable `xrpl.js` version
+(**4.7.0 or later**).
 
 ```ts
 import { Client } from "xrpl";
@@ -51,12 +51,12 @@ const manager = new WalletManager({
 const { account } = await manager.connect("xaman");
 ```
 
-`batch.adapterIds` is a testing allowlist, **not a wallet capability guarantee**.
+`batch.adapterIds` is an application allowlist, **not a wallet capability guarantee**.
 The manager rejects Batch requests from adapters not in this list. Ordinary
 non-Batch requests continue to use the existing signing flow.
 
 If you use `createWalletClient`, pass the same `batch` and `preflight` options to
-it. The helper is also exported from `@xrpl-wallet-kit/client` in development source.
+it. The helper is also exported from `@xrpl-wallet-kit/client`.
 
 ## 2. Prepare and Review
 
@@ -125,7 +125,7 @@ console.log(submitted.hash); // Outer hash, not proof that all operations succee
 
 `signAndSubmit({ txJson: prepared, submit: false })` is another sign-only path
 when the adapter supports it. Signing and submission on **mainnet can spend real
-funds**; no test submission is performed automatically by the kit.
+funds**; the kit signs or submits only when your application requests it.
 
 Preflight type allowlists must include both `Batch` and the inner types you permit.
 Application checks also run on each inner transaction. Fee ceiling and expiry
@@ -157,18 +157,12 @@ Reconcile the outer hash and ledger data before retrying; never automatically
 resubmit an unresolved Batch. If confirmation is disabled, your application
 must reconcile the results itself.
 
-## Wallet Readiness
+## Wallet Compatibility
 
-| Wallet | Current evidence |
-|---|---|
-| Xaman | Documents Batch sign requests; first live acceptance candidate |
-| GhostSig / Xyra | Generic signing paths exist; Batch acceptance not yet verified |
-| WalletConnect | Depends on the wallet and provider version behind the session |
-| Other adapters, including Ledger | Batch support not yet confirmed |
-
-Before enabling a wallet, test the complete review, sign-only, rejection,
-cancellation, submission and rollback flows. Record wallet/SDK versions and
-network. Successful ordinary Payment or NFT tests are not Batch acceptance tests.
+Enable only wallets that support the complete outer Batch payload and your
+chosen signing mode. Generic transaction signing or Payment/NFT support does
+not imply Batch support. For WalletConnect, compatibility depends on the wallet
+behind the session. Batch is XRPL-only; it is not supported by the kit's Xahau runtime.
 
 V1 does not offer multi-account `BatchSigners`, other Batch modes or `simulate`
 support. See the official [Batch reference](https://xrpl.org/docs/references/protocol/transactions/types/batch)

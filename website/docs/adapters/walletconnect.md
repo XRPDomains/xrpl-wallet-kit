@@ -204,15 +204,3 @@ await manager.autoReconnect();
 
 **Stale pairing/proposal error on reconnect?** The adapter automatically clears stale WalletConnect proposals and pairings before retrying. If reconnect still fails, call `manager.disconnect()` and start a fresh connection.
 
-## Manual Test Checklist
-
-- [ ] Connect via AppKit modal (desktop) — QR displays, wallet connects, address returned
-- [ ] Connect via AppKit modal (mobile) — deep link opens wallet app, approval returns address
-- [ ] Connect via custom QR (`modalMode: "never"`) — `onQr` callback fires with URI
-- [ ] `signAndSubmit` — wallet popup shows txn, hash returned after approval
-- [ ] `signMessage` — wallet popup shows message txn, `signatureKind: "signedTx"` returned
-- [ ] Page reload — `autoReconnect()` restores session from stored WC topic
-- [ ] Session expiry — QR retry button shown, fresh QR generated
-- [ ] Rejection — user cancels in wallet, adapter throws readable error
-- [ ] `createWalletConnectAdapters` `"details"` mode — per-wallet entries shown, deeplinks work
-

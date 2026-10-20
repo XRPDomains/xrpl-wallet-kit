@@ -35,6 +35,7 @@ const chainSelect = document.querySelector<HTMLSelectElement>("#chain")!;
 const maxFeeInput = document.querySelector<HTMLInputElement>("#max-fee-drops")!;
 maxFeeInput.addEventListener("input", () => maxFeeInput.setCustomValidity(""));
 const genericTx = document.querySelector<HTMLTextAreaElement>("#generic-tx")!;
+const genericTemplate = document.querySelector<HTMLSelectElement>("#generic-template")!;
 const genericResult = document.querySelector<HTMLPreElement>("#generic-result")!;
 const genericButton = document.querySelector<HTMLButtonElement>("#generic-sign-button")!;
 const uriOperation = document.querySelector<HTMLSelectElement>("#uri-operation")!;
@@ -142,18 +143,39 @@ chainSelect.addEventListener("change", () => {
   document.querySelector<HTMLElement>("#batch-test")!.hidden = chainSelect.value === "xahau";
   maxFeeInput.closest("label")!.hidden = chainSelect.value !== "xahau";
   document.querySelector<HTMLOptionElement>('#generic-template option[value="Invoke"]')!.disabled = chainSelect.value !== "xahau";
+  syncMainnetInvokeTemplate();
   saveNetworkSelection();
   resetPreview().catch(error => log("bootstrap_error", { message: formatError(error) }));
 });
 const templates: Record<string, TransactionPayload> = {
   Payment: { TransactionType: "Payment", Destination: "", Amount: "1" }, Invoke: { TransactionType: "Invoke", Destination: "" },
+  InvokeMainnetNoop: {
+    TransactionType: "Invoke",
+    Destination: "rH8M9qWfWspxY93sDNEd43cVabpf29msLV",
+    HookParameters: [{ HookParameter: { HookParameterName: "54455354", HookParameterValue: "77616C6C65742D6B6974" } }]
+  },
   TrustSet: { TransactionType: "TrustSet", LimitAmount: { currency: "USD", issuer: "", value: "0" } },
   OfferCreate: { TransactionType: "OfferCreate", TakerGets: "1", TakerPays: { currency: "USD", issuer: "", value: "1" } },
   OfferCancel: { TransactionType: "OfferCancel", OfferSequence: 0 }, AccountSet: { TransactionType: "AccountSet" }
 };
-document.querySelector<HTMLSelectElement>("#generic-template")!.addEventListener("change", event => { genericTx.value = JSON.stringify(templates[(event.target as HTMLSelectElement).value], null, 2); });
+function syncMainnetInvokeTemplate() {
+  const enabled = getSelectedNetwork() === "xahau-mainnet";
+  genericTemplate.querySelector<HTMLOptionElement>('option[value="InvokeMainnetNoop"]')!.disabled = !enabled;
+  if ((!enabled && genericTemplate.value === "InvokeMainnetNoop") ||
+      (chainSelect.value !== "xahau" && genericTemplate.value === "Invoke")) {
+    genericTemplate.value = chainSelect.value === "xahau" ? "Invoke" : "Payment";
+    genericTx.value = JSON.stringify(templates[genericTemplate.value], null, 2);
+  }
+}
+genericTemplate.addEventListener("change", () => { genericTx.value = JSON.stringify(templates[genericTemplate.value], null, 2); });
+if (initialUrl.searchParams.get("template") === "invoke-mainnet" && getSelectedNetwork() === "xahau-mainnet") {
+  genericTemplate.value = "InvokeMainnetNoop";
+  genericTx.value = JSON.stringify(templates.InvokeMainnetNoop, null, 2);
+  activeWorkflow = "json";
+}
 genericButton.addEventListener("click", () => {
   try {
+    if (genericTemplate.value === "InvokeMainnetNoop" && getSelectedNetwork() !== "xahau-mainnet") throw new Error("Select Xahau Mainnet for this template.");
     const txJson: unknown = JSON.parse(genericTx.value);
     if (!txJson || typeof txJson !== "object" || Array.isArray(txJson)) throw new Error("Enter a transaction object");
     void runTransaction(genericResult, "generic", { txJson: txJson as TransactionPayload, methodHint: "generic" }).catch(error => showTransactionError(genericResult, formatError(error)));
@@ -228,6 +250,7 @@ walletConnectMode.addEventListener("change", () => {
 [networkSelect].forEach((control) => control.addEventListener("change", () => {
   saveNetworkSelection();
   setDefaultSignMessage();
+  syncMainnetInvokeTemplate();
   resetPreview().catch((error) => {
     log("bootstrap_error", { message: formatError(error) });
   });
@@ -292,6 +315,7 @@ document.querySelector("#payment-unit")!.textContent = chainSelect.value === "xa
 document.querySelector<HTMLElement>("#batch-test")!.hidden = chainSelect.value === "xahau";
 maxFeeInput.closest("label")!.hidden = chainSelect.value !== "xahau";
 document.querySelector<HTMLOptionElement>('#generic-template option[value="Invoke"]')!.disabled = chainSelect.value !== "xahau";
+syncMainnetInvokeTemplate();
 networkSelect.querySelector<HTMLOptionElement>('option[value="devnet"]')!.disabled = chainSelect.value === "xahau";
 
 async function resetPreview() {

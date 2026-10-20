@@ -139,7 +139,7 @@ test("WalletManager availability checks fail closed when an adapter hangs", asyn
 
   assert.deepEqual(await manager.getWalletAvailability(), { hanging: false });
   assert.deepEqual(await manager.getAvailableWallets(), []);
-  assert.ok(Date.now() - startedAt < 2500);
+  assert.ok(Date.now() - startedAt < 5500);
 });
 
 test("WalletManager stores sessions in a versioned envelope", async () => {

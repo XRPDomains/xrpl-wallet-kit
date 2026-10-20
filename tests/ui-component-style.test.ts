@@ -111,6 +111,49 @@ test("WalletModal hides XRPL and Xahau mainnet badges but labels testnets", () =
   }
 });
 
+test("wallet footer identifies the active chain/network without a badge", () => {
+  for (const family of ["xrpl", "xahau"] as const) {
+    for (const networkType of ["MAINNET", "TESTNET"] as const) {
+      const name = `${family === "xrpl" ? "XRPL" : "Xahau"} ${networkType === "MAINNET" ? "Mainnet" : "Testnet"}`;
+      const modal = new WalletModal({ manager: { ...manager, getNetwork: () => ({ id: name, name, family, networkType }) } as never }) as unknown as { renderFooter(): string };
+      const footer = modal.renderFooter();
+      assert.match(footer, /XRPL Wallet Kit/);
+      assert.ok(footer.includes(name));
+      assert.match(footer, /&middot;/);
+      assert.doesNotMatch(footer, /xwk-network-badge|style="/);
+      assert.equal(footer.includes("xwk-footer-network-test"), networkType === "TESTNET");
+    }
+  }
+});
+
+test("wallet footer escapes custom branding/network names and permits empty branding", () => {
+  const options = { manager: { ...manager, getNetwork: () => ({ id: "custom", name: '<img src=x onerror="bad">', family: "xahau", networkType: "MAINNET" }) } as never };
+  const modal = new WalletModal({ ...options, footerText: "<b>My App</b>" }) as unknown as { renderFooter(): string };
+  const footer = modal.renderFooter();
+  assert.match(footer, /&lt;b&gt;My App&lt;\/b&gt;/);
+  assert.match(footer, /Xahau &lt;img/);
+  assert.doesNotMatch(footer, /<img|<b>/);
+  const unbranded = new WalletModal({ ...options, footerText: "" }) as unknown as { renderFooter(): string };
+  assert.doesNotMatch(unbranded.renderFooter(), /&middot;|xwk-footer-brand/);
+});
+
+test("wallet footer refreshes on network changes during QR or connection views", () => {
+  let name = "XRPL Mainnet";
+  let changed!: () => void;
+  const modal = new WalletModal({ manager: { ...manager,
+    on: (event: string, callback: () => void) => { if (event === "networkChanged") changed = callback; return () => {}; },
+    getNetwork: () => ({ id: name, name, family: "xrpl", networkType: "TESTNET" })
+  } as never }) as unknown as { root: unknown };
+  const footer = { outerHTML: "" };
+  for (const view of ["qr", "connect"]) {
+    modal.root = { dataset: { xwkView: view }, querySelector: () => footer };
+    name = "XRPL Testnet";
+    changed();
+    assert.match(footer.outerHTML, /XRPL Testnet/);
+    assert.doesNotMatch(footer.outerHTML, /XRPL Mainnet/);
+  }
+});
+
 test("WalletModal uses subtle motion without animating modal dimensions", () => {
   const modal = new WalletModal({
     manager: manager as never,
@@ -520,6 +563,7 @@ test("WalletModal wallet badge uses skeleton while availability is resolving", (
     manager: manager as never,
     themeMode: "light"
   }) as unknown as {
+    availability: Record<string, boolean>;
     availabilityLoading: boolean;
     renderWalletBadges(wallet: { id: string; name: string; type: string; group: string }, layout: string): string;
     renderMobileSheetOverrides(theme: typeof lightTheme): string;
@@ -533,6 +577,40 @@ test("WalletModal wallet badge uses skeleton while availability is resolving", (
   assert.match(html, /xwk-skeleton-pill/);
   assert.doesNotMatch(html, /Installed/);
   assert.match(overrides, /\.xwk-wallet-badge-loading\{[^}]*min-width:72px/);
+  modal.availability = { gemwallet: true };
+  const known = modal.renderWalletBadges({ id: "gemwallet", name: "GemWallet", type: "extension", group: "Extensions" }, "list");
+  assert.match(known, /xwk-installed/);
+  assert.doesNotMatch(known, /xwk-skeleton/);
+});
+
+test("WalletModal refreshes discovery during initial injection then returns to five-second polling", t => {
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  const modal = new WalletModal({ manager: manager as never }) as unknown as {
+    root: unknown; renderView(): void; refreshAvailability(refresh: boolean): Promise<void>; open(): void;
+  };
+  const descriptors = ["document", "HTMLElement"].map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const);
+  const calls: boolean[] = [];
+  modal.renderView = () => {};
+  modal.refreshAvailability = async refresh => { calls.push(refresh); };
+  modal.root = { dataset: { xwkView: "list" } };
+  try {
+    Object.defineProperty(globalThis, "document", { configurable: true, value: { activeElement: null } });
+    Object.defineProperty(globalThis, "HTMLElement", { configurable: true, value: class {} });
+    modal.open();
+    t.mock.timers.tick(10000);
+    assert.equal(calls.length, 11);
+    assert.ok(calls.every(refresh => refresh));
+    t.mock.timers.tick(4000);
+    assert.equal(calls.length, 11);
+    t.mock.timers.tick(1000);
+    assert.equal(calls.length, 12);
+    assert.equal(calls[11], false);
+  } finally {
+    for (const [name, descriptor] of descriptors) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else Reflect.deleteProperty(globalThis, name);
+    }
+  }
 });
 
 test("WalletModal installs shared styles instead of reinjecting inline style tags", () => {

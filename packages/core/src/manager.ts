@@ -19,7 +19,7 @@ export const WALLET_STORAGE_VERSION = 1;
 const RECOVER_SESSION_RETRY_DELAYS_MS = [0, 700, 1600, 3000];
 const DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS = 3000;
 const DEFAULT_PENDING_RETURN_RECOVERY_TIMEOUT_MS = 10000;
-const DEFAULT_AVAILABILITY_CHECK_TIMEOUT_MS = 1000;
+const DEFAULT_AVAILABILITY_CHECK_TIMEOUT_MS = 4000;
 const DEFAULT_ACCOUNT_STATUS_TIMEOUT_MS = 2500;
 const DEFAULT_AUTHENTICATE_EXPIRES_IN_SECONDS = 3600;
 const DEFAULT_TX_CONFIRMATION_ATTEMPTS = 6;
@@ -139,18 +139,20 @@ export class WalletManager extends WalletEventEmitter {
   }
 
   private async readWalletAvailability(): Promise<WalletAvailabilityMap> {
+    // Probe errors are inconclusive; an explicit false still clears a previous detection.
+    const previous = this.availabilityCache?.value ?? {};
     const entries = await Promise.all([...this.adapters.values()].map(async (adapter) => {
       if (!adapter.isAvailable) return [adapter.metadata.id, false] as const;
       try {
         const availability = await this.withTimeout(Promise.resolve(adapter.isAvailable()), DEFAULT_AVAILABILITY_CHECK_TIMEOUT_MS);
         if (availability.timedOut) {
           this.logger.warn(`Availability check timed out for ${adapter.metadata.id}`);
-          return [adapter.metadata.id, false] as const;
+          return [adapter.metadata.id, previous[adapter.metadata.id] === true] as const;
         }
         return [adapter.metadata.id, Boolean(availability.value)] as const;
       } catch (error) {
         this.logger.warn(`Availability check failed for ${adapter.metadata.id}`, error);
-        return [adapter.metadata.id, false] as const;
+        return [adapter.metadata.id, previous[adapter.metadata.id] === true] as const;
       }
     }));
 

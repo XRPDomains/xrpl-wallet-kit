@@ -102,14 +102,3 @@ There is no mobile return / deeplink recovery — Crossmark is a desktop browser
 **"signInAndWait is missing"?** Your Crossmark SDK version may be too old. Update the extension or inject a fresh `provider` via the adapter option.
 
 **Signature not extracted?** If `signMessage` throws after the user approves, the response shape may not match any expected path. Open a GitHub issue with the raw response object.
-
-## Manual Test Checklist
-
-- [ ] Extension detected — "Installed" badge shows in the modal
-- [ ] Connect — Crossmark sign-in popup appears, address returned on approval
-- [ ] `signAndSubmit` Payment — Crossmark popup shows correct txn, hash returned
-- [ ] `signAndSubmit` NFT offer — Crossmark popup shows correct NFT transaction
-- [ ] `signMessage` — compact signature returned, `signatureKind: "signature"`
-- [ ] Page reload — `autoReconnect()` restores session using `sync.getAddress()`
-- [ ] Extension not installed — modal shows install link to crossmark.io
-- [ ] Rejection — user clicks Cancel, adapter throws readable error

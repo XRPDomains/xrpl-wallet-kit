@@ -95,7 +95,7 @@ remain unknown after confirmation attempts.
 
 These APIs require `v0.1.21` or later npm/CDN packages.
 See [Batch Transactions](/docs/configuration/batch) for the complete integration
-and current wallet acceptance status.
+and wallet compatibility requirements.
 
 ### signMessage()
 
