@@ -1306,6 +1306,8 @@ watch(previewDevice, async () => {
 })
 
 onMounted(async () => {
+  const chain = new URLSearchParams(window.location.search).get('chain')
+  if (chain === 'xrpl' || chain === 'xahau') selectedChain.value = chain
   try {
     compactPageQuery = window.matchMedia('(max-width: 900px)')
     syncCompactPage(compactPageQuery)

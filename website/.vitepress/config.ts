@@ -48,11 +48,12 @@ export default defineConfig({
 
     nav: [
       { text: "Docs", link: "/docs/introduction" },
+      { text: "Xahau", link: "/xahau" },
       { text: "Playground", link: "/docs/playground" },
       { text: "Theme Builder", link: "/docs/theme-builder" },
       { text: "API Reference", link: "/docs/api/wallet-manager" },
         {
-          text: "v0.2.0",
+          text: "v0.2.1",
         items: [
           {
             text: "Changelog",

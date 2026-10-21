@@ -1,0 +1,131 @@
+/* Hallmark: modern-minimal; live product + integration reference; existing site tokens. */
+/* Hallmark pre-emit critique: P4 H4 E4 S5 R5 V4 */
+.xahau-page {
+  --xahau-bg: var(--xd-bg);
+  --xahau-surface: var(--xd-surface);
+  --xahau-rule: rgba(15, 23, 42, .14);
+  --xahau-ink: var(--xd-ink);
+  --xahau-soft: var(--xd-ink-soft);
+  --xahau-muted: var(--xd-mute);
+  --xahau-accent: var(--xd-accent);
+  --xahau-error: var(--xd-danger);
+  --xahau-radius: 6px;
+  --xahau-preview-light: #ffffff;
+  --xahau-preview-dark: #111827;
+  --xahau-control-bg: var(--xd-surface-elev);
+  --xahau-preview-ink-light: #334155;
+  --xahau-preview-ink-dark: #e8eaf0;
+  --xahau-preview-rule-light: rgba(15, 23, 42, .12);
+  --xahau-preview-rule-dark: rgba(255, 255, 255, .18);
+  --xahau-control-shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 3px 8px rgba(15, 23, 42, .03);
+  --xahau-frame-shadow: 0 2px 4px rgba(15, 23, 42, .03), 0 12px 32px rgba(15, 23, 42, .05);
+  --xahau-icon-shadow: 0 2px 5px rgba(15, 23, 42, .12);
+  --xahau-mode-active-light: #ffffff;
+  --xahau-mode-active-dark: #293548;
+  max-width: 1200px;
+  margin: auto;
+  padding: 0 24px;
+  color: var(--xahau-ink);
+  font-family: var(--vp-font-family-base);
+  letter-spacing: 0;
+}
+.dark .xahau-page { --xahau-rule: rgba(255, 255, 255, .16); --xahau-control-shadow: 0 2px 5px rgba(0, 0, 0, .18); --xahau-frame-shadow: 0 12px 32px rgba(0, 0, 0, .22); }
+.xahau-page *, .xahau-page *::before, .xahau-page *::after { box-sizing: border-box; }
+.xahau-page a, .xahau-page button { touch-action: manipulation; }
+.xahau-page a:focus-visible, .xahau-page button:focus-visible, .xahau-page select:focus-visible {
+  outline: 2px solid var(--xahau-soft);
+  outline-offset: 4px;
+}
+.xahau-page h1, .xahau-page h2 { font-style: normal; letter-spacing: 0; overflow-wrap: anywhere; }
+.xahau-intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 32px; padding: 32px 0; }
+.xahau-brand { grid-column: 1; margin: 0 0 8px; font-size: 14px; font-weight: 600; color: var(--xahau-soft); }
+.xahau-intro h1 { grid-column: 1; font-size: 42px; font-weight: 700; line-height: 1.15; margin: 0 0 12px; }
+.xahau-lede { grid-column: 1; font-size: 16px; line-height: 1.6; margin: 0; color: var(--xahau-soft); }
+.xahau-actions { grid-column: 2; grid-row: 1 / 4; display: flex; flex-wrap: wrap; align-items: center; align-content: center; gap: 12px 24px; }
+.xahau-actions a { font-size: 14px; font-weight: 600; white-space: nowrap; padding: 10px 0; color: var(--xahau-accent); }
+.xahau-actions .xahau-primary { border: 1px solid var(--xahau-rule); border-radius: var(--xahau-radius); padding: 10px 16px; color: var(--xahau-ink); background: var(--xahau-surface); }
+.xahau-actions a:hover, .xahau-resources a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.xahau-workbench { display: grid; grid-template-columns: minmax(340px, 440px) minmax(0, 1fr); align-items: start; gap: 48px; padding-bottom: 36px; }
+.xahau-demo { width: 100%; min-width: 0; }
+.xahau-demo-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px 12px; font-size: 12px; color: var(--xahau-muted); }
+.xahau-demo-toolbar h2 { color: var(--xahau-ink); font-size: 18px; font-weight: 600; margin: 0; }
+.xahau-demo select { appearance: auto; cursor: pointer; font: inherit; font-size: 13px; font-weight: 500; min-height: 38px; padding: 8px 12px; border: 1px solid var(--xahau-rule); border-radius: var(--xahau-radius); background: var(--xahau-surface); color: var(--xahau-ink); box-shadow: var(--xahau-control-shadow); }
+.xahau-demo-frame { border: 1px solid var(--xahau-rule); border-radius: 8px; overflow: clip; box-shadow: var(--xahau-frame-shadow); }
+.xahau-preview-area { position: relative; }
+.xahau-preview-area[data-mode="light"] { --xahau-preview-rule: var(--xahau-preview-rule-light); --xahau-mode-active: var(--xahau-mode-active-light); background: var(--xahau-preview-light); color: var(--xahau-preview-ink-light); }
+.xahau-preview-area[data-mode="dark"] { --xahau-preview-rule: var(--xahau-preview-rule-dark); --xahau-mode-active: var(--xahau-mode-active-dark); background: var(--xahau-preview-dark); color: var(--xahau-preview-ink-dark); }
+.xahau-wallet-mount { min-height: 280px; display: grid; place-items: center; padding: 60px 24px 32px; }
+.xahau-mode-switch { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 3px; padding: 4px; border: 1px solid var(--xahau-preview-rule); border-radius: var(--xahau-radius); box-shadow: var(--xahau-control-shadow); }
+.xahau-mode-switch button { display: grid; place-items: center; width: 38px; height: 36px; border-radius: 4px; font-size: 11px; font-weight: 500; color: inherit; }
+.xahau-mode-switch button[aria-pressed="true"] { background: var(--xahau-mode-active); box-shadow: var(--xahau-icon-shadow); }
+.xahau-mode-switch button:hover { box-shadow: inset 0 0 0 1px var(--xahau-preview-rule); }
+.xahau-mode-switch .vpi-sun, .xahau-mode-switch .vpi-moon { width: 21px; height: 21px; }
+.xahau-wallet-mount .xwk-account-button { box-shadow: var(--xahau-control-shadow); }
+.xahau-wallet-mount .xwk-button-icon { width: 32px; height: 32px; min-width: 32px; max-width: 32px; flex-basis: 32px; box-shadow: var(--xahau-icon-shadow); }
+.xahau-demo :is(select, input):focus { outline: none; border-color: var(--xahau-rule); box-shadow: var(--xahau-control-shadow); }
+.xahau-page[data-keyboard="false"] :is(button, select, input):focus-visible { outline: none; }
+.xahau-page[data-keyboard="true"] .xahau-demo :is(button, select, input):focus-visible { outline: 1px solid var(--xahau-soft); outline-offset: 3px; }
+.xahau-page button:focus:not(:focus-visible) { outline: none; }
+.xahau-loading { color: var(--xahau-muted); font-size: 14px; }
+.xahau-demo-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 16px; border-top: 1px solid var(--xahau-rule); background: var(--xahau-control-bg); }
+.xahau-demo-options label { display: grid; gap: 8px; min-width: 0; font-size: 12px; font-weight: 500; color: var(--xahau-soft); }
+.xahau-demo-options select { width: 100%; min-width: 0; font-size: 13px; }
+.xahau-session { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 12px; margin-top: 16px; }
+.xahau-session span { min-width: 0; flex: 1; }
+.xahau-session code { display: block; overflow-wrap: anywhere; color: var(--xahau-soft); }
+.xahau-session button, .xahau-error + p button { font-size: 13px; color: var(--xahau-accent); text-decoration: underline; }
+.xahau-error { color: var(--xahau-error); font-size: 13px; margin-top: 12px; }
+.xahau-section { border-top: 1px solid var(--xahau-rule); padding: 40px 0; min-width: 0; }
+.xahau-integration { border-top: 0; padding: 0; }
+.xahau-section h2 { font-size: 24px; font-weight: 600; line-height: 1.4; margin: 0 0 24px; }
+.xahau-section-heading p { color: var(--xahau-soft); font-size: 15px; line-height: 1.7; margin: -12px 0 24px; }
+.xahau-wallet-directory { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+.xahau-wallet-directory a { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; border-bottom: 1px solid var(--xahau-rule); padding: 16px 0; gap: 4px 16px; }
+.xahau-wallet-logo { grid-column: 1; grid-row: 1 / 3; width: 48px; height: 48px; }
+.xahau-wallet-logo img { display: block; width: 48px; height: 48px; object-fit: contain; border-radius: 8px; filter: drop-shadow(var(--xahau-icon-shadow)); }
+.xahau-wallet-directory strong { grid-column: 2; font-size: 15px; font-weight: 600; }
+.xahau-wallet-detail { grid-column: 2; grid-row: 2; font-size: 12px; color: var(--xahau-muted); }
+.xahau-wallet-arrow { grid-column: 3; grid-row: 1 / 3; color: var(--xahau-accent); }
+.xahau-wallet-directory a:hover strong { color: var(--xahau-accent); }
+.xahau-install { padding: 14px 0 20px; font-size: 13px; overflow-wrap: anywhere; }
+.xahau-page code, .xahau-page pre { font-family: var(--vp-font-family-mono); }
+.xahau-code-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid var(--xahau-rule); padding-bottom: 10px; }
+.xahau-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.xahau-tabs button { white-space: nowrap; min-height: 36px; padding: 8px 12px; font-size: 13px; color: var(--xahau-muted); border-radius: var(--xahau-radius); }
+.xahau-tabs button[aria-selected="true"] { color: var(--xahau-ink); background: var(--xahau-surface); box-shadow: inset 0 0 0 1px var(--xahau-rule); }
+.xahau-copy { font-size: 12px; padding: 8px; color: var(--xahau-accent); white-space: nowrap; min-width: 78px; }
+.xahau-code-panel { min-height: 310px; padding: 20px 0; overflow-x: auto; }
+.xahau-code-panel pre { margin: 0; font-size: 13px; line-height: 1.9; tab-size: 2; color: var(--xahau-ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.xahau-code-note, .xahau-scope { font-size: 13px; color: var(--xahau-muted); line-height: 1.8; max-width: 740px; }
+.xahau-operations { margin: 0; }
+.xahau-operations > div { display: grid; grid-template-columns: 160px minmax(0, 1fr); padding: 16px 0; gap: 12px; border-bottom: 1px solid var(--xahau-rule); }
+.xahau-operations dt { font-size: 14px; font-weight: 600; }
+.xahau-operations dd { margin: 0; color: var(--xahau-soft); font-size: 14px; line-height: 1.7; }
+.xahau-scope { margin-top: 20px; }
+.xahau-resources { display: flex; flex-wrap: wrap; gap: 16px 24px; border-top: 1px solid var(--xahau-rule); padding: 24px 0 48px; font-size: 13px; color: var(--xahau-accent); }
+.xahau-resources a { white-space: nowrap; }
+.xahau-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 960px) {
+  .xahau-intro { display: block; }
+  .xahau-actions { margin-top: 20px; }
+  .xahau-workbench { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .xahau-demo { max-width: 480px; margin-inline: auto; }
+  .xahau-integration { border-top: 1px solid var(--xahau-rule); padding-top: 28px; }
+}
+@media (max-width: 640px) {
+  .xahau-page { padding-inline: 20px; }
+  .xahau-wallet-mount { min-height: 220px; padding: 60px 16px 28px; }
+  .xahau-demo-options { gap: 8px; }
+  .xahau-intro { padding-top: 28px; }
+  .xahau-intro h1 { font-size: 36px; margin-bottom: 12px; }
+  .xahau-lede { font-size: 15px; }
+  .xahau-actions { gap: 8px 16px; margin-top: 20px; }
+  .xahau-section { padding-block: 28px; }
+  .xahau-section h2 { font-size: 21px; }
+  .xahau-wallet-directory { grid-template-columns: minmax(0, 1fr); }
+  .xahau-operations > div { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .xahau-tabs { gap: 0; }
+  .xahau-tabs button { padding-inline: 8px; font-size: 12px; }
+  .xahau-code-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+  .xahau-code-panel { min-height: 380px; }
+}
