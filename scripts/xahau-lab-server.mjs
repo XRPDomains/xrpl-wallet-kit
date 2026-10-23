@@ -1,4 +1,4 @@
-const methods = new Set(["server_info", "account_info", "fee", "submit", "tx"]);
+const methods = new Set(["server_info", "server_state", "account_info", "fee", "submit", "tx"]);
 
 // Local console only: two fixed upstreams, bounded bodies, no arbitrary RPC URL.
 export function addXahauLabServer(server, fetcher = globalThis.fetch) {
@@ -17,6 +17,12 @@ export function addXahauLabServer(server, fetcher = globalThis.fetch) {
         chunks.push(chunk);
       }
       const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      const network = new URL(req.url, "http://localhost").searchParams.get("network");
+      if (network !== null) {
+        if (body.network !== undefined && body.network !== network) return send(400, { error: "Conflicting Xahau network" });
+        body.network = network;
+      }
+      if (body.method === "server_state" && Array.isArray(body.params) && body.params.length === 0) body.params = [{}];
       if (!methods.has(body.method) || !Array.isArray(body.params) || body.params.length !== 1 ||
         !body.params[0] || typeof body.params[0] !== "object" || Array.isArray(body.params[0]) ||
         Object.keys(body).some(key => !["method", "params", "network"].includes(key))) return send(400, { error: "Unsupported console method or parameter object" });

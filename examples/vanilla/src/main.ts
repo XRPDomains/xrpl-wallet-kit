@@ -1,9 +1,9 @@
 import { WalletManager, createBrowserWalletStorage, sanitizeWalletUrl, adapterSupportsNetwork, getNativeAsset, getNetworkChainId } from "../../../packages/core/src";
 import { Buffer } from "buffer";
 import { createWalletAuth, formatAuthMessage } from "../../../packages/auth/src";
-import { createDefaultWalletUiConfig, resolveWalletButtonOptions } from "../../../packages/ui/src";
+import { createDefaultWalletUiConfig, createXrpBalanceResolver, resolveWalletButtonOptions } from "../../../packages/ui/src";
 import type { TransactionPayload, WalletAdapter } from "../../../packages/core/src";
-import type { WalletUiConfig, WalletUiLayout, WalletUiThemeMode } from "../../../packages/ui/src";
+import type { WalletBalanceResolver, WalletUiConfig, WalletUiLayout, WalletUiThemeMode } from "../../../packages/ui/src";
 
 import "./styles.css";
 import { mountReactPreview } from "./react-preview";
@@ -896,9 +896,19 @@ function getWalletUiOptions() {
   return createDefaultWalletUiConfig(getWalletUiConfig());
 }
 
+const defaultBalanceResolver = createXrpBalanceResolver();
+const localBalanceResolver: WalletBalanceResolver = context => {
+  const network = context.network;
+  if (network?.family !== "xahau" || !["xahau-mainnet", "xahau-testnet"].includes(network.id)) return defaultBalanceResolver(context);
+  const endpoint = new URL("/api/xahau/rpc", window.location.origin);
+  endpoint.searchParams.set("network", network.id);
+  return defaultBalanceResolver({ ...context, network: { ...network, httpRpcUrl: endpoint.href } });
+};
+
 function getWalletButtonOptions() {
   return resolveWalletButtonOptions(getWalletUiConfig(), {
     showBalance: true,
+    balanceResolver: localBalanceResolver,
     showRecentTransactions: true,
     maxVisibleTransactions: 5
   });

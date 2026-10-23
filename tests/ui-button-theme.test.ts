@@ -340,6 +340,95 @@ test("WalletButton exposes resolved balance on session only when showBalance is 
   assert.equal(session.balance?.total, "22.5");
 });
 
+test("WalletButton compacts native balances without changing the full balance", async () => {
+  const session = createSession();
+  session.account.network = { ...session.account.network!, family: "xahau", id: "xahau-mainnet" };
+  let value = "460.447349";
+  const button = createButton({}, {
+    showBalance: true,
+    manager: { on: () => () => undefined, getSession: () => session },
+    balanceResolver: async () => ({ value, formatted: `${value} XAH`, symbol: "XAH" })
+  }) as unknown as { refreshBalance(): Promise<void>; renderButton(): string; renderStyles(): string };
+  await button.refreshBalance();
+  assert.match(button.renderButton(), /\(460\.45 XAH\)/);
+  assert.match(button.renderButton(), /title="460\.447349 XAH"/);
+  assert.equal(session.balance?.value, "460.447349");
+  value = "1234567.123456";
+  await button.refreshBalance();
+  assert.match(button.renderButton(), /\(1\.23M XAH\)/);
+  assert.match(button.renderStyles(), /\.xwk-button-balance\{[^}]*white-space:nowrap/);
+});
+
+test("WalletButton hides only the button balance when constrained and restores it when widened", () => {
+  const session = createSession();
+  const button = createButton({}, {
+    showBalance: true,
+    manager: { on: () => () => undefined, getSession: () => session, getTransactions: () => [] }
+  }) as unknown as {
+    target: unknown;
+    balance: { value: string; formatted: string; symbol: string };
+    activationStatus: string;
+    syncButtonBalanceVisibility(): void;
+    renderPanelContent(session: WalletSession): string;
+    renderStyles(): string;
+  };
+  button.balance = { value: "460.447349", formatted: "460.447349 XRP", symbol: "XRP" };
+  button.activationStatus = "active";
+  const attributes = new Set<string>();
+  const label = { scrollWidth: 200, clientWidth: 100, querySelector: () => ({}) };
+  const node = {
+    querySelector: () => label,
+    removeAttribute: (name: string) => attributes.delete(name),
+    setAttribute: (name: string) => attributes.add(name)
+  };
+  button.target = { querySelector: () => node };
+  button.syncButtonBalanceVisibility();
+  assert.ok(attributes.has("data-xwk-hide-balance"));
+  assert.match(button.renderPanelContent(session), /460\.447349 XRP/);
+  label.clientWidth = 220;
+  button.syncButtonBalanceVisibility();
+  assert.equal(attributes.has("data-xwk-hide-balance"), false);
+  assert.match(button.renderStyles(), /\[data-xwk-hide-balance\] \.xwk-button-balance\{display:none!important\}/);
+});
+
+test("WalletButton retains same-network balance while refreshing and on transient failures only", async () => {
+  const session = createSession();
+  let resolve!: (value: string | null) => void;
+  let reject!: (reason: Error) => void;
+  const button = createButton({}, {
+    showBalance: true,
+    manager: { on: () => () => undefined, getSession: () => session },
+    balanceResolver: () => new Promise<string | null>((ok, fail) => { resolve = ok; reject = fail; })
+  }) as unknown as { refreshBalance(): Promise<void>; renderButton(): string };
+  const first = button.refreshBalance();
+  resolve("460.447349");
+  await first;
+  const refresh = button.refreshBalance();
+  assert.match(button.renderButton(), /460\.45 XRP/);
+  assert.doesNotMatch(button.renderButton(), /xwk-button-balance-loading/);
+  reject(new Error("Temporary RPC timeout"));
+  await refresh;
+  assert.match(button.renderButton(), /Last known balance: 460\.447349 XRP/);
+  assert.equal(session.balance?.value, "460.447349");
+  const empty = button.refreshBalance();
+  resolve(null);
+  await empty;
+  assert.match(button.renderButton(), /460\.45 XRP/);
+  session.account.network = { ...session.account.network!, id: "testnet", networkType: "TESTNET" };
+  const changed = button.refreshBalance();
+  assert.doesNotMatch(button.renderButton(), /460\.45/);
+  resolve("12");
+  await changed;
+  assert.match(button.renderButton(), /\(12 XRP\)/);
+  assert.doesNotMatch(button.renderButton(), /Last known balance/);
+  session.account.address = "rAnotherAccount";
+  const changedAccount = button.refreshBalance();
+  assert.doesNotMatch(button.renderButton(), /\(12 XRP\)/);
+  resolve(null);
+  await changedAccount;
+  assert.equal(session.balance, undefined);
+});
+
 test("WalletButton preserves spendable balance metadata on session", async () => {
   const session = createSession();
   const button = createButton({}, {

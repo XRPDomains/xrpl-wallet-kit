@@ -74,39 +74,23 @@ test("WalletModal buttons defend against host button CSS", () => {
   assert.match(styles, /\.xwk-action\{[^}]*box-sizing:border-box/);
   assert.match(styles, /\.xwk-action\{[^}]*line-height:1\.2/);
   assert.match(styles, /\.xwk-action\{[^}]*width:100%/);
+  assert.match(styles, /\.xwk-grid\{display:grid;[^}]*gap:7px\}/);
+  assert.match(styles, /\.xwk-overlay\[data-xwk-view="qr"\] \.xwk-qr\{display:block\}\.xwk-grid\{/);
+  assert.doesNotMatch(styles, /xwk-network-badge|xwk-network-row/);
 });
 
-test("WalletModal network badge avoids inline styles for strict CSP", () => {
-  const modal = new WalletModal({
-    manager: {
-      ...manager,
-      getNetwork: () => ({ id: "testnet", name: "XRPL Testnet", networkType: "TESTNET" })
-    } as never,
-    themeMode: "light"
-  }) as unknown as {
-    renderNetworkBadge(): string;
-    renderStyles(theme: typeof lightTheme, layout: "list", size: "default", textSize: "sm"): string;
-  };
-
-  const badge = modal.renderNetworkBadge();
-  const styles = modal.renderStyles(lightTheme, "list", "default", "sm");
-
-  assert.doesNotMatch(badge, /style="/);
-  assert.match(badge, /xwk-network-badge-testnet/);
-  assert.match(styles, /\.xwk-network-badge-testnet/);
-});
-
-test("WalletModal hides XRPL and Xahau mainnet badges but labels testnets", () => {
+test("wallet list shows network only in the footer for mainnet, testnet and devnet", () => {
   for (const family of ["xrpl", "xahau"] as const) {
-    for (const networkType of ["MAINNET", "TESTNET"] as const) {
-      const name = `${family === "xahau" ? "Xahau" : "XRPL"} ${networkType === "MAINNET" ? "Mainnet" : "Testnet"}`;
-      const modal = new WalletModal({ manager: { ...manager, getNetwork: () => ({ id: name, name, family, networkType }) } as never }) as unknown as { renderNetworkBadge(): string };
-      const badge = modal.renderNetworkBadge();
-      if (networkType === "MAINNET") assert.equal(badge, "");
-      else {
-        assert.match(badge, /xwk-network-badge-testnet/);
-        if (family === "xahau") assert.match(badge, /Xahau Testnet/);
-      }
+    for (const networkType of ["MAINNET", "TESTNET", "DEVNET"] as const) {
+      const name = `${family === "xahau" ? "Xahau" : "XRPL"} ${networkType}`;
+      const modal = new WalletModal({
+        manager: { ...manager, getNetwork: () => ({ id: name, name, family, networkType }) } as never
+      }) as unknown as { renderShell(): string };
+      const shell = modal.renderShell();
+      assert.doesNotMatch(shell, /xwk-network-row|xwk-network-badge/);
+      assert.match(shell, /xwk-footer-network/);
+      assert.equal(shell.split(name).length - 1, 1);
+      assert.equal(shell.includes("xwk-footer-network-test"), networkType !== "MAINNET");
     }
   }
 });
