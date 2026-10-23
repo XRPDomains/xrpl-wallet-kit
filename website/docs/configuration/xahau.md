@@ -304,15 +304,49 @@ Batch, multisign, delegated-key signing and XLS-20 parity are not supported here
 
 ## Browser / CDN
 
+### Load the IIFE Bundle
+
+Use the latest browser bundle directly in an HTML page. No npm installation,
+bundler or separate Xahau package import is required.
+
+```html
+<div id="connect-wallet"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js"></script>
+<script>
+  const kit = XRPLWalletKit.createWalletKit({
+    network: "xahau-mainnet", // or "xahau-testnet"
+    xamanClientId: "YOUR_XAMAN_CLIENT_ID",
+    preflight: { maxFeeDrops: "50000" },
+    connectButton: "#connect-wallet",
+  });
+</script>
+```
+
+After connecting, use the same `kit.signTransaction()` and `kit.signAndSubmit()`
+calls shown in the Payment, Invoke and URIToken examples above. Run signing
+requests from your application's transaction buttons.
+
+### Dynamic Xahau Runtime
+
 The browser bundle uses the same configuration through
 `XRPLWalletKit.createWalletKit()`. On first Xahau transaction preparation or
 lookup it automatically imports `xrpl-wallet-kit-xahau.runtime.js` from the
 original IIFE script directory. It does not load the runtime just to connect,
-and XRPL-only pages do not download it.
+and XRPL-only pages do not download it. With the `@latest` script above, the
+runtime is dynamically loaded from:
+
+```text
+https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit-xahau.runtime.js
+```
+
+Do not add a second script tag for this runtime; the bundle loads it on demand.
 
 - The runtime is already minified, despite having no `.min.js` suffix.
-- Self-host the runtime beside `xrpl-wallet-kit.iife.min.js`, or use a
-  version-pinned CDN URL. Both files must be the same release.
+- When self-hosting, keep the runtime beside `xrpl-wallet-kit.iife.min.js`.
+  Both files must be the same release. If `@latest` assets update at different
+  times and a version mismatch occurs, reload after the CDN has updated or
+  pin both assets to the same release.
 - Load the IIFE through an external script tag. Allow its hosting origin in
   CSP `script-src`; cross-origin module hosting must allow CORS. No `unsafe-eval`
   is required by the Xahau loader.

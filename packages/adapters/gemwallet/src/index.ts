@@ -197,6 +197,11 @@ export class GemWalletAdapter extends BaseWalletAdapter {
     if (request.txJson.Account !== undefined && request.txJson.Account !== account.address) throw createWalletError.signFailed(new Error("GemWallet transaction Account differs from connected account"));
     const current = async () => {
       if (request.signal?.aborted || generation !== this.generation) throw createWalletError.notConnected();
+      if (context) {
+        if (this.protocolContext !== context || this.account !== account) throw createWalletError.notConnected();
+        // GemWallet getters may prompt. The protocol verifies signer, network and intent from the signed blob.
+        return;
+      }
       if (this.options.supportedChains) { await this.assertProviderState(provider, request.signal); if (request.signal?.aborted) throw createWalletError.notConnected(); return; }
       const address = await provider.getAddress?.();
       if (address?.result?.address !== account.address) throw createWalletError.notConnected();

@@ -14,22 +14,14 @@ function hasReleaseFeatures(bundle: any): boolean {
 export async function loadWalletKit(): Promise<any> {
   const host = window as any
   if (hasReleaseFeatures(host.XRPLWalletKit) &&
-      [latestUrl, releaseUrl, fallbackUrl].includes(host.__XRPL_WALLET_KIT_WEBSITE_BUNDLE_URL__)) {
+      [releaseUrl, fallbackUrl].includes(host.__XRPL_WALLET_KIT_WEBSITE_BUNDLE_URL__)) {
     return host.XRPLWalletKit
   }
   if (pending) return pending
   if (host.XRPLWalletKit) throw new Error('Reload the page to refresh the XRPL Wallet Kit bundle')
 
   pending = (async () => {
-    // Probe before execution: loading two SDK versions duplicates custom elements.
-    const hasCurrentFeatures = await fetch(latestUrl)
-      .then(async response => {
-        if (!response.ok) return false
-        const source = await response.text()
-        return ['createGhostsigAdapter', 'createXyraAdapter', 'xahau-mainnet'].every(feature => source.includes(feature))
-      })
-      .catch(() => false)
-    const url = hasCurrentFeatures ? latestUrl : releaseUrl
+    // Pin the website release: @latest may still serve a feature-compatible older SDK.
     const loadScript = (url: string) => new Promise((resolve, reject) => {
       const script = document.createElement('script')
       script.src = url
@@ -49,7 +41,7 @@ export async function loadWalletKit(): Promise<any> {
       document.head.appendChild(script)
     })
     try {
-      return await loadScript(url)
+      return await loadScript(releaseUrl)
     } catch (error) {
       // Never execute another SDK after partial execution or a feature mismatch.
       if (host.XRPLWalletKit) throw error

@@ -186,12 +186,15 @@ test("GemWallet treats rejected Xahau metadata as unreported, without retries or
   await xrpl.disconnect();
 });
 
-test("GemWallet without network metadata still verifies signed NetworkID and never submits a changed blob", async () => {
+test("GemWallet Xahau avoids repeated approval getters while verifying blobs and cancelled requests", async () => {
   const wallet = Wallet.generate();
   let changedNetwork = false;
   let submissions = 0;
   let signingCalls = 0;
   let rpcNetwork = 21337;
+  const reads = { address: 0, publicKey: 0, network: 0 };
+  const controller = new AbortController();
+  let cancelSigning = false;
   const protocol = createXahauProtocol({ request: async (_network, method) => {
     if (method === "server_info") return { info: { network_id: rpcNetwork, validated_ledger: { seq: 100, age: 1 } } };
     if (method === "account_info") return { account_data: { Account: wallet.address, Sequence: 1 }, queue_data: { txn_count: 0 } };
@@ -201,11 +204,12 @@ test("GemWallet without network metadata still verifies signed NetworkID and nev
   } });
   const provider: GemWalletProvider = {
     isInstalled: async () => true,
-    getAddress: async () => ({ result: { address: wallet.address } }),
-    getPublicKey: async () => ({ result: { address: wallet.address, publicKey: wallet.publicKey } }),
-    getNetwork: async () => ({ type: "reject" }),
+    getAddress: async () => { reads.address++; return { result: { address: wallet.address } }; },
+    getPublicKey: async () => { reads.publicKey++; return { result: { address: wallet.address, publicKey: wallet.publicKey } }; },
+    getNetwork: async () => { reads.network++; return { type: "reject" }; },
     signTransaction: async payload => {
       signingCalls++;
+      if (cancelSigning) controller.abort();
       const tx = (payload as { transaction: Record<string, unknown> }).transaction;
       return { result: { signature: wallet.sign({ ...tx, ...(changedNetwork ? { NetworkID: 21338 } : {}) } as never).tx_blob } };
     }
@@ -216,13 +220,24 @@ test("GemWallet without network metadata still verifies signed NetworkID and nev
   const signed = await adapter.signTransaction(request);
   assert.equal(decode(signed.txBlob).NetworkID, 21337);
   assert.equal(submissions, 0);
+  await adapter.signAndSubmit(request);
+  assert.equal(signingCalls, 2);
+  assert.equal(submissions, 1);
+  assert.deepEqual(reads, { address: 1, publicKey: 1, network: 1 });
   changedNetwork = true;
   await assert.rejects(adapter.signAndSubmit(request), { code: "SIGN_FAILED" });
-  assert.equal(submissions, 0);
+  assert.equal(submissions, 1);
   rpcNetwork = 21338;
   await assert.rejects(adapter.signTransaction(request), { code: "NETWORK_MISMATCH" });
-  assert.equal(signingCalls, 2);
-  assert.equal(submissions, 0);
+  assert.equal(signingCalls, 3);
+  assert.equal(submissions, 1);
+  rpcNetwork = 21337;
+  changedNetwork = false;
+  cancelSigning = true;
+  await assert.rejects(adapter.signAndSubmit({ ...request, signal: controller.signal }));
+  assert.equal(signingCalls, 4);
+  assert.equal(submissions, 1);
+  assert.deepEqual(reads, { address: 1, publicKey: 1, network: 1 });
   await adapter.disconnect();
 });
 
