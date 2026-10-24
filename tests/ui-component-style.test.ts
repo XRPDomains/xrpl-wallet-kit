@@ -225,6 +225,7 @@ test("WalletModal openAndWait rejects when the modal closes before connection", 
     removeEventListener: () => undefined
   };
   (globalThis as typeof globalThis & { window: unknown }).window = {
+    removeEventListener: () => undefined,
     clearTimeout: () => undefined,
     matchMedia: () => ({ matches: true })
   };

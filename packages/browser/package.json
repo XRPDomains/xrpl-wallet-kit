@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/browser",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Browser-ready XRPL Wallet Kit bundle for vanilla JavaScript and legacy HTML sites.",
   "license": "MIT",
   "type": "module",
@@ -29,8 +29,8 @@
     "build": "vite build --mode readable && vite build --mode minified && vite build --config vite.xahau.config.ts && node -e \"require('node:fs').rmSync('tsconfig.tsbuildinfo',{force:true})\" && tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@xrpl-wallet-kit/client": "0.3.0",
-    "@xrpl-wallet-kit/xahau": "0.3.0",
+    "@xrpl-wallet-kit/client": "0.3.1",
+    "@xrpl-wallet-kit/xahau": "0.3.1",
     "buffer": "^6.0.3"
   },
   "devDependencies": {

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- Add opt-in Auto wallet layout: use List until it overflows, then reuse the built-in Card layout.
+- Keep Card at three columns on mobile and synchronize styles/content during live layout changes without losing keyboard focus.
+
 ## 0.2.0
 
 - Theme Builder includes Xyra and chain/network selection for XRPL and Xahau, with matching wallet lists and generated configuration. Xahau Mainnet, like XRPL Mainnet, does not display a network badge.

@@ -4,6 +4,19 @@ XRPL Wallet Kit UI supports deep theming through `themeName`, `theme`, and `cust
 
 ## Basic Usage
 
+### Adaptive Wallet Layout
+
+```ts
+const kit = createWalletKit({
+  network: "mainnet",
+  ui: { walletList: { layout: "auto" } },
+});
+```
+
+Auto starts with List and uses the built-in three-column Card layout when the list overflows the modal. It responds to viewport and wallet-list changes without adding a separate card design. Use `"list"`, `"card"`, `"grid"`, or `"icon"` for a fixed layout; the default remains `"list"`. Auto keeps List for inline previews, where height is unconstrained.
+
+### Theme Options
+
 ```ts
 import { WalletModal } from "@xrpl-wallet-kit/ui";
 

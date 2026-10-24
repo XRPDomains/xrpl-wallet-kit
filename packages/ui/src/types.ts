@@ -1,6 +1,6 @@
 import type { WalletManager, WalletNetwork, WalletSession, WalletSessionBalance } from "@xrpl-wallet-kit/core";
 import type { WalletUiLocale, WalletUiMessagesInput } from "./locales";
-export type WalletUiLayout = "list" | "card" | "grid" | "icon";
+export type WalletUiLayout = "auto" | "list" | "card" | "grid" | "icon";
 export type WalletUiSize = "compact" | "default" | "wide";
 export type WalletUiThemeMode = "light" | "dark" | "auto";
 export type WalletUiTextSize = "sm" | "md" | "lg";

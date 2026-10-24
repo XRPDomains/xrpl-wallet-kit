@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/client",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "All-in-one XRPL Wallet Kit client with core, UI, and first-party adapters.",
   "license": "MIT",
   "type": "module",
@@ -25,19 +25,19 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@xrpl-wallet-kit/core": "0.3.0",
-    "@xrpl-wallet-kit/xahau": "0.3.0",
-    "@xrpl-wallet-kit/adapter-xyra": "0.3.0",
-    "@xrpl-wallet-kit/adapter-crossmark": "0.3.0",
-    "@xrpl-wallet-kit/adapter-dropfi": "0.3.0",
-    "@xrpl-wallet-kit/adapter-ghostsig": "0.3.0",
-    "@xrpl-wallet-kit/adapter-gemwallet": "0.3.0",
-    "@xrpl-wallet-kit/adapter-ledger": "0.3.0",
-    "@xrpl-wallet-kit/adapter-walletconnect": "0.3.0",
-    "@xrpl-wallet-kit/adapter-xaman": "0.3.0",
-    "@xrpl-wallet-kit/adapter-xrpl-snap": "0.3.0",
-    "@xrpl-wallet-kit/ui": "0.3.0",
-    "@xrpl-wallet-kit/adapter-joey-wallet": "0.3.0"
+    "@xrpl-wallet-kit/core": "0.3.1",
+    "@xrpl-wallet-kit/xahau": "0.3.1",
+    "@xrpl-wallet-kit/adapter-xyra": "0.3.1",
+    "@xrpl-wallet-kit/adapter-crossmark": "0.3.1",
+    "@xrpl-wallet-kit/adapter-dropfi": "0.3.1",
+    "@xrpl-wallet-kit/adapter-ghostsig": "0.3.1",
+    "@xrpl-wallet-kit/adapter-gemwallet": "0.3.1",
+    "@xrpl-wallet-kit/adapter-ledger": "0.3.1",
+    "@xrpl-wallet-kit/adapter-walletconnect": "0.3.1",
+    "@xrpl-wallet-kit/adapter-xaman": "0.3.1",
+    "@xrpl-wallet-kit/adapter-xrpl-snap": "0.3.1",
+    "@xrpl-wallet-kit/ui": "0.3.1",
+    "@xrpl-wallet-kit/adapter-joey-wallet": "0.3.1"
   },
   "publishConfig": {
     "access": "public"

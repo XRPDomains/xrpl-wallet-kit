@@ -942,7 +942,7 @@ function getWalletButtonOptions() {
 
 function getWalletLayout(): WalletUiLayout {
   const value = walletLayout.value;
-  if (value === "card" || value === "icon") return value;
+  if (value === "auto" || value === "card" || value === "icon") return value;
   return "list";
 }
 

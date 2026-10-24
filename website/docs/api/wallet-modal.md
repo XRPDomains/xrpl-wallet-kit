@@ -2,6 +2,8 @@
 
 `WalletModal` is the prebuilt connect modal UI. It handles the full connection flow: wallet list → connecting state → QR code (for mobile wallets) → error/retry.
 
+Set `walletList: { layout: "auto" }` in your UI configuration, or `layout: "auto"` when constructing `WalletModal`, to start with List and use the existing three-column Card layout when the wallet list needs scrolling. The modal recalculates when its viewport or wallet list changes. Explicit layouts remain fixed; the default remains `"list"`. Inline pickers keep List in Auto mode because their height is unconstrained.
+
 ## Import
 
 ```ts
@@ -42,7 +44,7 @@ interface WalletUiOptions {
   customTheme?: WalletUiTheme;
 
   /** Wallet list layout (default: "list") */
-  layout?: "list" | "grid" | "card" | "icon";
+  layout?: "auto" | "list" | "grid" | "card" | "icon";
 
   /** Modal width preset (default: "default") */
   size?: "default" | "compact" | "wide";
@@ -187,7 +189,7 @@ interface WalletUiConfig {
   };
   /** Wallet list settings */
   walletList?: {
-    layout?: "list" | "grid" | "card" | "icon";
+    layout?: "auto" | "list" | "grid" | "card" | "icon";
     wallets?: string[];
     groups?: WalletUiGroup[];
     /** Show small wallet group subtitles under wallet names (default: false) */

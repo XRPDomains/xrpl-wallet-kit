@@ -54,6 +54,10 @@ class WalletPickerView {
     private activeGroupId?: string;
     private cachedStyleKey = "";
     private cachedStyle = "";
+    private adaptiveLayout: "list" | "card" = "list";
+    private adaptiveSignature = "";
+    private adaptiveFrame?: number;
+    private readonly onLayoutResize = () => this.scheduleAdaptiveLayout();
     private closeTimer?: number;
     private recentWalletId?: string;
     private openWaitRequest?: OpenAndWaitRequest;
@@ -130,6 +134,10 @@ class WalletPickerView {
         return request.promise;
     }
     close(notify = true, restoreFocus = notify, animate = true) {
+        window.removeEventListener("resize", this.onLayoutResize);
+        window.visualViewport?.removeEventListener("resize", this.onLayoutResize);
+        if (this.adaptiveFrame !== undefined) window.cancelAnimationFrame(this.adaptiveFrame);
+        this.adaptiveFrame = undefined;
         this.availabilityRequest++;
         if (this.availabilityTimer) clearInterval(this.availabilityTimer);
         this.availabilityTimer = undefined;
@@ -231,7 +239,11 @@ class WalletPickerView {
         this.availabilityRequest++;
         this.options = { ...this.options, mount: options.mount ?? this.options.mount, ...resolveWalletUiOptions(options) };
         this.activeGroupId = undefined;
-        if (this.root?.dataset.xwkView === "list") void this.refreshAvailability();
+        this.adaptiveSignature = "";
+        if (this.root?.dataset.xwkView === "list") {
+            this.refreshWalletList();
+            void this.refreshAvailability();
+        }
     }
     private bind() {
         this.root?.querySelector("[data-xwk-close]")?.addEventListener("click", () => this.close());
@@ -405,6 +417,8 @@ class WalletPickerView {
         this.close(false, false, false);
         this.pendingQr = pendingQr;
         this.activeRequestAdapterId = activeRequestAdapterId;
+        this.adaptiveLayout = "list";
+        this.adaptiveSignature = "";
         if (this.presentation === "modal") {
             this.removeExistingOverlays();
             lockPageScroll();
@@ -429,6 +443,11 @@ class WalletPickerView {
             document.addEventListener("keydown", this.onDocumentKeyDown);
         }
         this.bind();
+        if (this.presentation === "modal") {
+            window.addEventListener("resize", this.onLayoutResize);
+            window.visualViewport?.addEventListener("resize", this.onLayoutResize);
+        }
+        this.scheduleAdaptiveLayout();
     }
     private ensureMounted(view: WalletModalView) {
         if (!this.root?.isConnected || !this.root.querySelector(".xwk-modal")) {
@@ -592,6 +611,9 @@ class WalletPickerView {
         finally {
             if (request === this.availabilityRequest) this.availabilityLoading = false;
         }
+        this.refreshWalletList();
+    }
+    private refreshWalletList(scheduleLayout = true) {
         if (this.root?.dataset.xwkView !== "list")
             return;
         const grid = this.root.querySelector<HTMLElement>(".xwk-grid");
@@ -602,7 +624,15 @@ class WalletPickerView {
         const walletId = focused?.dataset.walletId;
         const groupId = focused?.dataset.walletGroupId;
         const scrollTop = grid.scrollTop;
-        const layout = this.options.layout ?? "list";
+        const layout = this.getLayout();
+        this.ensureStyles(this.resolveTheme(), layout, this.options.size ?? "default", this.options.textSize ?? "sm");
+        const modal = this.root.querySelector<HTMLElement>(".xwk-modal");
+        if (modal) {
+            for (const name of Array.from(modal.classList)) {
+                if (name.startsWith("xwk-layout-")) modal.classList.remove(name);
+            }
+            modal.classList.add(`xwk-layout-${layout}`);
+        }
         const activeGroup = this.activeGroupId ? this.getGroups().find((group) => group.id === this.activeGroupId) : undefined;
         grid.innerHTML = activeGroup
             ? this.getGroupWallets(activeGroup).map((wallet) => this.renderWallet(wallet, layout)).join("")
@@ -615,6 +645,37 @@ class WalletPickerView {
                 .find(element => walletId ? element.dataset.walletId === walletId : groupId && element.dataset.walletGroupId === groupId);
             (replacement ?? this.root.querySelector<HTMLElement>("[data-xwk-close]") ?? this.root).focus({ preventScroll: true });
         }
+        if (scheduleLayout) this.scheduleAdaptiveLayout();
+    }
+    private getLayout(): Exclude<WalletUiLayout, "auto"> {
+        const layout = this.options.layout ?? "list";
+        return layout === "auto" ? this.adaptiveLayout : layout;
+    }
+    private scheduleAdaptiveLayout() {
+        if (this.presentation !== "modal" || this.options.layout !== "auto" || this.adaptiveFrame !== undefined)
+            return;
+        this.adaptiveFrame = window.requestAnimationFrame(() => {
+            this.adaptiveFrame = undefined;
+            if (this.root?.dataset.xwkView !== "list" || this.options.layout !== "auto") return;
+            const body = this.root.querySelector<HTMLElement>(".xwk-body");
+            const grid = this.root.querySelector<HTMLElement>(".xwk-grid");
+            const modal = this.root.querySelector<HTMLElement>(".xwk-modal");
+            if (!body || !grid || !modal || !grid.getClientRects().length) return;
+            const entries = Array.from(grid.querySelectorAll<HTMLElement>(":scope > button"));
+            const ids = entries.map(item => item.dataset.walletId ?? `group:${item.dataset.walletGroupId}`).sort();
+            const signature = `${window.innerWidth}:${window.innerHeight}:${window.visualViewport?.height}:${modal.clientWidth}:${this.activeGroupId ?? ""}:${ids.join(",")}`;
+            if (signature === this.adaptiveSignature) return;
+            this.adaptiveSignature = signature;
+            // Measure native List only when geometry or membership changes, not on badge refreshes.
+            if (this.adaptiveLayout !== "list") {
+                this.adaptiveLayout = "list";
+                this.refreshWalletList(false);
+            }
+            if (entries.length > 1 && body.scrollHeight > body.clientHeight + 1) {
+                this.adaptiveLayout = "card";
+                this.refreshWalletList(false);
+            }
+        });
     }
     private showList() {
         this.activeGroupId = undefined;
@@ -633,9 +694,10 @@ class WalletPickerView {
             title.textContent = this.options.title ?? this.messages().connectWallet;
         const grid = this.root?.querySelector(".xwk-grid");
         if (grid)
-            grid.innerHTML = this.renderWalletList(this.options.layout ?? "list");
+            grid.innerHTML = this.renderWalletList(this.getLayout());
         this.bindGroupButtons();
         this.bindWalletButtons();
+        this.scheduleAdaptiveLayout();
     }
     private showWalletGroup(groupId: string) {
         const group = this.getGroups().find((item) => item.id === groupId);
@@ -653,8 +715,9 @@ class WalletPickerView {
             title.textContent = group.name;
         const grid = this.root.querySelector(".xwk-grid");
         if (grid)
-            grid.innerHTML = this.getGroupWallets(group).map((wallet) => this.renderWallet(wallet, this.options.layout ?? "list")).join("");
+            grid.innerHTML = this.getGroupWallets(group).map((wallet) => this.renderWallet(wallet, this.getLayout())).join("");
         this.bindWalletButtons();
+        this.scheduleAdaptiveLayout();
     }
     private showQr(adapterId: string, uri: string, deeplink?: string) {
         if (this.isStaleAdapterEvent(adapterId))
@@ -850,7 +913,7 @@ class WalletPickerView {
     private renderShell() {
         const messages = this.messages();
         const theme = this.resolveTheme();
-        const layout = this.options.layout ?? "list";
+        const layout = this.getLayout();
         const size = this.options.size ?? "default";
         const textSize = this.options.textSize ?? "sm";
         this.ensureStyles(theme, layout, size, textSize);
@@ -872,7 +935,7 @@ class WalletPickerView {
     private renderQrShell(state: WalletQrState) {
         const messages = this.messages();
         const theme = this.resolveTheme();
-        const layout = this.options.layout ?? "list";
+        const layout = this.getLayout();
         const size = this.options.size ?? "default";
         const textSize = this.options.textSize ?? "sm";
         const hasReadyUri = state.status === "ready" && Boolean(state.uri);
@@ -932,7 +995,7 @@ class WalletPickerView {
     private renderConnectShell(wallet: WalletMetadata | undefined, adapterId: string) {
         const messages = this.messages();
         const theme = this.resolveTheme();
-        const layout = this.options.layout ?? "list";
+        const layout = this.getLayout();
         const size = this.options.size ?? "default";
         const textSize = this.options.textSize ?? "sm";
         const walletName = wallet?.name ?? adapterId;
@@ -996,7 +1059,8 @@ class WalletPickerView {
         const styles = `.xwk-overlay{position:fixed;inset:0;background:${theme.overlay};-webkit-backdrop-filter:${overlayBlur};backdrop-filter:${overlayBlur};display:grid;overscroll-behavior:contain;place-items:center;z-index:var(--xwk-layer-modal,2147483000);font-family:${theme.fontFamily};font-size:${bodyFontSize};opacity:0;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));transition:opacity .2s ease-out}.xwk-overlay[data-xwk-state="open"]{opacity:1}.xwk-overlay[data-xwk-state="closing"]{opacity:0;transition-duration:.18s;transition-timing-function:cubic-bezier(.4,0,1,1)}.xwk-modal{box-sizing:border-box;display:block;width:min(${width},100%);max-height:calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));background:${theme.background};border:1px solid ${theme.border};border-radius:${theme.radius};box-shadow:${theme.shadow};color:${theme.foreground};opacity:0;overflow:hidden;transform:translateY(8px) scale(.97);transform-origin:center bottom;transition:opacity .24s cubic-bezier(.22,1,.36,1),transform .24s cubic-bezier(.22,1,.36,1)}.xwk-overlay[data-xwk-state="open"] .xwk-modal{opacity:1;transform:translateY(0) scale(1)}.xwk-overlay[data-xwk-state="closing"] .xwk-modal{opacity:0;transform:translateY(6px) scale(.985);transition-duration:.18s;transition-timing-function:cubic-bezier(.4,0,1,1)}.xwk-header{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;column-gap:8px;padding:8px 18px;background:${theme.headerBackground};border-bottom:1px solid ${theme.border}}.xwk-title{font-size:${titleFontSize};font-weight:600;letter-spacing:0;text-align:center;color:${theme.foreground};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-close,.xwk-back{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:transparent;border:0;border-radius:999px;box-shadow:none;box-sizing:border-box;color:${theme.muted};cursor:pointer;display:inline-flex;font:inherit;height:44px;justify-content:center;margin:0;min-height:0;outline:none;overflow:hidden;padding:0;touch-action:manipulation;transform:none;width:44px}.xwk-back{justify-self:start}.xwk-close{font-size:26px;font-weight:500;justify-self:end;line-height:1}.xwk-close:hover,.xwk-back:hover{background:${theme.surfaceHover};box-shadow:none;color:${theme.foreground};transform:none}.xwk-close:focus-visible,.xwk-back:focus-visible,.xwk-wallet:focus-visible,.xwk-action:focus-visible,.xwk-qr-theme-action:focus-visible{outline:2px solid ${theme.accent};outline-offset:2px;text-decoration:none}.xwk-body{-webkit-overflow-scrolling:touch;box-sizing:border-box;max-height:min(620px,calc(100dvh - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));overscroll-behavior:contain;overflow:auto;padding:12px 22px 18px}.xwk-list,.xwk-connect,.xwk-qr{display:none}.xwk-overlay[data-xwk-view="list"] .xwk-list{display:block}.xwk-overlay[data-xwk-view="connect"] .xwk-connect{display:block}.xwk-overlay[data-xwk-view="qr"] .xwk-qr{display:block}.xwk-grid{display:grid;grid-template-columns:${gridColumns};gap:7px}.xwk-wallet{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:${theme.surface};border:0;border-radius:${theme.walletRadius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:flex;flex-direction:${walletDirection};font:inherit;gap:12px;justify-content:${layout === "list" ? "flex-start" : "center"};line-height:1.2;margin:0;min-height:${walletMinHeight};min-width:0;outline:none;overflow:hidden;padding:${layout === "list" ? "12px 12px" : "12px 10px"};text-align:${textAlign};touch-action:manipulation;transform:none;transition:background-color .16s ease;width:100%}.xwk-wallet:hover{background:${theme.surfaceHover};box-shadow:none;transform:none}.xwk-wallet:active{background:${theme.surfaceHover};transform:none}.xwk-wallet img:not(.xwk-mini-icon),.xwk-icon-fallback{border-radius:${theme.walletRadius};flex:0 0 auto;height:${iconSize};object-fit:contain;overflow:hidden;width:${iconSize}}.xwk-icon-fallback{align-items:center;background:${theme.accent};color:${theme.accentText};display:inline-flex;font-weight:700;justify-content:center}.xwk-wallet-group{margin-top:0;min-height:${walletMinHeight}}.xwk-wallet-group .xwk-wallet-info{align-items:center;display:${layout === "list" ? "flex" : "grid"};gap:${layout === "list" ? "10px" : "2px"}}.xwk-wallet-group .xwk-name{flex:1 1 auto}.xwk-wallet-group .xwk-group{display:${layout === "list" ? "none" : groupDisplay}}.xwk-group-placeholder{visibility:hidden}.xwk-wallet-info{display:grid;gap:2px;min-width:0;width:100%}.xwk-name{color:${walletNameColor};display:block;font-size:${layout === "list" ? nameFontSize : gridNameFontSize};font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-group{color:${theme.muted};display:${groupDisplay};font-size:${groupFontSize};font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-group-icons{align-items:center;display:${layout === "list" ? "inline-flex" : "none"};flex:0 0 auto;gap:4px;justify-content:flex-end;margin-left:auto;min-width:0}.xwk-mini-icon,.xwk-mini-fallback,.xwk-mini-more{align-items:center;border:1px solid ${miniIconBorder};border-radius:10px;box-sizing:border-box;display:inline-flex;flex:0 0 auto;height:32px;justify-content:center;object-fit:cover;overflow:hidden;width:32px}.xwk-mini-fallback,.xwk-mini-more{background:${theme.background};color:${theme.muted};font-size:12px;font-weight:600}.xwk-mini-more{border-radius:999px;width:auto;min-width:32px;padding:0 8px}.xwk-wallet-badges{align-items:center;display:inline-flex;flex:0 0 auto;gap:6px;justify-content:flex-end;margin-left:auto;min-width:0}.xwk-wallet-badge{align-items:center;background:${badgeBackground};border:1px solid ${badgeBorder};border-radius:999px;color:${badgeColor};display:inline-flex;flex:0 0 auto;font-size:11px;font-weight:500;gap:6px;line-height:1;min-height:24px;padding:0 10px;visibility:hidden}.xwk-wallet-badge:before{background:${badgeDot};border-radius:999px;content:"";height:6px;width:6px}.xwk-wallet-badge.xwk-installed,.xwk-wallet-badge.xwk-recommended,.xwk-wallet-badge.xwk-recent{visibility:visible}.xwk-wallet-badge.xwk-recommended,.xwk-wallet-badge.xwk-recent{background:${recommendedBadgeBackground};border-color:${recommendedBadgeBorder};color:${theme.accent}}.xwk-wallet-badge.xwk-recommended:before,.xwk-wallet-badge.xwk-recent:before{background:currentColor}.xwk-status{color:${theme.accent};font-size:12px;margin-top:8px;min-height:0;max-width:100%;overflow-wrap:anywhere}.xwk-status.xwk-error,.xwk-error-text{color:${theme.error}}.xwk-status.xwk-error{background:${theme.surface};border:1px solid ${theme.border};border-radius:10px;box-sizing:border-box;line-height:1.35;padding:9px 10px}.xwk-hidden{display:none}.xwk-back.xwk-hidden{display:inline-flex;pointer-events:none;visibility:hidden}.xwk-connect{text-align:center;padding:30px 0 16px}.xwk-spinner{display:grid;margin:0 auto 16px;place-items:center;position:relative;width:104px;height:104px}.xwk-spinner:before{animation:xwk-spin 1s linear infinite;border:3px solid transparent;border-top-color:${spinnerPrimary};border-right-color:${spinnerSecondary};border-radius:50%;content:"";height:96px;position:absolute;width:96px}.xwk-connect-icon img,.xwk-connect-icon .xwk-icon-fallback{border-radius:${theme.walletRadius};height:66px;object-fit:contain;overflow:hidden;width:66px}.xwk-connect-name{display:block;font-size:${nameFontSize};font-weight:600;margin-top:4px}.xwk-connect-status{color:${theme.muted};font-size:${bodyFontSize};font-weight:400;line-height:1.45;margin:14px auto 0;max-width:420px}.xwk-qr{text-align:center}.xwk-qr-title{color:${theme.foreground};font-size:${titleFontSize};font-weight:500;margin:0 0 14px}.xwk-qr-card{background:${theme.surface};border:1px solid ${theme.border};border-radius:14px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;margin:0 auto 10px;min-height:386px;padding:12px;width:min(332px,100%)}.xwk-qr-code-wrap{position:relative;flex:0 0 auto;margin:0 auto 10px;width:100%}.xwk-qr-code{aspect-ratio:1/1;background:transparent;border:0;border-radius:10px;box-sizing:border-box;color:${theme.muted};display:grid;min-height:0;padding:0;place-items:center;width:100%}.xwk-qr-code-light{background:${QR_LIGHT};padding:8px}.xwk-qr-theme-action{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:${theme.background};border:1px solid ${actionBorder};border-radius:999px;box-shadow:none;box-sizing:border-box;color:${theme.muted};cursor:pointer;display:inline-flex;height:34px;justify-content:center;margin:0;min-height:0;opacity:0;outline:none;padding:0;pointer-events:none;position:absolute;right:8px;top:8px;touch-action:manipulation;transform:none;transition:opacity .14s ease,background-color .16s ease,border-color .16s ease,color .16s ease;width:34px}.xwk-qr-code-wrap:hover .xwk-qr-theme-action,.xwk-qr-code-wrap:focus-within .xwk-qr-theme-action,.xwk-qr-theme-action:focus-visible{opacity:1;pointer-events:auto}.xwk-qr-theme-action:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;color:${theme.foreground};transform:none}.xwk-qr-theme-action svg{height:17px;width:17px}.xwk-qr-code canvas,.xwk-qr-code img,.xwk-qr-code svg{aspect-ratio:1/1;display:block;height:auto;max-width:100%;width:100%}.xwk-qr-loading{align-items:center;color:${qrLoadingColor};display:inline-flex;font-size:13px;gap:8px}.xwk-qr-message{align-items:center;color:${theme.muted};display:grid;font-size:${bodyFontSize};gap:7px;line-height:1.35;max-width:260px;text-align:center}.xwk-qr-message strong{color:${theme.foreground};font-size:${nameFontSize};font-weight:600}.xwk-qr-message span{display:block;max-width:100%;overflow-wrap:anywhere}.xwk-qr-loading-spinner{animation:xwk-spin 1s linear infinite;border:2px solid ${spinnerSecondary};border-top-color:${spinnerPrimary};border-radius:999px;display:inline-block;height:18px;width:18px}.xwk-qr-help{color:${theme.muted};font-size:${bodyFontSize};font-weight:400;line-height:1.35;margin:10px auto 0;max-width:420px;min-height:22px;white-space:nowrap}.xwk-qr-fallback{color:${theme.muted};font-size:11px;line-height:1.5;overflow-wrap:anywhere}.xwk-actions{display:grid;gap:10px;grid-template-columns:1fr 1fr;margin-top:14px}.xwk-qr-card-actions{display:grid;flex:0 0 auto;gap:10px;grid-template-columns:1fr;min-height:46px}.xwk-qr-card-actions-dual{grid-template-columns:repeat(auto-fit,minmax(0,1fr))}.xwk-qr-card-actions-placeholder{visibility:hidden}.xwk-action{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:${theme.surface};border:1px solid ${actionBorder};border-radius:${theme.walletRadius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:inline-flex;font:inherit;font-size:${bodyFontSize};font-weight:560;gap:8px;justify-content:center;line-height:1.2;margin:0;min-height:46px;min-width:0;outline:none;overflow:hidden;padding:0 12px;text-decoration:none;touch-action:manipulation;transform:none;transition:background-color .16s ease,border-color .16s ease;white-space:nowrap;width:100%}.xwk-copy-inside{background:${theme.surface};border-color:${actionBorder};color:${theme.foreground};font-size:${bodyFontSize};width:100%}.xwk-action:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;text-decoration:none;transform:none}.xwk-action:active{background:${theme.surfaceHover};box-shadow:none;opacity:1;text-decoration:none;transform:none}.xwk-copy-inside:hover{background:${theme.surfaceHover};box-shadow:none;text-decoration:none}.xwk-action-primary{background:${theme.surface};border-color:${actionBorder};color:${theme.foreground}}.xwk-action-primary:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;color:${theme.foreground};text-decoration:none}.xwk-action svg{flex:0 0 auto;opacity:.58}.xwk-copied-icon{--xwk-success-icon-foreground:${theme.background};color:${theme.success};opacity:1!important}.xwk-action:disabled{cursor:default;opacity:.76}.xwk-retrying .xwk-refresh-icon{animation:xwk-spin .7s linear infinite}.xwk-footer{border-top:0;color:${theme.muted};font-size:11px;font-weight:400;padding:12px 16px 14px;text-align:center}@keyframes xwk-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.xwk-overlay,.xwk-modal,.xwk-wallet,.xwk-action,.xwk-close,.xwk-back,.xwk-qr-theme-action{transition-duration:1ms!important;animation-duration:1ms!important}.xwk-spinner:before,.xwk-qr-loading-spinner{animation:none}}@media(max-width:640px){.xwk-overlay{padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left));place-items:end center}.xwk-modal{border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:calc(100dvh - 24px - env(safe-area-inset-top));transform:translateY(100%);width:100%}.xwk-overlay[data-xwk-state="open"] .xwk-modal{transform:translateY(0);transition-duration:.32s;transition-timing-function:cubic-bezier(.32,.72,0,1)}.xwk-overlay[data-xwk-state="closing"] .xwk-modal{transform:translateY(100%);transition-duration:.24s;transition-timing-function:cubic-bezier(.4,0,1,1)}.xwk-header{grid-template-columns:44px minmax(0,1fr) 44px;column-gap:8px;padding:10px 16px}.xwk-body{max-height:calc(100dvh - 112px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:14px 16px 16px}.xwk-grid{grid-template-columns:${layout === "icon" ? "repeat(3,minmax(0,1fr))" : "1fr"}}.xwk-wallet-badges{gap:4px}.xwk-wallet-badge{font-size:10px;min-height:22px;padding:0 8px}.xwk-actions{grid-template-columns:1fr}.xwk-qr-card{min-height:358px;padding:12px;width:min(304px,100%)}.xwk-qr-code-wrap{width:100%}.xwk-action{font-size:clamp(12px,3.55vw,${bodyFontSize});gap:6px;padding:0 10px}.xwk-action svg{height:17px;width:17px;flex:0 0 auto}.xwk-qr-card-actions-dual{grid-template-columns:1fr}.xwk-qr-help{font-size:clamp(12px,3.45vw,${bodyFontSize});min-height:38px;white-space:normal}}@media(max-width:360px){.xwk-qr-card{min-height:354px;width:min(284px,100%)}}@media(max-height:560px){.xwk-body{max-height:calc(100dvh - 96px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:10px 16px}.xwk-connect{padding:18px 0 10px}.xwk-spinner{height:82px;margin-bottom:12px;width:82px}.xwk-spinner:before{height:76px;width:76px}.xwk-connect-icon img,.xwk-connect-icon .xwk-icon-fallback{border-radius:${theme.walletRadius};height:54px;width:54px}.xwk-qr-card{min-height:320px;width:min(260px,100%)}.xwk-qr-title{margin-bottom:10px}.xwk-qr-help{margin-top:8px}.xwk-footer{padding:8px 16px 10px}}`;
         this.cachedStyleKey = styleKey;
         const footerStyles = `.xwk-footer{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:center;gap:0 5px;line-height:1.4}.xwk-footer-brand,.xwk-footer-network{min-width:0;max-width:100%;overflow-wrap:anywhere}.xwk-footer-network-test{color:${this.resolveThemeMode() === "dark" ? "#fbbf24" : "#92400e"}}`;
-        this.cachedStyle = `${styles}${footerStyles}`;
+        const cardMobileStyles = layout === "card" ? "@media(max-width:640px){.xwk-layout-card .xwk-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}" : "";
+        this.cachedStyle = `${styles}${footerStyles}${cardMobileStyles}`;
         return this.cachedStyle;
     }
     private ensureStyles(theme: Required<WalletUiTheme>, layout: WalletUiLayout, size: WalletUiSize, textSize: WalletUiTextSize) {

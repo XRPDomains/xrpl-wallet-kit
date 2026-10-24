@@ -2,6 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { resolveWalletButtonOptions, resolveWalletUiOptions } from "../packages/ui/src/config";
 
+test("adaptive wallet layout is opt-in and preserves explicit layouts", () => {
+  assert.equal(resolveWalletUiOptions().layout, "list");
+  assert.equal(resolveWalletUiOptions({ walletList: { layout: "auto" } }).layout, "auto");
+  for (const layout of ["list", "card", "grid", "icon"] as const) {
+    assert.equal(resolveWalletUiOptions({ walletList: { layout } }).layout, layout);
+  }
+});
+
 test("resolveWalletButtonOptions defaults account panel mode to modal", () => {
   const options = resolveWalletButtonOptions();
 

@@ -6,6 +6,8 @@ This document describes the current public UI configuration surface so the proje
 
 ## Full Example
 
+`ui.walletList.layout` accepts `"auto"`, `"list"`, `"card"`, `"grid"`, or `"icon"`. Auto starts with List and switches to the existing Card layout when the modal list overflows. Explicit layouts stay fixed, and the default remains List. Inline pickers keep List in Auto mode.
+
 ```ts
 createWalletKit({
   metadata: {
