@@ -8,6 +8,11 @@
 
 ## What it does
 
+This guide describes the existing message-auth flow built on `signMessage()`.
+For Joey Wallet's native login protocol, use the separate
+[Wallet-Native Sign In](/docs/auth/native-sign-in) API and verifier. Do not map
+native sign-in proofs to arbitrary message signatures.
+
 Instead of asking users to trust a password-based login, Sign-In with Wallet lets users prove ownership of their XRPL address by signing a human-readable message. The server verifies the signature — no private key ever leaves the user's wallet.
 
 The flow:

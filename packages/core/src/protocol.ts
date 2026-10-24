@@ -11,6 +11,9 @@ export interface WalletProtocol {
   encode(tx: TransactionPayload): string;
   decode(blob: string): TransactionPayload;
   submit(blob: string, network: WalletNetwork, options: WalletProtocolOptions): Promise<TxResult>;
+  /** Combined post-approval verification/revalidation and submission; never consumes a caller validation token. */
+  verifyAndSubmit?(blob: string, expected: TransactionPayload, account: WalletAccount, network: WalletNetwork,
+    options: WalletProtocolOptions, assertCurrent: () => void): Promise<TxResult & { txBlob: string }>;
   lookupTransaction?(hash: string, network: WalletNetwork, signal?: AbortSignal): Promise<Record<string, unknown>>;
 }
 export interface WalletProtocolContext { readonly protocol: WalletProtocol; readonly network: WalletNetwork; }
@@ -20,8 +23,8 @@ export async function prepareProtocolTransaction(context: WalletProtocolContext,
   return context.protocol.prepare(structuredClone(request.txJson), account, context.network, { maxFeeDrops: request.maxFeeDrops, signal: request.signal });
 }
 
-/** Permit only bounded changes to a kit-autofilled expiry, then recheck with the protocol's trusted RPC. */
-export async function verifyProtocolTransaction(context: WalletProtocolContext, request: SignTransactionRequest,
+/** Permit only bounded changes to a kit-autofilled expiry, never other signed fields. */
+function verifyProtocolIntent(context: WalletProtocolContext, request: SignTransactionRequest,
   account: WalletAccount, prepared: TransactionPayload, blob: string, maxExpiryExtension = 50) {
   let expected = prepared;
   let verified: ReturnType<WalletProtocol["verify"]>;
@@ -38,6 +41,24 @@ export async function verifyProtocolTransaction(context: WalletProtocolContext, 
     expected = { ...prepared, LastLedgerSequence: returned };
     verified = context.protocol.verify(blob, expected, account, context.network, request);
   }
+  return { expected, verified };
+}
+
+export async function verifyProtocolTransaction(context: WalletProtocolContext, request: SignTransactionRequest,
+  account: WalletAccount, prepared: TransactionPayload, blob: string, maxExpiryExtension = 50) {
+  const { expected, verified } = verifyProtocolIntent(context, request, account, prepared, blob, maxExpiryExtension);
   await context.protocol.prepare(expected, account, context.network, request);
   return verified;
+}
+
+export async function verifyAndSubmitProtocolTransaction(context: WalletProtocolContext, request: SignTransactionRequest,
+  account: WalletAccount, prepared: TransactionPayload, blob: string, assertCurrent: () => void, maxExpiryExtension = 50) {
+  assertCurrent();
+  const { expected, verified } = verifyProtocolIntent(context, request, account, prepared, blob, maxExpiryExtension);
+  if (context.protocol.verifyAndSubmit) {
+    return context.protocol.verifyAndSubmit(verified.txBlob, expected, account, context.network, request, assertCurrent);
+  }
+  await context.protocol.prepare(expected, account, context.network, request);
+  assertCurrent();
+  return { ...await context.protocol.submit(verified.txBlob, context.network, request), txBlob: verified.txBlob };
 }

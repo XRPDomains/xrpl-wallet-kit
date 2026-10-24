@@ -2,6 +2,8 @@ import { createWalletError, isWalletKitError, normalizeWalletError, WalletKitErr
 import { snapshotPreflightValue, validateTransactionPreflight } from "./preflight";
 import { createBatchTracking, inspectBatchResult, validateBatchTransaction } from "./batch";
 import { assertWalletRequestActive, WalletRequestTracker } from "./request";
+import { assertSignInRequest } from "./sign-in";
+import type { SignInRequest, SignInResult } from "./types";
 import type { TransactionPreflightContext, TransactionPreflightReport } from "./types";
 import { WalletEventEmitter } from "./events";
 import { createWalletKitLogger } from "./logger";
@@ -539,6 +541,40 @@ export class WalletManager extends WalletEventEmitter {
     } catch (error) {
       const normalized = normalizeWalletError(error);
       this.emit("rejected", { adapterId: adapter.metadata.id, kind: "message", error: normalized });
+      throw normalized;
+    }
+  }
+
+  async signIn(request: SignInRequest): Promise<SignInResult> {
+    if (this.destroyed) throw new WalletKitError(WalletKitErrorCode.REQUEST_CANCELLED, "Wallet manager was destroyed.");
+    assertSignInRequest(request);
+    const adapter = this.requireActiveAdapter("signIn");
+    if (!adapter.capabilities.signIn) throw createWalletError.unsupportedMethod("signIn", adapter.metadata.name);
+    const session = this.activeSession;
+    const account = this.getAccount()!;
+    if (request.account && request.account.address !== account.address) throw new WalletKitError(WalletKitErrorCode.INVALID_REQUEST, "Sign-in account mismatch.");
+    const input = { ...request, resources: request.resources ? [...request.resources] : undefined, account };
+    try {
+      const result = await this.requestTracker.run(adapter.metadata.id, "sign-in", input,
+        { account: account.address, networkId: account.network?.id }, async control => {
+          control.progress({ state: "opened" });
+          this.emit("signing", { adapterId: adapter.metadata.id, kind: "sign-in" });
+          assertWalletRequestActive(control.signal);
+          const result = await adapter.signIn!({ ...input, signal: control.signal, requestId: control.requestId, onRequestProgress: control.progress });
+          assertWalletRequestActive(control.signal);
+          if (this.activeSession !== session || result?.address !== account.address || result.nonce !== input.nonce ||
+            result.chainId !== getNetworkChainId(account.network ?? this.getNetwork()) || typeof result.proof !== "string" || !result.proof ||
+            !((result.mode === "caip122" && result.signatureKind === "signature" && result.proof === result.signature && typeof result.message === "string" && typeof result.publicKey === "string") ||
+              (result.mode === "challenge-v1" && result.signatureKind === "signedTx" && result.proof === result.txBlob))) {
+            throw new WalletKitError(WalletKitErrorCode.SIGN_FAILED, "Wallet returned an invalid sign-in proof.");
+          }
+          return result;
+        }, () => ({ state: "signed" }));
+      this.emit("signed", { adapterId: adapter.metadata.id, kind: "sign-in", result });
+      return result;
+    } catch (error) {
+      const normalized = normalizeWalletError(error);
+      this.emit("rejected", { adapterId: adapter.metadata.id, kind: "sign-in", error: normalized });
       throw normalized;
     }
   }

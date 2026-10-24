@@ -33,6 +33,13 @@ await manager.connect("gemwallet");
 
 ## Signing
 
+For wallet-native authentication, use `manager.signIn({ nonce, statement, resources })`
+after checking `manager.can("signIn")`. A server-issued nonce is mandatory;
+results preserve CAIP-122 message signatures or Ledger transaction challenges.
+Verify with `verifyWalletSignIn` from `@xrpl-wallet-kit/auth/verifiers` and
+atomically consume the nonce before creating a server session. This is separate
+from arbitrary `signMessage()` and the existing `authenticate()` flow.
+
 ```ts
 const messageResult = await manager.signMessage({
   message: "Sign in to My XRPL App",

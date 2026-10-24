@@ -26,6 +26,24 @@ interface WalletManagerConfig {
 
 ## Methods
 
+### signIn()
+
+Request a wallet-native login proof without submitting a transaction:
+
+```ts
+if (manager.can("signIn")) {
+  const proof = await manager.signIn({ nonce: nonceFromServer, statement: "Sign in to My dApp" });
+  // Send proof to the server for verification and one-time nonce consumption.
+}
+```
+
+Requires a wallet with the `signIn` capability. Optional `resources`, `signal`,
+`timeoutMs`, `requestId` and progress callbacks are supported. Results use
+`mode: "caip122"` or `mode: "challenge-v1"`. See
+[Wallet-Native Sign In](/docs/auth/native-sign-in) for the result and server contract.
+`signMessage()` and `authenticate()` keep their existing behavior; no automatic
+fallback or authentication session is created.
+
 ### connect()
 
 Connect to a specific wallet by adapter ID.

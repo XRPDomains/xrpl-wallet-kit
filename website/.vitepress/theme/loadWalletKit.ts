@@ -7,6 +7,7 @@ let pending: Promise<any> | null = null
 
 function hasReleaseFeatures(bundle: any): boolean {
   return typeof bundle?.createGhostsigAdapter === 'function' &&
+    typeof bundle?.createJoeyWalletAdapter === 'function' &&
     typeof bundle?.createXyraAdapter === 'function' &&
     bundle?.XAHAU_NETWORKS?.some((network: any) => network.id === 'xahau-mainnet')
 }
@@ -28,7 +29,7 @@ export async function loadWalletKit(): Promise<any> {
       script.onload = () => {
         if (!hasReleaseFeatures(host.XRPLWalletKit)) {
           script.remove()
-          reject(new Error('XRPL Wallet Kit bundle is missing Xyra or Xahau support'))
+          reject(new Error('XRPL Wallet Kit bundle is missing current wallet or chain support'))
           return
         }
         host.__XRPL_WALLET_KIT_WEBSITE_BUNDLE_URL__ = url

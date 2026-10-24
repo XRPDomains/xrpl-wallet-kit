@@ -13,6 +13,7 @@
     { "path": "./packages/adapters/xrpl-snap" },
     { "path": "./packages/adapters/ledger" },
     { "path": "./packages/adapters/otsu" },
+    { "path": "./packages/adapters/joey-wallet" },
     { "path": "./packages/ui" },
     { "path": "./packages/react" },
     { "path": "./packages/vue" },

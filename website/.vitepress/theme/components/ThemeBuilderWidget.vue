@@ -588,7 +588,7 @@ const btnSizes = [
   { value: 'md', label: 'MD' },
   { value: 'lg', label: 'LG' },
 ]
-type WalletOptionId = 'xaman' | 'gemwallet' | 'crossmark' | 'dropfi' | 'xrplsnap' | 'walletconnect' | 'ghostsig' | 'xyra' | 'ledger'
+type WalletOptionId = 'xaman' | 'gemwallet' | 'crossmark' | 'dropfi' | 'xrplsnap' | 'walletconnect' | 'ghostsig' | 'xyra' | 'ledger' | 'joey-wallet'
 const selectedChain = ref<'xrpl' | 'xahau'>('xrpl')
 const selectedNetworkType = ref<'mainnet' | 'testnet'>('mainnet')
 const selectedNetwork = computed(() => selectedChain.value === 'xahau'
@@ -596,6 +596,7 @@ const selectedNetwork = computed(() => selectedChain.value === 'xahau'
 const allWalletOptions: Array<{ id: WalletOptionId; label: string }> = [
   { id: 'xaman', label: 'Xaman' },
   { id: 'gemwallet', label: 'GemWallet' },
+  { id: 'joey-wallet', label: 'Joey Wallet' },
   { id: 'crossmark', label: 'Crossmark' },
   { id: 'dropfi', label: 'DropFi' },
   { id: 'xrplsnap', label: 'MetaMask' },

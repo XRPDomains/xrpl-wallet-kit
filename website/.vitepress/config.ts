@@ -53,7 +53,7 @@ export default defineConfig({
       { text: "Theme Builder", link: "/docs/theme-builder" },
       { text: "API Reference", link: "/docs/api/wallet-manager" },
         {
-          text: "v0.2.2",
+          text: "v0.3.0",
         items: [
           {
             text: "Changelog",
@@ -109,6 +109,7 @@ export default defineConfig({
         collapsed: true,
         items: [
           { text: "Sign In with XRPL", link: "/docs/auth/introduction" },
+          { text: "Wallet-Native Sign In", link: "/docs/auth/native-sign-in" },
           { text: "Next.js Integration", link: "/docs/auth/nextjs" },
           { text: "Custom Backend (Express)", link: "/docs/auth/custom-backend" },
         ],
@@ -124,7 +125,7 @@ export default defineConfig({
           { text: "Ledger (Hardware)", link: "/docs/adapters/ledger" },
           { text: "DropFi", link: "/docs/adapters/dropfi" },
           { text: "XRPL Snap (MetaMask)", link: "/docs/adapters/xrpl-snap" },
-          { text: "Otsu Wallet", link: "/docs/adapters/otsu" },
+          { text: "Joey Wallet", link: "/docs/adapters/joey-wallet" },
           { text: "GhostSig", link: "/docs/adapters/ghostsig" },
           { text: "Xyra", link: "/docs/adapters/xyra" },
         ],

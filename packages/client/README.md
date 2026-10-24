@@ -6,6 +6,12 @@ This package creates the wallet manager, official adapters, modal UI, connect bu
 
 ## Install
 
+Joey Wallet's native extension is opt-in via `wallets: ["joey-wallet"]`.
+The kit exposes `signIn({ nonce, statement, resources })` for its native login
+proofs. Check `kit.manager.can("signIn")` and verify on the server using
+`verifyWalletSignIn` from `@xrpl-wallet-kit/auth/verifiers`. A server-issued,
+one-time nonce is required. Existing `signMessage()` integrations are unchanged.
+
 ```bash
 npm install @xrpl-wallet-kit/client
 ```

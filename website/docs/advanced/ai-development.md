@@ -130,7 +130,7 @@ The skill's checklist prompts you to verify:
 These prompts work well with Claude Code after activating the skill:
 
 **New browser extension:**
-> "Build an adapter for OtsuWallet. It injects `window.xrpl` with `isOtsu === true`. Methods: `connect()`, `signTransaction(tx)`, `signMessage(msg)`. Type is `extension`. Use the adapter skill."
+> "Build a native Joey Wallet extension adapter using its official SDK and documented provider APIs. Keep it separate from Joey WalletConnect. Use the adapter skill."
 
 **WalletConnect wallet definition:**
 > "Add BitgetWallet to the WalletConnect adapter's wallet list. The wallet supports EIP-155 and XRPL chains. AppStore ID: 1639703499, Play Store package: com.bitget.wallet. Icon URL: [url]. Use the walletconnect-wallet reference from the skill."

@@ -8,6 +8,7 @@ export * from "@xrpl-wallet-kit/adapter-walletconnect";
 export * from "@xrpl-wallet-kit/adapter-xaman";
 export * from "@xrpl-wallet-kit/adapter-xrpl-snap";
 export * from "@xrpl-wallet-kit/adapter-xyra";
+export * from "@xrpl-wallet-kit/adapter-joey-wallet";
 export { XAHAU_MAINNET, XAHAU_TESTNET, XAHAU_NETWORKS } from "@xrpl-wallet-kit/xahau/lazy";
 export * from "@xrpl-wallet-kit/ui";
 
@@ -16,6 +17,7 @@ import { resolveClientStorage } from "./storage";
 import { createLazyXahauProtocol, XAHAU_NETWORKS } from "@xrpl-wallet-kit/xahau/lazy";
 import type { XahauRpcRequest } from "@xrpl-wallet-kit/xahau";
 import { createXyraAdapter } from "@xrpl-wallet-kit/adapter-xyra";
+import { createJoeyWalletAdapter } from "@xrpl-wallet-kit/adapter-joey-wallet";
 import type { WalletAdapter, WalletAppMetadata, WalletEventHandler, WalletEventName, WalletEvents, WalletManagerConfig } from "@xrpl-wallet-kit/core";
 import { createCrossmarkAdapter } from "@xrpl-wallet-kit/adapter-crossmark";
 import { createDropFiAdapter } from "@xrpl-wallet-kit/adapter-dropfi";
@@ -49,6 +51,7 @@ export type WalletKitAdapterId =
   | "staticbit"
   | "bitget"
   | "joey"
+  | "joey-wallet"
   | "girin"
   | "bifrost"
   | (string & {});
@@ -109,7 +112,7 @@ export function createWalletClient(options: CreateWalletClientOptions): WalletMa
   let manager: WalletManager | undefined;
   const adapters = options.adapters ?? createDefaultAdapters(options, (event) => {
     manager?.emitQr(event.adapterId, event.uri, event.deeplink);
-  });
+  }, () => manager?.emitDisconnected("joey-wallet"));
 
   manager = new WalletManager({
     ...withoutKitOnlyOptions(options),
@@ -172,7 +175,8 @@ export function createWalletKit(options: CreateWalletKitOptions) {
     subscribe,
     signAndSubmit: manager.signAndSubmit.bind(manager),
     signTransaction: manager.signTransaction.bind(manager),
-    signMessage: manager.signMessage.bind(manager)
+    signMessage: manager.signMessage.bind(manager),
+    signIn: manager.signIn.bind(manager)
   };
 }
 
@@ -258,7 +262,7 @@ function resolveToastOptions(options: CreateWalletKitOptions, modalUi: Partial<O
   };
 }
 
-function createDefaultAdapters(options: CreateWalletClientOptions, onQr: (event: { adapterId: string; uri: string; deeplink?: string }) => void): WalletAdapter[] {
+function createDefaultAdapters(options: CreateWalletClientOptions, onQr: (event: { adapterId: string; uri: string; deeplink?: string }) => void, onJoeyDisconnected: () => void): WalletAdapter[] {
   const ids = options.wallets === "all" || !options.wallets ? undefined : new Set<string>(options.wallets);
   const adapters: WalletAdapter[] = [];
   const chainOptions = usesXahau(options) ? { supportedChains: { families: ["xrpl", "xahau"] } } : {};
@@ -272,6 +276,7 @@ function createDefaultAdapters(options: CreateWalletClientOptions, onQr: (event:
   if (shouldInclude(ids, "crossmark")) adapters.push(createCrossmarkAdapter());
   if (shouldInclude(ids, "dropfi")) adapters.push(createDropFiAdapter());
   if (ids?.has("ghostsig")) adapters.push(createGhostsigAdapter(options.ghostsig));
+  if (ids?.has("joey-wallet")) adapters.push(createJoeyWalletAdapter({ onDisconnected: onJoeyDisconnected }));
   if (shouldInclude(ids, "xrplsnap")) adapters.push(createXrplSnapAdapter());
 
   if (options.walletConnectProjectId && shouldIncludeWalletConnect(ids)) {

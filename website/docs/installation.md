@@ -48,12 +48,12 @@ All available adapters:
 |---|---|
 | `@xrpl-wallet-kit/adapter-xaman` | Xaman (mobile) |
 | `@xrpl-wallet-kit/adapter-gemwallet` | GemWallet (extension) |
+| `@xrpl-wallet-kit/adapter-joey-wallet` | [Joey Wallet](/docs/adapters/joey-wallet) (extension, opt-in) |
 | `@xrpl-wallet-kit/adapter-walletconnect` | WalletConnect v2 |
 | `@xrpl-wallet-kit/adapter-crossmark` | Crossmark (extension) |
 | `@xrpl-wallet-kit/adapter-ledger` | Ledger hardware wallet |
 | `@xrpl-wallet-kit/adapter-dropfi` | DropFi (extension + mobile) |
 | `@xrpl-wallet-kit/adapter-xrpl-snap` | XRPL Snap (MetaMask) |
-| `@xrpl-wallet-kit/adapter-otsu` | Otsu Wallet |
 | `@xrpl-wallet-kit/adapter-ghostsig` | GhostSig (hosted popup, opt-in) |
 | `@xrpl-wallet-kit/adapter-xyra` | [Xyra](/docs/adapters/xyra) (hosted popup, opt-in) |
 
@@ -72,6 +72,16 @@ Install Xyra with core and the XRPL peer dependency, then follow the
 ```sh
 npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-xyra xrpl@^4
 ```
+
+Install Joey Wallet with core and the XRPL peer dependency:
+
+```sh
+npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-joey-wallet xrpl@^4
+```
+
+See the [Joey Wallet guide](/docs/adapters/joey-wallet) for configuration.
+With the all-in-one client, enable it using `wallets: ["joey-wallet"]`;
+`wallets: "all"` does not include it. The WalletConnect wallet ID remains `joey`.
 
 ## All-in-One Client Package
 

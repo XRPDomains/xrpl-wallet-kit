@@ -117,6 +117,39 @@ function addAuthTestServer(server) {
   });
 }
 
+function addNativeSignInServer(server) {
+  const nonces = new Map();
+  server.middlewares.use("/api/native-sign-in/nonce", async (req, res) => {
+    if (req.method !== "POST") return sendJson(res, 405, { ok: false });
+    try {
+      const input = await readJsonBody(req);
+      if (!/^r[1-9A-HJ-NP-Za-km-z]{24,35}$/.test(input.address ?? "") || !["xrpl:0", "xrpl:1", "xrpl:2"].includes(input.chainId) ||
+        typeof input.statement !== "string" || input.statement.length > 512) return sendJson(res, 400, { error: "Invalid sign-in context." });
+      const now = Date.now();
+      for (const [key, value] of nonces) if (now - value.issuedAt > 300000) nonces.delete(key);
+      const nonce = randomBytes(24).toString("hex");
+      const origin = `http://${req.headers.host}`;
+      nonces.set(nonce, { nonce, address: input.address, chainId: input.chainId, statement: input.statement,
+        domain: new URL(origin).host, uri: origin, issuedAt: now });
+      return sendJson(res, 200, { nonce });
+    } catch { return sendJson(res, 400, { error: "Invalid sign-in request." }); }
+  });
+  server.middlewares.use("/api/native-sign-in/verify", async (req, res) => {
+    if (req.method !== "POST") return sendJson(res, 405, { ok: false });
+    try {
+      const proof = await readJsonBody(req);
+      const expected = nonces.get(proof.nonce);
+      if (!expected || Date.now() - expected.issuedAt > 300000) return sendJson(res, 401, { ok: false, error: "Nonce expired or consumed." });
+      const { verifyWalletSignIn } = await server.ssrLoadModule(authVerifierModuleId);
+      const verified = await verifyWalletSignIn(proof, { ...expected, consumeNonce() {
+        if (nonces.get(expected.nonce) !== expected || Date.now() - expected.issuedAt > 300000) return false;
+        nonces.delete(expected.nonce); return true;
+      } });
+      return sendJson(res, verified ? 200 : 401, { ok: verified, address: verified ? expected.address : undefined });
+    } catch { return sendJson(res, 401, { ok: false, error: "Invalid native sign-in proof." }); }
+  });
+}
+
 const server = await createServer({
   root: "examples/vanilla",
   cacheDir: resolve(tmpdir(), "xrpl-wallet-kit-vite"),
@@ -138,7 +171,7 @@ const server = await createServer({
   plugins: [react(), {
     name: "xwk-auth-test-server",
     configureServer(server) {
-      addAuthTestServer(server); addXahauLabServer(server);
+      addAuthTestServer(server); addNativeSignInServer(server); addXahauLabServer(server);
       server.middlewares.use("/xahau.html", (_req, res) => { res.statusCode = 302; res.setHeader("location", "/"); res.end(); });
     }
   }],

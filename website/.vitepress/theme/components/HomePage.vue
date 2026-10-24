@@ -29,8 +29,8 @@ const manager = new WalletManager({
       <span class="xwk-home__adapter-label">Adapters</span>
       <div class="xwk-home__adapter-list">
         <span>Xaman</span><span>GemWallet</span><span>WalletConnect</span><span>Crossmark</span>
-        <span>Ledger</span><span>DropFi</span><span>XRPL Snap</span><span>Otsu</span>
-        <span>GhostSig</span>
+        <span>Ledger</span><span>DropFi</span><span>XRPL Snap</span>
+        <span>GhostSig</span><span>Xyra</span><span>Joey Wallet</span>
       </div>
     </div>
 

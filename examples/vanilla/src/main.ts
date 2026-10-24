@@ -81,6 +81,8 @@ const signResult = document.querySelector<HTMLPreElement>("#sign-result")!;
 const authStatementInput = document.querySelector<HTMLInputElement>("#auth-statement")!;
 const authSignInButton = document.querySelector<HTMLButtonElement>("#auth-sign-in-button")!;
 const authResult = document.querySelector<HTMLPreElement>("#auth-result")!;
+const nativeSignInButton = document.querySelector<HTMLButtonElement>("#native-sign-in-button")!;
+const nativeSignInResult = document.querySelector<HTMLPreElement>("#native-sign-in-result")!;
 
 type WalletConnectMode = "default" | "list" | "group";
 type SignMessagePreviewAdapter = WalletAdapter & {
@@ -308,6 +310,29 @@ authSignInButton.addEventListener("click", () => {
   });
 });
 
+nativeSignInButton.addEventListener("click", () => {
+  signInNative().catch(error => { nativeSignInResult.textContent = formatError(error); });
+});
+
+async function signInNative() {
+  const account = manager.getAccount();
+  if (!account || !manager.getCapabilities()?.signIn) throw new Error("This wallet does not support native sign-in.");
+  nativeSignInButton.disabled = true;
+  try {
+    const statement = authStatementInput.value.trim() || "Sign in to XRPL Wallet Kit Preview";
+    const nonceResponse = await fetch("/api/native-sign-in/nonce", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ address: account.address, chainId: getNetworkChainId(manager.getNetwork()), statement }) });
+    const challenge = await nonceResponse.json();
+    if (!nonceResponse.ok) throw new Error(challenge.error);
+    nativeSignInResult.textContent = "Awaiting native sign-in approval...";
+    const proof = await manager.signIn({ nonce: challenge.nonce, statement });
+    const verification = await fetch("/api/native-sign-in/verify", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(proof) });
+    const server = await verification.json();
+    nativeSignInResult.textContent = JSON.stringify({ proof, server }, null, 2);
+    if (!verification.ok) throw new Error(JSON.stringify(server));
+  } finally { renderAuthState(); }
+}
+
 setDefaultSignMessage();
 renderWorkspace();
 renderUriFields();
@@ -339,7 +364,7 @@ async function bootstrap(run = bootstrapRun) {
     { createGhostsigAdapter },
     { createXyraAdapter },
     { createLedgerAdapter },
-    { createOtsuAdapter },
+    { createJoeyWalletAdapter },
     { createWalletConnectAdapters, createWalletConnectMetadata },
     { createXamanAdapter },
     { createXrplSnapAdapter }
@@ -350,7 +375,7 @@ async function bootstrap(run = bootstrapRun) {
     import("../../../packages/adapters/ghostsig/src"),
     import("../../../packages/adapters/xyra/src"),
     import("../../../packages/adapters/ledger/src"),
-    import("../../../packages/adapters/otsu/src"),
+    import("../../../packages/adapters/joey-wallet/src"),
     import("../../../packages/adapters/walletconnect/src"),
     import("../../../packages/adapters/xaman/src"),
     import("../../../packages/adapters/xrpl-snap/src")
@@ -377,7 +402,7 @@ async function bootstrap(run = bootstrapRun) {
   adapters.push(createDropFiAdapter());
   adapters.push(createGhostsigAdapter());
   adapters.push(createXyraAdapter({ supportedChains: chainSupport }));
-  adapters.push(createOtsuAdapter());
+  adapters.push(createJoeyWalletAdapter({ onDisconnected: () => manager?.emitDisconnected("joey-wallet") }));
   adapters.push(createXrplSnapAdapter({
     signMessageDestination: PREVIEW_CONFIG.walletConnectSignMessageDestination
   }));
@@ -541,6 +566,7 @@ function renderAuthState() {
   const current = manager.getSession();
   const adapter = manager.getAdapter();
   const canSignMessage = Boolean(current && adapter?.capabilities.signMessage && chainSelect.value !== "xahau");
+  nativeSignInButton.disabled = !(current && adapter?.capabilities.signIn && chainSelect.value !== "xahau");
   authSignInButton.disabled = !canSignMessage;
   if (chainSelect.value === "xahau") { authResult.textContent = "Xahau authentication needs a chain-aware backend; the XRPL auth server is not used."; return; }
   if (!current) {

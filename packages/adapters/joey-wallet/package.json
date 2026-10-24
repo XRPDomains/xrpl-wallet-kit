@@ -1,0 +1,22 @@
+{
+  "name": "@xrpl-wallet-kit/adapter-joey-wallet",
+  "version": "0.3.0",
+  "description": "Native Joey Wallet browser extension adapter.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist", "README.md"],
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "dependencies": {
+    "@xrpl-wallet-kit/core": "0.3.0",
+    "@joeywallet/wallet-sdk": "0.5.0",
+    "ripple-keypairs": "^2.0.0"
+  },
+  "peerDependencies": { "xrpl": "^4.0.0 || ^5.0.0" },
+  "devDependencies": { "xrpl": "^4.0.0" },
+  "publishConfig": { "access": "public" },
+  "repository": { "type": "git", "url": "git+https://github.com/XRPDomains/xrpl-wallet-kit.git" }
+}

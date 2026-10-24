@@ -14,7 +14,7 @@ function fixture(outcomes: Array<"ok" | "network" | "invalid">) {
   const host: Record<string, any> = {};
   const urls: string[] = [];
   const exports: Record<string, any> = {};
-  const sdk = { createGhostsigAdapter() {}, createXyraAdapter() {}, XAHAU_NETWORKS: [{ id: "xahau-mainnet" }] };
+  const sdk = { createGhostsigAdapter() {}, createJoeyWalletAdapter() {}, createXyraAdapter() {}, XAHAU_NETWORKS: [{ id: "xahau-mainnet" }] };
   runInNewContext(source, {
     exports, require: () => ({ version: releaseVersion }), window: host,
     fetch: async () => { throw new Error("The pinned loader must not probe @latest"); },
@@ -69,7 +69,7 @@ test("website reports the failing URL when both CDNs fail, and permits a later r
 
 test("website never executes a second SDK after a feature mismatch", async () => {
   const { load, urls } = fixture(["invalid", "ok"]);
-  await assert.rejects(load(), /missing Xyra or Xahau support/);
+  await assert.rejects(load(), /missing current wallet or chain support/);
   await assert.rejects(load(), /Reload the page/);
   assert.equal(urls.length, 1);
 });

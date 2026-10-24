@@ -6,6 +6,12 @@ This package is intentionally split from `@xrpl-wallet-kit/core`: core signs mes
 
 ## Install
 
+For wallet-native authentication, call `manager.signIn()` with a server nonce
+and verify using `verifyWalletSignIn` from `@xrpl-wallet-kit/auth/verifiers`.
+It supports Joey's CAIP-122 and Ledger challenge proofs and requires an atomic
+server-side `consumeNonce` callback. This is separate from the existing
+`createWalletAuth()` / `verifyWalletAuth()` message-authentication flow.
+
 ```bash
 npm install @xrpl-wallet-kit/auth @xrpl-wallet-kit/core
 ```

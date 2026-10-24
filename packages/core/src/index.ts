@@ -14,6 +14,7 @@ export * from "./result";
 export * from "./storage";
 export * from "./standard-wallet";
 export * from "./types";
+export * from "./sign-in";
 export * from "./protocol";
 export * from "./provider-hints";
 export * from "./tx-store";

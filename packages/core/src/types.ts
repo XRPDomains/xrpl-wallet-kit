@@ -37,6 +37,7 @@ export interface WalletCapabilities {
   connect: boolean;
   disconnect?: boolean;
   signMessage?: boolean;
+  signIn?: boolean;
   signTransaction?: boolean;
   signAndSubmit?: boolean;
   nftOffers?: boolean;
@@ -132,7 +133,7 @@ export interface WalletRequestOptions {
 }
 
 export type WalletRequestState = "pending" | "opened" | "connected" | "signed" | "submitted" | "expired" | "cancelled" | "failed";
-export type WalletRequestKind = "connect" | "sign-message" | "sign-only" | "sign-and-submit";
+export type WalletRequestKind = "connect" | "sign-message" | "sign-in" | "sign-only" | "sign-and-submit";
 export interface WalletRequestProgress {
   state: "opened" | "signed" | "submitted" | "expired";
   providerRequestId?: string;
@@ -158,6 +159,32 @@ export interface SignMessageRequest extends WalletRequestOptions {
   message: string;
   account?: WalletAccount;
 }
+
+/** Wallet-native authentication. Nonce must be issued and consumed by the server. */
+export interface SignInRequest extends WalletRequestOptions {
+  nonce: string;
+  statement?: string;
+  resources?: readonly string[];
+  account?: WalletAccount;
+}
+
+export type SignInResult = {
+  address: string;
+  chainId: string;
+  nonce: string;
+  proof: string;
+  raw?: unknown;
+} & ({
+  mode: "caip122";
+  signatureKind: "signature";
+  message: string;
+  signature: string;
+  publicKey: string;
+} | {
+  mode: "challenge-v1";
+  signatureKind: "signedTx";
+  txBlob: string;
+});
 
 export type SignatureKind = "signature" | "signedTx";
 
@@ -329,6 +356,7 @@ export interface WalletAdapter {
   recoverSession?: (options: ConnectOptions) => Promise<ConnectResult | null>;
   switchNetwork?: (network: WalletNetwork) => Promise<SwitchNetworkResult | void>;
   signMessage?: (request: SignMessageRequest) => Promise<SignMessageResult>;
+  signIn?: (request: SignInRequest) => Promise<SignInResult>;
   signTransaction?: (request: SignTransactionRequest) => Promise<SignTransactionResult>;
   signAndSubmit?: (request: SignAndSubmitRequest) => Promise<TxResult>;
 }
@@ -364,9 +392,9 @@ export interface WalletEvents {
   disconnected: { adapterId?: string };
   error: { adapterId?: string; error: unknown };
   qr: { adapterId: string; uri: string; deeplink?: string };
-  signing: { adapterId: string; kind: "message" | "transaction" };
-  signed: { adapterId: string; kind: "message" | "transaction"; result: unknown };
-  rejected: { adapterId: string; kind?: "message" | "transaction"; error?: unknown };
+  signing: { adapterId: string; kind: "message" | "transaction" | "sign-in" };
+  signed: { adapterId: string; kind: "message" | "transaction" | "sign-in"; result: unknown };
+  rejected: { adapterId: string; kind?: "message" | "transaction" | "sign-in"; error?: unknown };
   accountChanged: { adapterId: string; account: WalletAccount; previousAccount?: WalletAccount };
   networkChanged: { adapterId: string; network?: WalletNetwork; previousNetwork?: WalletNetwork };
   tx_submitted: { adapterId?: string; account?: WalletAccount; hash: string; result?: TxResult | WalletTransaction; transaction?: WalletTransaction };

@@ -82,6 +82,7 @@ Optional methods:
 - `disconnect()` if provider supports cleanup/logout;
 - `restoreSession(session)` for `autoReconnect`; keep it passive and document whether it verifies provider state or only restores cached account metadata;
 - `signMessage(request)` only if supported;
+- `signIn(request)` only for a wallet-native login protocol; do not alias it to `signMessage()`;
 - `signTransaction(request)` only if the wallet can sign without submitting;
 - `signAndSubmit(request)` only if supported.
 - `canRecoverSession()` plus `recoverSession()` only for redirect/deeplink/session recovery flows.
@@ -109,6 +110,7 @@ Set capabilities conservatively:
 - `signMessage`: true only if the wallet supports message proof or an agreed transaction-style message proof.
 - `signTransaction`: true only if the wallet can sign without submit.
 - `signMessage` results must distinguish compact signatures from signed transaction proofs with `signatureKind` and normalize the supported proof fields.
+- `signIn`: advertise only with an implemented native provider flow. Require a server nonce, preserve the actual signed proof and its mode, validate the connected account and request context, honor cancellation/session changes, and never submit an authentication challenge. Do not silently fall back to or from `signMessage()`. Server verification must independently verify the proof and atomically consume a scoped, unexpired nonce; wallet approval alone is not a login session.
 - `signAndSubmit`: true only if the wallet can submit or its provider handles submit.
 - `payments`, `nftOffers`: true only after testing the expected XRPL transaction payloads.
 - `qr`, `deeplink`: true only if the adapter emits usable QR/deeplink data.

@@ -1,5 +1,5 @@
-import { BaseWalletAdapter, DEFAULT_XRPL_NETWORKS, WalletKitError, WalletKitErrorCode, createWalletError, getProviderHint, isLegacyNetwork, adapterSupportsNetwork, prepareProtocolTransaction } from "@xrpl-wallet-kit/core";
-import type { ConnectOptions, SignAndSubmitRequest, SignTransactionRequest, WalletAccount, WalletCapabilities, WalletMetadata, WalletNetwork, WalletChainFilter, WalletProtocolContext } from "@xrpl-wallet-kit/core";
+import { BaseWalletAdapter, DEFAULT_XRPL_NETWORKS, WalletKitError, WalletKitErrorCode, createWalletError, getProviderHint, isLegacyNetwork, adapterSupportsNetwork, prepareProtocolTransaction, verifyAndSubmitProtocolTransaction } from "@xrpl-wallet-kit/core";
+import type { ConnectOptions, SignAndSubmitRequest, SignTransactionRequest, WalletAccount, WalletCapabilities, WalletMetadata, WalletNetwork, WalletChainFilter, WalletProtocolContext, TxResult } from "@xrpl-wallet-kit/core";
 import { deriveAddress } from "ripple-keypairs";
 import { decode, encode, hashes, validate, verifySignature, type Transaction } from "xrpl";
 import { XyraPopup } from "./popup";
@@ -7,7 +7,7 @@ import { XyraPopup } from "./popup";
 export const XYRA_ICON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMDAgMzAwIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ieHlyYS1pY29uLWdyYWRpZW50LTEiIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIiBncmFkaWVudFVuaXRzPSJvYmplY3RCb3VuZGluZ0JveCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiM2M2UwZmYiIC8+CiAgICAgIDxzdG9wIG9mZnNldD0iNTAlIiBzdG9wLWNvbG9yPSIjNWE3Y2ZmIiAvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNiMjZiZmYiIC8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJ4eXJhLWljb24tZ3JhZGllbnQtMiIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiIGdyYWRpZW50VW5pdHM9Im9iamVjdEJvdW5kaW5nQm94Ij4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzYzZTBmZiIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI1MCUiIHN0b3AtY29sb3I9IiM1YTdjZmYiIC8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2IyNmJmZiIgLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIDxnIHRyYW5zZm9ybT0ibWF0cml4KDEuMzY5ODA2IDAgMCAxLjM2OTgwNiAtNDQ4LjMzMjY0NCAtMTMwLjE5MzgyMikiPgogICAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDM2LjgwMSAyMDQuNTUpIj4KICAgICAgPGVsbGlwc2Ugcng9IjkwIiByeT0iMzgiIHRyYW5zZm9ybT0ibWF0cml4KDAuODE5MTUyIDAuNTczNTc2IC0wLjU3MzU3NiAwLjgxOTE1MiAwIDApIiBmaWxsPSJub25lIiBzdHJva2U9InVybCgjeHlyYS1pY29uLWdyYWRpZW50LTEpIiBzdHJva2Utd2lkdGg9IjE4IiBzdHJva2UtbGluZWNhcD0icm91bmQiIC8+CiAgICAgIDxlbGxpcHNlIHJ4PSI5MCIgcnk9IjM4IiB0cmFuc2Zvcm09Im1hdHJpeCgwLjgxOTE1MiAtMC41NzM1NzYgMC41NzM1NzYgMC44MTkxNTIgMCAwKSIgb3BhY2l0eT0iMC45NSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI3h5cmEtaWNvbi1ncmFkaWVudC0yKSIgc3Ryb2tlLXdpZHRoPSIxOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiAvPgogICAgPC9nPgogIDwvZz4KPC9zdmc+Cg==";
 
 export interface XyraAdapterOptions { timeoutMs?: number; maxFeeDrops?: string; supportedChains?: WalletChainFilter; }
-interface SignedReply extends Record<string, unknown> { tx_blob: string; hash: string; submitted: boolean; }
+interface SignedReply extends Record<string, unknown> { tx_blob: string; hash: string; submitted: boolean; protocolResult?: TxResult & { txBlob: string }; }
 
 function invalid(message: string, cause?: unknown): never {
   throw new WalletKitError(WalletKitErrorCode.INVALID_REQUEST, message, { cause });
@@ -90,9 +90,8 @@ export class XyraAdapter extends BaseWalletAdapter {
   async signAndSubmit(request: SignAndSubmitRequest) {
     const context = this.protocolContext;
     if (context && request.submit !== false) {
-      const raw = await this.sign(request, false);
-      if (context !== this.protocolContext || request.signal?.aborted) throw createWalletError.notConnected();
-      return context.protocol.submit(raw.tx_blob, context.network, request);
+      const raw = await this.sign(request, false, true);
+      return raw.protocolResult!;
     }
     if (request.submit === false) {
       const raw = await this.sign(request, false);
@@ -115,7 +114,7 @@ export class XyraAdapter extends BaseWalletAdapter {
     });
   }
 
-  private async sign(request: SignTransactionRequest, submit: boolean): Promise<SignedReply> {
+  private async sign(request: SignTransactionRequest, submit: boolean, protocolSubmit = false): Promise<SignedReply> {
     const account = this.account && structuredClone(this.account);
     if (!account?.network || !account.publicKey) throw createWalletError.notConnected();
     const generation = this.generation;
@@ -136,6 +135,13 @@ export class XyraAdapter extends BaseWalletAdapter {
         if (generation !== this.generation || request.signal?.aborted || raw.network !== selector(context.network) || raw.submitted !== false || raw.submitResult !== undefined || typeof raw.tx_blob !== "string" || typeof raw.hash !== "string") invalid("Invalid Xyra sign-only network/result");
         const verified = context.protocol.verify(raw.tx_blob, tx, account, context.network, request);
         if (verified.hash !== raw.hash.toUpperCase()) invalid("Xyra transaction hash mismatch");
+        if (protocolSubmit) {
+          const current = () => {
+            if (generation !== this.generation || this.protocolContext !== context || request.signal?.aborted) throw createWalletError.notConnected();
+          };
+          const protocolResult = await verifyAndSubmitProtocolTransaction(context, request, account, tx, raw.tx_blob, current, 0);
+          return { ...raw, tx_blob: verified.txBlob, hash: verified.hash, submitted: true, protocolResult };
+        }
         await context.protocol.prepare(tx, account, context.network, request);
         if (generation !== this.generation || request.signal?.aborted) throw createWalletError.notConnected();
         return { ...raw, tx_blob: verified.txBlob, hash: verified.hash, submitted: false };

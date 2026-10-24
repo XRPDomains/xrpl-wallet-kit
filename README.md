@@ -21,6 +21,7 @@ Useful links:
 - Event-driven core: subscribe to connection, account, network, session, and transaction lifecycle events.
 - Persistent sessions: best-effort auto reconnect with guarded recovery for browser extensions, Xaman, and WalletConnect.
 - Auth-ready signing: normalized `signMessage()` and `@xrpl-wallet-kit/auth` helpers for server verification.
+- Native Joey Wallet extension (`joey-wallet`) with separate `signIn()` proofs and server-side CAIP-122 / Ledger challenge verification; existing message-signing flows are unchanged.
 - Type safe: TypeScript-first packages with explicit adapter capabilities and typed wallet results.
 
 ## What's Included

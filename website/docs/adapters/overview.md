@@ -8,12 +8,12 @@ An adapter is the only layer in XRPL Wallet Kit that talks directly to a wallet 
 |---|---|---|---|
 | [Xaman](/docs/adapters/xaman) | `@xrpl-wallet-kit/adapter-xaman` | Mobile app (OAuth2 + QR / deep link) | Browser |
 | [GemWallet](/docs/adapters/gemwallet) | `@xrpl-wallet-kit/adapter-gemwallet` | Browser extension | Browser |
+| [Joey Wallet](/docs/adapters/joey-wallet) | `@xrpl-wallet-kit/adapter-joey-wallet` | Browser extension (opt-in) | Browser |
 | [WalletConnect](/docs/adapters/walletconnect) | `@xrpl-wallet-kit/adapter-walletconnect` | Multi-wallet QR protocol | Browser |
 | [Crossmark](/docs/adapters/crossmark) | `@xrpl-wallet-kit/adapter-crossmark` | Browser extension | Browser |
 | [Ledger](/docs/adapters/ledger) | `@xrpl-wallet-kit/adapter-ledger` | Hardware wallet (USB/HID) | Browser |
 | [DropFi](/docs/adapters/dropfi) | `@xrpl-wallet-kit/adapter-dropfi` | Extension + Mobile App | Browser / Mobile |
 | [XRPL Snap](/docs/adapters/xrpl-snap) | `@xrpl-wallet-kit/adapter-xrpl-snap` | MetaMask Snap | Browser |
-| [Otsu Wallet](/docs/adapters/otsu) | `@xrpl-wallet-kit/adapter-otsu` | Browser extension (MV3) | Browser |
 | [GhostSig](/docs/adapters/ghostsig) | `@xrpl-wallet-kit/adapter-ghostsig` | Hosted web / popup (opt-in) | Browser |
 | [Xyra](/docs/adapters/xyra) | `@xrpl-wallet-kit/adapter-xyra` | Hosted web / popup (opt-in) | Browser |
 
@@ -27,12 +27,12 @@ Xaman, GemWallet, Xyra and opt-in Ledger, see the
 |:---|:---:|:---:|:---:|:---:|:---:|:---|
 | Xaman | ✅ | ✅ | ✅ | — | ✅ | `signedTx` (SignIn blob) |
 | GemWallet | ✅ | — | ✅ | ✅* | ✅ | `signature` (compact) |
+| Joey Wallet | ✅ | ✅ | — | ✅ | ✅ | — |
 | WalletConnect | ✅ | ✅ | ✅ | ✅ | ✅ | `signedTx` (Payment blob) |
 | Crossmark | ✅ | ✅ | ✅ | ✅ | ✅ | `signature` (compact) |
 | Ledger | ✅ | ✅ | — | ✅ | ✅ | — |
 | DropFi | ✅ | ✅ | ✅ | — | ✅ | `signature` (compact) |
 | XRPL Snap | ✅ | — | ✅ | — | ✅ | `signedTx` (Payment blob) |
-| Otsu Wallet | ✅ | ✅ | ✅ | ✅ | ✅ | `signature` (compact) |
 | GhostSig | ✅ | ✅ | — | ✅ | ✅ | — |
 | Xyra | ✅ | ✅ | — | ✅ | ✅ | — |
 
@@ -41,6 +41,21 @@ Xaman, GemWallet, Xyra and opt-in Ledger, see the
 \* GemWallet sign-only requires a provider with `signTransaction`. Xaman exposes
 sign-only through the manager's declared transaction-mode fallback rather than
 a separate adapter method. Use `manager.can()` for the active wallet's capabilities.
+
+### Joey Wallet Opt-In
+
+[Joey Wallet](/docs/adapters/joey-wallet) connects directly to the browser
+extension, without WalletConnect. Enable `wallets: ["joey-wallet"]` or add
+`createJoeyWalletAdapter()` to your manager. Default lists and
+`wallets: "all"` exclude it. XRPL Mainnet, Testnet and Devnet support connection,
+passive granted-session restore, sign-only and sign-and-submit. The `joey`
+WalletConnect entry is unchanged. Message signing and Xahau are not supported
+by the extension adapter.
+
+Joey Wallet exposes native `signIn()` separately from `signMessage()`. Check
+`manager.can("signIn")` and use the
+[native sign-in flow and server verifier](/docs/auth/native-sign-in); the
+message-signing capability stays disabled.
 
 ### GhostSig Opt-In
 
@@ -124,7 +139,7 @@ if (result.signatureKind === "signature") {
 
 Adapters that return `signedTx`: Xaman (uses `SignIn` tx), WalletConnect, XRPL Snap (both use a 1-drop Payment with message in Memos).
 
-Adapters that return `signature`: GemWallet, Crossmark, DropFi, Otsu Wallet.
+Adapters that return `signature`: GemWallet, Crossmark, DropFi.
 
 ## Session Restore
 
@@ -140,7 +155,7 @@ Restore behavior varies by wallet type:
 These restore paths describe XRPL sessions. For Xahau, reconnect explicitly
 after a reload; see [Xahau connection behavior](/docs/configuration/xahau#connection-and-message-signing).
 
-- **Browser extensions** (GemWallet, Crossmark, Otsu): check whether the extension still reports the same active address — passive, no popup.
+- **Browser extensions** (GemWallet, Crossmark, Joey Wallet): check whether the extension still reports the same active address — passive, no popup.
 - **DropFi**: same passive check via `isConnected()` — works identically for both the Chrome extension and the mobile in-app browser.
 - **Xaman**: verify via saved SDK state; no new QR or deep link needed.
 - **WalletConnect**: look up the stored session topic in the SignClient store; restore without re-approval if still valid.

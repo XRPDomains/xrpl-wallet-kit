@@ -36,10 +36,22 @@ interface WalletAdapter {
   cancelPendingConnection?: () => void | Promise<void>;
 
   signMessage?: (request: SignMessageRequest) => Promise<SignMessageResult>;
+  signIn?: (request: SignInRequest) => Promise<SignInResult>;
   signTransaction?: (request: SignTransactionRequest) => Promise<SignTransactionResult>;
   signAndSubmit?: (request: SignAndSubmitRequest) => Promise<TxResult>;
 }
 ```
+
+## Wallet-Native Sign In
+
+`signIn()` is an optional wallet-native authentication method, gated by
+`capabilities.signIn`. It must not be used as an implicit `signMessage()`
+fallback. Preserve the actual CAIP-122 message or transaction challenge and
+bind results to the requested nonce, connected account and chain. Require a
+server nonce; never generate one silently for authentication. Return the
+appropriate `mode` and `signatureKind`, honor cancellation/session changes,
+and never submit an authentication challenge. The server must independently
+verify and atomically consume its outstanding nonce before granting a session.
 
 ## Message Signing Result Shape
 
@@ -286,6 +298,17 @@ a compatibility fallback. Missing or invalid hints fail before provider prompts.
 Hints are application configuration, not evidence of the wallet's active network;
 adapters must still verify the provider response. A new family also requires a
 matching protocol and explicit adapter chain configuration.
+
+For immediate protocol-backed submission, adapters may use core
+`verifyAndSubmitProtocolTransaction()` with a synchronous guard that rejects
+changes to the connection/session generation, protocol context or request signal.
+Its optional protocol operation verifies the exact signed blob, revalidates fresh
+head/queue/fee data and submits in one phase. No validation token or caller-supplied
+"already validated" flag is accepted. Xahau limits that phase to five seconds,
+revalidating once if stale; it never retries a submission. Older protocols retain
+the separate prepare/submit path. Sign-only still revalidates after approval, and
+standalone submission still checks a fresh head. Preliminary submission success
+does not replace a validated transaction receipt.
 
 Adapters must not:
 

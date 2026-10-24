@@ -72,9 +72,9 @@ mock operations and release all resources in fixture disposal.
 
 ## First-Party Coverage
 
-`tests/adapter-conformance.test.ts` runs all eight first-party adapter factories
-in CI: GemWallet, Crossmark, DropFi, Otsu, Ledger, Xaman, XRPL Snap and
-WalletConnect. Capability-based skips are printed. All have lifecycle, restore,
+`tests/adapter-conformance.test.ts` covers first-party factories in CI, including
+GemWallet, Crossmark, DropFi, Ledger, Xaman, XRPL Snap and WalletConnect.
+Capability-based skips are printed. These have lifecycle, restore,
 rejection, timeout mapping, resource counters and manager-facing account/network
 event tests. The manager event tests inject normalized bridge updates; they do
 not claim to validate every provider's event parsing. Existing provider-specific

@@ -1,4 +1,4 @@
-import { BaseWalletAdapter, createWalletError, validateMultisignTransaction, WalletKitError, WalletKitErrorCode, getProviderHint, isLegacyNetwork, adapterSupportsNetwork, prepareProtocolTransaction } from "@xrpl-wallet-kit/core";
+import { BaseWalletAdapter, createWalletError, validateMultisignTransaction, WalletKitError, WalletKitErrorCode, getProviderHint, isLegacyNetwork, adapterSupportsNetwork, prepareProtocolTransaction, verifyAndSubmitProtocolTransaction } from "@xrpl-wallet-kit/core";
 import type { WalletChainFilter, WalletProtocolContext } from "@xrpl-wallet-kit/core";
 import { ensureLedgerApp } from "./device-app";
 import type { LedgerAppTransport } from "./device-app";
@@ -193,8 +193,8 @@ export class LedgerAdapter extends BaseWalletAdapter {
   async signAndSubmit(request: SignAndSubmitRequest): Promise<TxResult> {
     const context = this.protocolContext;
     if (context) {
-      const result = await this.signTransaction(request);
-      return request.submit === false ? { ...result, status: "signed" } : context.protocol.submit(result.txBlob!, context.network, request);
+      const result = await this.signTransactionRequest(request, request.submit !== false);
+      return request.submit === false ? { ...result, status: "signed" } : result;
     }
     if (!this.session) throw createWalletError.notConnected();
     if (this.isMultisignTransaction(request.txJson)) {
@@ -214,6 +214,9 @@ export class LedgerAdapter extends BaseWalletAdapter {
   }
 
   async signTransaction(request: SignTransactionRequest): Promise<SignTransactionResult> {
+    return this.signTransactionRequest(request, false);
+  }
+  private async signTransactionRequest(request: SignTransactionRequest, submit: boolean): Promise<TxResult & SignTransactionResult> {
     if (!this.session) throw createWalletError.notConnected();
     const context = this.protocolContext;
     if (context) {
@@ -222,7 +225,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
       const account = { address: session.address, publicKey: session.publicKey, network: context.network };
       const tx = await prepareProtocolTransaction(context, request, account);
       const current = () => {
-        if (generation !== this.connectionGeneration || this.session !== session || request.signal?.aborted) throw createWalletError.notConnected();
+        if (generation !== this.connectionGeneration || this.session !== session || this.protocolContext !== context || request.signal?.aborted) throw createWalletError.notConnected();
       };
       current();
       let blob: string | undefined;
@@ -233,6 +236,7 @@ export class LedgerAdapter extends BaseWalletAdapter {
       } else blob = (await session.signTransaction(tx, false)).txBlob;
       current();
       if (!blob) throw createWalletError.signFailed(new Error("Ledger returned no signed blob"));
+      if (submit) return verifyAndSubmitProtocolTransaction(context, request, account, tx, blob, current, 0);
       const verified = context.protocol.verify(blob, tx, account, context.network, request);
       await context.protocol.prepare(tx, account, context.network, request);
       current();

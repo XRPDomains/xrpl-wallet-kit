@@ -250,6 +250,11 @@ kit.manager.addTransaction({
 
 ## Selecting Specific Wallets
 
+The kit also exposes `kit.signIn(request)` for wallet-native authentication.
+Check `kit.manager.can("signIn")` and follow the
+[native sign-in guide](/docs/auth/native-sign-in). It is separate from
+`kit.signMessage()` and does not establish a server session by itself.
+
 ```ts
 createWalletKit({
   wallets: ["xaman", "gemwallet", "ledger", "walletconnect"],
@@ -257,7 +262,11 @@ createWalletKit({
 });
 ```
 
-Available IDs: `"xaman"`, `"gemwallet"`, `"walletconnect"`, `"crossmark"`, `"ledger"`, `"dropfi"`, `"xrpl-snap"`, `"otsu"`.
+Available IDs: `"xaman"`, `"gemwallet"`, `"walletconnect"`, `"crossmark"`, `"ledger"`, `"dropfi"`, `"xrpl-snap"`, `"ghostsig"`, `"xyra"`, `"joey-wallet"`.
+
+[Joey Wallet](/docs/adapters/joey-wallet) is opt-in: select
+`wallets: ["joey-wallet"]`. Default lists and `wallets: "all"` exclude it.
+The separate `"joey"` ID connects through WalletConnect, not the extension.
 
 `ledger` is included in `wallets: "all"` by default. It uses WebHID/WebUSB and never silently restores after a reload; users must reconnect the device and open the XRP app.
 

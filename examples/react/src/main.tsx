@@ -8,7 +8,7 @@ import { createGhostsigAdapter } from "../../../packages/adapters/ghostsig/src";
 import { createXyraAdapter } from "../../../packages/adapters/xyra/src";
 import { createGemWalletAdapter } from "../../../packages/adapters/gemwallet/src";
 import { createLedgerAdapter } from "../../../packages/adapters/ledger/src";
-import { createOtsuAdapter } from "../../../packages/adapters/otsu/src";
+import { createJoeyWalletAdapter } from "../../../packages/adapters/joey-wallet/src";
 import { createWalletConnectAdapters, createWalletConnectMetadata } from "../../../packages/adapters/walletconnect/src";
 import { createXamanAdapter } from "../../../packages/adapters/xaman/src";
 import { createXrplSnapAdapter } from "../../../packages/adapters/xrpl-snap/src";
@@ -34,18 +34,18 @@ const PREVIEW_CONFIG = {
 };
 
 function createPreviewManager() {
+  let manager: WalletManager;
   const adapters: WalletAdapter[] = [
     createGemWalletAdapter(),
     createCrossmarkAdapter(),
     createDropFiAdapter(),
     createXrplSnapAdapter(),
     createLedgerAdapter(),
-    createOtsuAdapter(),
+    createJoeyWalletAdapter({ onDisconnected: () => manager?.emitDisconnected("joey-wallet") }),
     createGhostsigAdapter(),
     createXyraAdapter()
   ];
 
-  let manager: WalletManager;
   if (PREVIEW_CONFIG.xamanClientId) {
     adapters.unshift(createXamanAdapter({
       apiKey: PREVIEW_CONFIG.xamanClientId,

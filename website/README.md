@@ -56,7 +56,7 @@ website/
 │   │   ├── ledger.md
 │   │   ├── dropfi.md
 │   │   ├── xrpl-snap.md
-│   │   └── otsu.md
+│   │   └── joey-wallet.md
 │   └── api/
 │       ├── wallet-manager.md
 │       ├── wallet-modal.md

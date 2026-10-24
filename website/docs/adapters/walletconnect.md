@@ -109,10 +109,13 @@ Detail-mode adapters (`"details"`) do **not** background-restore sessions on pag
 | Wallet | ID | Universal Link |
 |---|---|---|
 | Bitget Wallet | `bitget` | `bitkeep.com` |
-| Joey Wallet | `joey` | `joey.finance` |
+| Joey Wallet | `joey` | `joeywallet.xyz` |
 | Girin Wallet | `girin` | `girin.io` |
 | Bifrost Wallet | `bifrost` | `bifrostwallet.com` |
 | StaticBit | `staticbit` | `staticbit.io` |
+
+For Joey's browser extension, use the [Joey Wallet adapter](/docs/adapters/joey-wallet)
+with ID `joey-wallet`. The `joey` entry above connects through WalletConnect.
 
 ## Capabilities
 

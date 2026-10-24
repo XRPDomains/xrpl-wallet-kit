@@ -20,6 +20,15 @@ export function createXahauProtocolLoader(options: { readonly request?: XahauRpc
     family: "xahau", networks: XAHAU_NETWORKS, transactionTypes: XAHAU_TRANSACTION_TYPES,
     prepare: async (...args) => (await load()).prepare(...args),
     submit: async (...args) => (await load()).submit(...args),
+    verifyAndSubmit: async (blob, expected, account, network, policy, assertCurrent) => {
+      const protocol = await load();
+      if (protocol.verifyAndSubmit) return protocol.verifyAndSubmit(blob, expected, account, network, policy, assertCurrent);
+      assertCurrent();
+      const verified = protocol.verify(blob, expected, account, network, policy);
+      await protocol.prepare(expected, account, network, policy);
+      assertCurrent();
+      return { ...await protocol.submit(verified.txBlob, network, policy), txBlob: verified.txBlob };
+    },
     lookupTransaction: async (...args) => (await load()).lookupTransaction!(...args),
     verify: (...args) => loaded().verify(...args), encode: (...args) => loaded().encode(...args), decode: (...args) => loaded().decode(...args)
   };

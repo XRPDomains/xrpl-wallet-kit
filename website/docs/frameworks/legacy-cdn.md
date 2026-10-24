@@ -213,13 +213,19 @@ XRPLWalletKit.createCrossmarkAdapter()
 XRPLWalletKit.createLedgerAdapter()
 XRPLWalletKit.createDropfiAdapter()
 XRPLWalletKit.createXrplSnapAdapter()
-XRPLWalletKit.createOtsuAdapter()
 XRPLWalletKit.createGhostsigAdapter(options) // v0.1.20+, opt-in
+XRPLWalletKit.createJoeyWalletAdapter(options) // v0.3.0+, opt-in
 ```
 
 GhostSig is not included by `wallets: 'all'`. Enable it explicitly with
 `wallets: ['ghostsig']` or pass `createGhostsigAdapter()` in `adapters`.
 See the [GhostSig guide](/docs/adapters/ghostsig) for popup and signing requirements.
+
+Enable Joey Wallet's browser extension with `wallets: ['joey-wallet']`.
+The returned kit exposes `kit.signIn({ nonce, statement, resources })` for
+wallet-native authentication; `kit.manager.can('signIn')` reports support.
+See [Wallet-Native Sign In](/docs/auth/native-sign-in) for server-issued nonces
+and proof verification. This does not replace `signMessage()`.
 
 ## TypeScript in a `<script type="module">`
 

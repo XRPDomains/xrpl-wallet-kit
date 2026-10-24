@@ -5,3 +5,4 @@ const core = (globalThis as typeof globalThis & { XRPLWalletKit?: typeof Core })
 if (!core?.WalletKitError || !core.WalletKitErrorCode) throw new Error("Load XRPL Wallet Kit before its Xahau runtime.");
 export const WalletKitError = core.WalletKitError;
 export const WalletKitErrorCode = core.WalletKitErrorCode;
+export const assertWalletRequestActive = core.assertWalletRequestActive;

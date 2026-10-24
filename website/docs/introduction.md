@@ -28,12 +28,12 @@ WalletManager          ← orchestrates adapters, sessions, events
     │
     ├── XamanAdapter
     ├── GemWalletAdapter
+    ├── JoeyWalletAdapter (opt-in)
     ├── WalletConnectAdapter
     ├── CrossmarkAdapter
     ├── LedgerAdapter
     ├── DropfiAdapter
     ├── XrplSnapAdapter
-    ├── OtsuAdapter
     ├── GhostsigAdapter (opt-in)
     └── XyraAdapter (opt-in)
 ```
@@ -49,14 +49,21 @@ uses a chain-filtered subset with its own transaction scope and wallet configura
 |---|---|---|:---:|:---:|:---:|
 | Xaman | `adapter-xaman` | Mobile QR / OAuth | ✅ | ✅ | ✅ |
 | GemWallet | `adapter-gemwallet` | Browser Extension | ✅ | ✅ | ✅ |
+| [Joey Wallet](/docs/adapters/joey-wallet) | `adapter-joey-wallet` | Browser Extension (opt-in) | ✅ | ✅ | ✅ |
 | WalletConnect | `adapter-walletconnect` | Multi-wallet QR | ✅ | ✅ | ✅ |
 | Crossmark | `adapter-crossmark` | Browser Extension | ✅ | ✅ | ✅ |
 | Ledger | `adapter-ledger` | Hardware (USB/HID) | ✅ | ✅ | ✅ |
 | DropFi | `adapter-dropfi` | Extension + Mobile App | ✅ | ✅ | ✅ |
 | XRPL Snap | `adapter-xrpl-snap` | MetaMask Snap | ✅ | ✅ | ✅ |
-| Otsu Wallet | `adapter-otsu` | Browser Extension | ✅ | ✅ | ✅ |
 | [GhostSig](/docs/adapters/ghostsig) | `adapter-ghostsig` | Hosted web / popup (opt-in) | ✅ | ✅ | ✅ |
 | [Xyra](/docs/adapters/xyra) | `adapter-xyra` | Hosted web / popup (opt-in) | ✅ | ✅ | ✅ |
+
+[Joey Wallet](/docs/adapters/joey-wallet) connects directly to Joey's
+browser extension on XRPL Mainnet, Testnet and Devnet. Enable
+`wallets: ["joey-wallet"]` or use `createJoeyWalletAdapter()` explicitly.
+The separate `joey` entry continues to use WalletConnect. Extension support
+includes passive restore and transaction signing with or without submission;
+it does not expose `signMessage()` or Xahau.
 
 GhostSig is published starting in **v0.1.20**. It supports transaction signing
 and submission, including Payment and NFT offers, but not `signMessage()`.

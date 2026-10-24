@@ -74,6 +74,7 @@ function createState(options: WalletKitVueOptions) {
     connect: (id: string) => manager.connect(id), disconnect: () => manager.disconnect(),
     signTransaction: manager.signTransaction.bind(manager), signAndSubmit: manager.signAndSubmit.bind(manager),
     signMessage: manager.signMessage.bind(manager),
+    signIn: manager.signIn.bind(manager),
     openModal: () => { start(); modal.value?.open(); },
     openAndWait: (): Promise<WalletSession> => {
       start();
