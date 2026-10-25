@@ -10,9 +10,9 @@ XRPL Wallet Kit solves this with a **uniform adapter contract**:
 
 ```ts
 adapter.connect(options)      // → ConnectResult
-adapter.signTransaction(req)  // → { txBlob, hash }
+adapter.signTransaction(req)  // → { txBlob, ... } when supported
 adapter.signAndSubmit(req)    // → { hash, ... }
-adapter.signMessage(req)      // → { signature }
+adapter.signMessage(req)      // → { signatureKind, proof, ... } when supported
 adapter.disconnect()
 ```
 
@@ -32,7 +32,7 @@ WalletManager          ← orchestrates adapters, sessions, events
     ├── WalletConnectAdapter
     ├── CrossmarkAdapter
     ├── LedgerAdapter
-    ├── DropfiAdapter
+    ├── DropFiAdapter
     ├── XrplSnapAdapter
     ├── GhostsigAdapter (opt-in)
     └── XyraAdapter (opt-in)
@@ -45,16 +45,16 @@ The **core** package contains the manager, types, errors, and storage logic. It 
 The table below covers XRPL. The [Xahau integration](/docs/configuration/xahau) in v0.2.0
 uses a chain-filtered subset with its own transaction scope and wallet configuration.
 
-| Wallet | Package | Type | connect | sign | signAndSubmit |
+| Wallet | Package | Type | Connect | Sign only | Sign and submit |
 |---|---|---|:---:|:---:|:---:|
-| Xaman | `adapter-xaman` | Mobile QR / OAuth | ✅ | ✅ | ✅ |
-| GemWallet | `adapter-gemwallet` | Browser Extension | ✅ | ✅ | ✅ |
+| Xaman | `adapter-xaman` | Mobile QR / OAuth | ✅ | Manager fallback | ✅ |
+| GemWallet | `adapter-gemwallet` | Browser Extension | ✅ | Provider dependent | ✅ |
 | [Joey Wallet](/docs/adapters/joey-wallet) | `adapter-joey-wallet` | Browser Extension (opt-in) | ✅ | ✅ | ✅ |
-| WalletConnect | `adapter-walletconnect` | Multi-wallet QR | ✅ | ✅ | ✅ |
-| Crossmark | `adapter-crossmark` | Browser Extension | ✅ | ✅ | ✅ |
+| WalletConnect | `adapter-walletconnect` | Multi-wallet QR | ✅ | Wallet dependent | Wallet dependent |
+| Crossmark | `adapter-crossmark` | Browser Extension | ✅ | Not exposed | ✅ |
 | Ledger | `adapter-ledger` | Hardware (USB/HID) | ✅ | ✅ | ✅ |
-| DropFi | `adapter-dropfi` | Extension + Mobile App | ✅ | ✅ | ✅ |
-| XRPL Snap | `adapter-xrpl-snap` | MetaMask Snap | ✅ | ✅ | ✅ |
+| DropFi | `adapter-dropfi` | Extension + Mobile App | ✅ | Not exposed | ✅ |
+| XRPL Snap | `adapter-xrpl-snap` | MetaMask Snap | ✅ | Not exposed | ✅ |
 | [GhostSig](/docs/adapters/ghostsig) | `adapter-ghostsig` | Hosted web / popup (opt-in) | ✅ | ✅ | ✅ |
 | [Xyra](/docs/adapters/xyra) | `adapter-xyra` | Hosted web / popup (opt-in) | ✅ | ✅ | ✅ |
 
@@ -65,7 +65,7 @@ The separate `joey` entry continues to use WalletConnect. Extension support
 includes passive restore and transaction signing with or without submission;
 it does not expose `signMessage()` or Xahau.
 
-GhostSig is published starting in **v0.1.20**. It supports transaction signing
+GhostSig supports transaction signing
 and submission, including Payment and NFT offers, but not `signMessage()`.
 Enable it explicitly with `wallets: ["ghostsig"]` or `createGhostsigAdapter()`;
 the default client list and `wallets: "all"` do not include it.
@@ -73,8 +73,9 @@ the default client list and `wallets: "all"` do not include it.
 [Xyra](/docs/adapters/xyra) supports XRPL mainnet/testnet connection and
 transaction signing with or without submission. Add `createXyraAdapter()`
 explicitly to your manager's `adapters`. It does not support `signMessage()`
-or passive session restore. The sign column above refers to transaction signing;
-see the [capability matrix](/docs/adapters/overview#capability-matrix) for message signing.
+or passive session restore. The Sign only column refers to `manager.signTransaction()`;
+see the [capability matrix](/docs/adapters/overview#capability-matrix) for message signing,
+native sign-in and session guarantees.
 
 ## Package Overview
 

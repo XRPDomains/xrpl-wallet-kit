@@ -1,125 +1,130 @@
 # Xyra Adapter
 
-[Xyra](https://www.xyra.now/) is a hosted wallet. The adapter opens a popup for
-connection and transaction approval; no browser extension or WalletConnect
-project ID is required. XRPL mainnet and testnet are supported.
+[Xyra](https://www.xyra.now/) opens a hosted wallet popup for connection and transaction approval. No browser extension or WalletConnect project ID is required.
+
+| Integration | Value |
+|---|---|
+| Package | `@xrpl-wallet-kit/adapter-xyra` |
+| Adapter ID | `xyra` |
+| Wallet type | Hosted web / popup |
+| Client registration | Opt-in on XRPL; included by default on Xahau |
 
 ## Installation
-
-For Xahau mainnet/testnet support in v0.2.0+, see the
-[Xahau guide](/docs/configuration/xahau). The examples below target XRPL.
 
 ```sh
 npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-xyra xrpl@^4
 ```
 
-## Quick Start
+For the Client tab below, install `@xrpl-wallet-kit/client` instead.
 
-```ts
+<div id="quick-start"></div>
+
+## Connect
+
+::: code-group
+
+```ts [Client]
+import { createWalletKit } from "@xrpl-wallet-kit/client";
+
+const kit = createWalletKit({ network: "mainnet", wallets: ["xyra"] });
+const { manager } = kit;
+const { account } = await kit.connect("xyra");
+```
+
+```ts [Core]
 import { WalletManager } from "@xrpl-wallet-kit/core";
 import { createXyraAdapter } from "@xrpl-wallet-kit/adapter-xyra";
 
 const manager = new WalletManager({
-  network: "mainnet", // or "testnet"
-  adapters: [createXyraAdapter()],
-});
-
-// Call from a connect button's click handler.
-const { account } = await manager.connect("xyra");
-console.log(account.address);
-```
-
-With the selective client:
-
-```ts
-import { createWalletClient } from "@xrpl-wallet-kit/client/selective";
-import { createXyraAdapter } from "@xrpl-wallet-kit/adapter-xyra";
-
-const manager = createWalletClient({
   network: "mainnet",
   adapters: [createXyraAdapter()],
 });
-```
-
-Add the adapter explicitly when using core or the selective client.
-
-Since v0.2.0, the full client also accepts `wallets: ["xyra"]`, and the browser
-bundle exports `XRPLWalletKit.createXyraAdapter()`. Xyra remains opt-in for XRPL
-and is included by default when configuring Xahau.
-
-## Options
-
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `timeoutMs` | `number` | `60000` | Connection and signing timeout, in milliseconds |
-| `maxFeeDrops` | `string` | `"1000000"` | Maximum accepted XRPL transaction fee, in drops (1 XRP by default) |
-
-Use a fee ceiling suitable for your application. The adapter rejects a signed
-transaction whose fee exceeds the configured ceiling.
-
-## Capabilities
-
-| Capability | Supported |
-|---|:---:|
-| connect / disconnect | Yes |
-| signTransaction (sign-only) | Yes |
-| signAndSubmit | Yes |
-| signMessage | No |
-| passive session restore | No |
-
-The default adapter accepts standard XRPL mainnet/testnet, not devnet or custom
-RPC definitions. Transactions use the generic `txJson` API; dedicated
-`payments` and `nftOffers` capability flags are not advertised. Do not infer
-Batch support from generic transaction signing.
-
-## Transactions
-
-Use `manager` and the connected `account` from Quick Start. Run each request
-from its own button click and replace the recipient address before signing.
-
-::: code-group
-
-```ts [Sign Only]
-const result = await manager.signTransaction({
-  txJson: {
-    TransactionType: "Payment",
-    Account: account.address,
-    Destination: "<recipient_address>",
-    Amount: "1000000", // 1 XRP in drops
-  },
-});
-console.log(result.txBlob); // Verified signed transaction; not submitted
-```
-
-```ts [Sign and Submit]
-const result = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "Payment",
-    Account: account.address,
-    Destination: "<recipient_address>",
-    Amount: "1000000", // 1 XRP in drops
-  },
-  submit: true,
-});
-console.log(result.hash, result.status);
+const { account } = await manager.connect("xyra");
 ```
 
 :::
 
-Include `DestinationTag` if the recipient requires one. Submission on mainnet
-spends real funds and network fees. A preliminary `submitted` result is not
-ledger confirmation; wait for `tx_confirmed` or check the hash on the ledger.
-If submission times out, check the hash before retrying.
+Call connect and each signing request from a user action. The selective client also accepts an explicitly configured adapter through `adapters`.
 
-## Browser Requirements
+## Networks
 
-- Use HTTPS or localhost and allow popups. Connect and sign from user actions.
-- Preserve the requesting origin with `Referrer-Policy: strict-origin-when-cross-origin`
-  or `origin`; avoid `no-referrer`, `noopener` and `noreferrer` for the wallet popup.
-- If setting COOP, use `Cross-Origin-Opener-Policy: same-origin-allow-popups`.
-- Allow `data:` in CSP `img-src` for the embedded wallet icon.
-- Reconnect after a page reload; disconnect clears local state, not wallet credentials.
+Supports standard XRPL Mainnet/Testnet and Xahau Mainnet/Testnet. The default XRPL adapter does not accept Devnet or custom RPC definitions. For Xahau, the full client accepts `network: "xahau-mainnet"` or `"xahau-testnet"` with a positive `preflight.maxFeeDrops`; core/selective integrations must register the protocol and adapter chain filter. See [Xahau Configuration](/docs/configuration/xahau).
 
-Transaction JSON is sent in the popup URL; do not include secrets in transaction
-metadata. See [Xyra's developer documentation](https://www.xyra.now/developers)
-for the wallet protocol.
+## Capabilities
+
+This table describes manager-level operations. Payment/NFT requests use generic signing rather than dedicated `payments`/`nftOffers` capability flags.
+
+| Operation | Support |
+|---|---|
+| Connect | Yes |
+| Disconnect | Yes; local session/popup cleanup |
+| Session restore | No; reconnect from a user action |
+| `signTransaction()` | Yes |
+| `signAndSubmit()` | Yes |
+| `signMessage()` | Not exposed |
+| `signIn()` | Not exposed |
+| `switchNetwork()` | Not exposed |
+| Payment / NFT transactions | Through generic `txJson` signing |
+| QR / deep link | No |
+
+## Options
+
+These options apply to `createXyraAdapter()`. Pass a configured adapter through the client's `adapters` option when custom options are needed.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `timeoutMs` | `number` | `60000` | Connection and signing timeout in milliseconds |
+| `maxFeeDrops` | `string` | `"1000000"` | XRPL transaction fee ceiling |
+| `supportedChains` | `WalletChainFilter` | XRPL Mainnet/Testnet | Restrict chains in a protocol-aware integration |
+
+## Transactions
+
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#introduction-->
+
+### Payment
+
+::: code-group
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-submit-->
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-sign-only-->
+:::
+
+The adapter verifies the signed result before returning it or submitting it. A configured/request fee ceiling can reject a signed transaction with excessive fees.
+
+### NFT Transactions
+
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#nft-->
+
+For sign-only NFT requests, pass the same `txJson` to `manager.signTransaction()`. Do not infer Batch support from generic transaction signing.
+
+## Authentication
+
+Neither arbitrary `signMessage()` nor wallet-native `signIn()` is exposed. Connection approval is not a backend login proof; choose an authentication-capable adapter when your application needs one.
+
+## Sessions and Disconnect
+
+Xyra does not expose passive session restore. After reload, reconnect from a user action. `manager.disconnect()` clears local state and pending popup work, not wallet credentials.
+
+<div id="browser-requirements"></div>
+
+## Integration Notes
+
+- Use HTTPS or localhost and allow popups for connection and signing.
+- Preserve the requesting origin with `Referrer-Policy: strict-origin-when-cross-origin` or `origin`; avoid `no-referrer`, `noopener` and `noreferrer` for the wallet popup.
+- If setting COOP, use `Cross-Origin-Opener-Policy: same-origin-allow-popups`. Allow `data:` in CSP `img-src` for the embedded icon.
+- Transaction JSON is sent in the popup URL. Do not put secrets in transaction metadata.
+- Check a transaction's hash before retrying a submission with an unknown outcome.
+
+## Troubleshooting
+
+| Symptom | Action |
+|---|---|
+| Xyra is missing on XRPL | Add `"xyra"` explicitly to `wallets` |
+| Popup is blocked | Start the request from a user action and allow popups |
+| Wallet cannot identify the dApp origin | Check referrer and opener policies |
+| Fee limit is rejected on Xahau | Configure a positive global/request fee ceiling as shown in the Xahau guide |
+
+## Related Guides
+
+- [Adapters Overview](/docs/adapters/overview)
+- [Xahau Configuration](/docs/configuration/xahau)
+- [Xyra Developer Documentation](https://www.xyra.now/developers)

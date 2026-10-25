@@ -22,6 +22,31 @@ test("UI package exports WalletButton alias for vanilla imports", () => {
   assert.equal(WalletButton, WalletButtonController);
 });
 
+test("close controls use color-only hover/active feedback in light and dark themes", () => {
+  for (const [mode, theme] of [["light", lightTheme], ["dark", darkTheme]] as const) {
+    const modal = new WalletModal({ manager: manager as never, themeMode: mode }) as unknown as {
+      renderStyles(theme: typeof lightTheme, layout: "list", size: "default", textSize: "sm"): string;
+    };
+    const button = new WalletButtonController({ manager: manager as never, modal: modal as unknown as WalletModal, themeMode: mode }) as unknown as { renderStyles(): string };
+    const toast = new WalletToast({ manager: manager as never, themeMode: mode }) as unknown as { renderStyles(): string };
+    for (const [styles, selector] of [
+      [modal.renderStyles(theme, "list", "default", "sm"), ".xwk-close:hover,.xwk-back:hover,.xwk-close:active,.xwk-back:active"],
+      [button.renderStyles(), ".xwk-account-close:hover,.xwk-account-back:hover,.xwk-account-close:active,.xwk-account-back:active"],
+      [toast.renderStyles(), ".xwk-toast-dismiss:hover,.xwk-toast-dismiss:active"],
+    ]) {
+      assert.ok(styles.includes(`${selector}{`));
+      const rule = styles.split(`${selector}{`)[1].split("}")[0];
+      assert.match(rule, /background:transparent!important/);
+      assert.ok(rule.includes(`color:${theme.foreground}`));
+      assert.match(rule, /box-shadow:none/);
+      assert.match(rule, /transform:none/);
+      assert.match(styles, /:focus-visible/);
+    }
+    assert.match(button.renderStyles(), /\.xwk-account-close,\.xwk-account-back\{[^}]*box-sizing:border-box/);
+    assert.match(toast.renderStyles(), /\.xwk-toast-dismiss\{[^}]*border:0!important/);
+  }
+});
+
 test("UI package exports WalletInline and its XRPL alias", () => {
   assert.equal(WalletInline, XrplWalletInline);
 });

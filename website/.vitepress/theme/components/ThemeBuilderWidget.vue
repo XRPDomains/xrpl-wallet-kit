@@ -448,7 +448,7 @@ import { loadWalletKit } from '../loadWalletKit'
 
 // ── Config state ──────────────────────────────────────────────
 const config = reactive({
-  layout:       'list',
+  layout:       'auto',
   mode:         'light',
   themeName:    'default',
   size:         'default',
@@ -562,8 +562,8 @@ function syncCompactPage(event: MediaQueryListEvent | MediaQueryList) {
 
 // ── Options ───────────────────────────────────────────────────
 const layouts = [
+  { value: 'auto', label: 'Auto' },
   { value: 'list', label: 'List' },
-  { value: 'grid', label: 'Grid' },
   { value: 'card', label: 'Card' },
   { value: 'icon', label: 'Icon' },
 ]
@@ -696,15 +696,15 @@ const BLANK = {
 }
 
 const presets = [
-  { id: 'default',  label: 'Default',  config: { layout: 'list', mode: 'light', themeName: 'default', size: 'default', btnVariant: 'default', btnSize: 'md', accent: '#0078ae', radius: '14px', walletRadius: '10px', ...BLANK } },
+  { id: 'default',  label: 'Default',  config: { layout: 'auto', mode: 'light', themeName: 'default', size: 'default', btnVariant: 'default', btnSize: 'md', accent: '#0078ae', radius: '14px', walletRadius: '10px', ...BLANK } },
   { id: 'dark',     label: 'Dark',     config: { layout: 'list', mode: 'dark',  themeName: 'dark',    size: 'default', btnVariant: 'default', btnSize: 'md', accent: '#4aa3ff', radius: '14px', walletRadius: '10px', ...BLANK } },
   { id: 'xrpl',     label: 'XRPL',     config: { layout: 'list', mode: 'light', themeName: 'xrpl',    size: 'default', btnVariant: 'default', btnSize: 'md', accent: '#0078ae', radius: '12px', walletRadius: '10px', ...BLANK } },
   { id: 'minimal',  label: 'Minimal',  config: { layout: 'list', mode: 'light', themeName: 'minimal', size: 'compact', btnVariant: 'minimal', btnSize: 'sm', accent: '#0078ae', radius: '8px',  walletRadius: '8px',  ...BLANK } },
   { id: 'midnight', label: 'Midnight', config: { layout: 'list', mode: 'dark',  themeName: 'midnight', size: 'default', btnVariant: 'pill',    btnSize: 'md', accent: '#3b82f6', radius: '16px', walletRadius: '12px', ...BLANK, overlayBlur: 12 } },
-  { id: 'glass',    label: 'Glass',    config: { layout: 'grid', mode: 'light', themeName: 'glass',   size: 'default', btnVariant: 'pill',    btnSize: 'md', accent: '#6366f1', radius: '20px', walletRadius: '14px', ...BLANK, overlayBlur: 20 } },
+  { id: 'glass',    label: 'Glass',    config: { layout: 'card', mode: 'light', themeName: 'glass',   size: 'default', btnVariant: 'pill',    btnSize: 'md', accent: '#6366f1', radius: '20px', walletRadius: '14px', ...BLANK, overlayBlur: 20 } },
   { id: 'rounded',  label: 'Rounded',  config: { layout: 'card', mode: 'light', themeName: 'rounded', size: 'default', btnVariant: 'pill',    btnSize: 'lg', accent: '#7c3aed', radius: '24px', walletRadius: '16px', ...BLANK } },
   { id: 'crisp',    label: 'Crisp',    config: { layout: 'list', mode: 'light', themeName: 'crisp',   size: 'default', btnVariant: 'outline', btnSize: 'md', accent: '#111827', radius: '4px',  walletRadius: '4px',  ...BLANK } },
-  { id: 'soft',     label: 'Soft',     config: { layout: 'grid', mode: 'light', themeName: 'soft',    size: 'default', btnVariant: 'default', btnSize: 'md', accent: '#7c3aed', radius: '16px', walletRadius: '12px', ...BLANK } },
+  { id: 'soft',     label: 'Soft',     config: { layout: 'card', mode: 'light', themeName: 'soft',    size: 'default', btnVariant: 'default', btnSize: 'md', accent: '#7c3aed', radius: '16px', walletRadius: '12px', ...BLANK } },
 ]
 
 const PRESET_THEME_TOKENS: Record<string, Record<string, string | number>> = {
@@ -1011,6 +1011,7 @@ function renderPreview() {
   if (modalInstance)  { try { modalInstance.destroy()  } catch {}; modalInstance  = null }
 
   const mount = mountRef.value
+  mount.classList.toggle('tb-layout-auto', config.layout === 'auto')
   mount.innerHTML = ''
   mount.style.position = 'relative'
 
@@ -2289,6 +2290,10 @@ onUnmounted(() => {
 .tb-mount.tb-preview-compact :deep(.xwk-body) {
   max-height: none;
   padding: 8px 12px 10px;
+}
+
+.tb-mount.tb-preview-compact.tb-layout-auto :deep(.xwk-body) {
+  max-height: min(480px, calc(100dvh - 220px));
 }
 
 .tb-mount.tb-preview-compact :deep(.xwk-grid) { gap: 6px; }

@@ -1,104 +1,134 @@
 # Crossmark Adapter
 
-[Crossmark](https://crossmark.io) is a browser extension wallet for XRPL. It provides extension-based signing with a WebAuthn-backed security model and a persistent SDK session layer.
+[Crossmark](https://crossmark.io) connects through its browser extension SDK for account approval, message signing and transaction submission.
+
+| Integration | Value |
+|---|---|
+| Package | `@xrpl-wallet-kit/adapter-crossmark` |
+| Adapter ID | `crossmark` |
+| Wallet type | Browser extension |
+| Client registration | Included in default XRPL wallet lists |
 
 ## Installation
 
-```bash
-npm install @xrpl-wallet-kit/adapter-crossmark
+```sh
+npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-crossmark xrpl@^4
 ```
 
-## Quick Start
+For the Client tab below, install `@xrpl-wallet-kit/client` instead. Enable the Crossmark extension for the dApp.
 
-```ts
+<div id="quick-start"></div>
+<div id="connection-flow"></div>
+
+## Connect
+
+::: code-group
+
+```ts [Client]
+import { createWalletKit } from "@xrpl-wallet-kit/client";
+
+const kit = createWalletKit({ network: "mainnet", wallets: ["crossmark"] });
+const { manager } = kit;
+const { account } = await kit.connect("crossmark");
+```
+
+```ts [Core]
+import { WalletManager } from "@xrpl-wallet-kit/core";
 import { createCrossmarkAdapter } from "@xrpl-wallet-kit/adapter-crossmark";
 
-const adapter = createCrossmarkAdapter();
+const manager = new WalletManager({
+  network: "mainnet",
+  adapters: [createCrossmarkAdapter()],
+});
+const { account } = await manager.connect("crossmark");
 ```
 
-## Options
+:::
 
-| Option | Type | Description |
-|---|---|---|
-| `provider` | `CrossmarkProvider` | Override the Crossmark SDK (useful for testing) |
+Call connect from a user action. Crossmark prompts for approval using a fresh random connection challenge; this is not your application's login challenge.
 
-## Connection Flow
+## Networks
 
-1. User clicks Crossmark in the connect modal
-2. The adapter calls `sdk.methods.signInAndWait(randomHex)` — a random 32-byte hex challenge
-3. Crossmark opens a popup for the user to approve the sign-in request
-4. On approval, the adapter extracts the XRPL address from the response
-
-The random hex challenge proves the connection is live. Crossmark re-uses `signInAndWait` for both connection and message signing.
+This adapter targets XRPL. Select the network expected by the dApp in Crossmark. Xahau is not supported by this adapter.
 
 ## Capabilities
 
-| Capability | Supported |
-|---|:---:|
-| connect | ✅ |
-| signMessage | ✅ |
-| signAndSubmit | ✅ |
-| nftOffers | ✅ |
-| payments | ✅ |
-| sessionRestore | ✅ |
-| disconnect | ❌ |
-| signTransaction | ❌ |
+This table describes manager-level operations, not every method the wallet may expose outside Kit.
 
-## Message Signing
+| Operation | Support |
+|---|---|
+| Connect | Yes |
+| Disconnect | Local Kit cleanup; no provider-level disconnect |
+| Session restore | Yes, with a matching passive account |
+| `signTransaction()` | Not exposed |
+| `signAndSubmit()` | Yes |
+| `signMessage()` | Yes; `signature` proof |
+| `signIn()` | Not exposed |
+| `switchNetwork()` | Not exposed |
+| Payment / NFT transactions | Yes, through `txJson` |
+| QR / deep link | No |
 
-Crossmark returns a **compact message signature** (ECDSA/Ed25519). The adapter encodes the message as UTF-8 hex and calls `signInAndWait`, then extracts the signature from the response.
+## Options
 
-```ts
-const result = await manager.signMessage({ message: "Verify wallet ownership" });
+These options apply to `createCrossmarkAdapter()`. Pass a configured adapter through the client's `adapters` option when needed.
 
-// result.signatureKind === "signature"
-// result.proof      — same as result.signature
-// result.signature  — compact hex signature
-// result.publicKey  — account public key (when Crossmark includes it)
-```
-
-The adapter searches multiple response paths for the signature field (`response.data.signature`, `response.data.signedMessage`, `response.data.resp.signature`, etc.) because Crossmark's response shape has varied across versions.
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `provider` | `CrossmarkProvider` | Bundled SDK | Supply a compatible Crossmark SDK/provider |
 
 ## Transactions
 
-Pass standard XRPL `txJson` to `signAndSubmit`. The adapter calls `sdk.methods.signAndSubmitAndWait(txJson)` and normalises the result:
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#introduction-->
+
+### Payment
+
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-submit-->
+
+Crossmark uses `signAndSubmitAndWait()`. This adapter does not expose a sign-only operation; do not use `manager.signTransaction()` for this wallet.
+
+### NFT Transactions
+
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#nft-->
+
+<div id="message-signing"></div>
+
+## Authentication
 
 ```ts
-const result = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "Payment",
-    Account: session.account.address,
-    Destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe",
-    Amount: "1000000",
-  },
-});
-// result.hash   — transaction hash
-// result.status — e.g. "tesSUCCESS"
-// result.signed — boolean
+const proof = await manager.signMessage({ message: "Verify wallet ownership" });
+console.log(proof.signatureKind); // "signature"
+console.log(proof.signature, proof.publicKey);
 ```
 
-NFT offers, TrustSet, and other transaction types are passed through identically — Crossmark handles the UI display based on `TransactionType`.
+The adapter sends the UTF-8 message as hex to Crossmark and returns the compact proof. Verify it on your backend; see [Message Authentication](/docs/auth/introduction). Crossmark's provider method named `signInAndWait` does not mean Kit exposes native `manager.signIn()`.
 
-## Session Restore / Mobile Return Recovery
+<div id="session-restore-mobile-return-recovery"></div>
 
-**Session restore**: on page reload, the adapter checks `sdk.sync.getAddress()` (or falls back to `sdk.session.address`). If the address matches the stored session, the session is silently restored without any popup.
+## Sessions and Disconnect
 
-The adapter waits up to 2.5 seconds for the Crossmark extension to inject before checking availability.
+`manager.autoReconnect()` restores only when the passive SDK address matches the stored address. It does not open a signing popup.
 
-There is no mobile return / deeplink recovery — Crossmark is a desktop browser extension only.
+`manager.disconnect()` clears the Kit session; extension site permissions remain managed by Crossmark.
 
-## Known Limitations
+<div id="known-limitations"></div>
 
-- No `disconnect()` — Crossmark does not expose a provider-level disconnect. The kit clears local session storage only.
-- No `signTransaction` (sign without submit) — `signAndSubmit` is the only signing path.
-- The signature response path varies across Crossmark SDK versions; the adapter searches multiple paths as a fallback.
+## Integration Notes
+
+- Connection and message signing both require Crossmark approval; keep connection and backend authentication as separate application steps.
+- Signature response shapes vary by SDK version; consume Kit's normalized proof fields rather than raw provider paths.
+- Generic transaction signing does not imply Batch support.
 
 ## Troubleshooting
 
-**Extension not detected?** Verify Crossmark is installed, enabled, and not blocked by a browser privacy shield for the current domain.
+| Symptom | Action |
+|---|---|
+| Extension is not detected | Enable Crossmark for the current domain and allow extension injection |
+| `signInAndWait` is unavailable | Update the extension/SDK or inspect your injected `provider` |
+| No message proof after approval | Check SDK compatibility; redact sensitive data before reporting a provider response |
+| Sign-only fails | Use sign-and-submit; sign-only is not exposed by this adapter |
 
-**Connection popup doesn't appear?** The Crossmark SDK must be loaded. A hard reload sometimes helps if the extension didn't inject in time.
+## Related Guides
 
-**"signInAndWait is missing"?** Your Crossmark SDK version may be too old. Update the extension or inject a fresh `provider` via the adapter option.
-
-**Signature not extracted?** If `signMessage` throws after the user approves, the response shape may not match any expected path. Open a GitHub issue with the raw response object.
+- [Adapters Overview](/docs/adapters/overview)
+- [Message Authentication](/docs/auth/introduction)
+- [NFT Marketplace](/docs/use-cases/nft-marketplace)

@@ -182,7 +182,7 @@ Mock tests do not establish production readiness. Report remaining live acceptan
 
 ## Consumer Docs and Registration
 
-- Follow neighboring guides: introduction, installation, minimal connection example, options, capabilities, and essential limitations. Keep audit histories, issue progress, test logs and protocol internals out of consumer quick starts.
+- Follow `references/adapter-docs.md` for the required consumer guide structure, capability table and shared transaction examples. Do not copy a neighboring page's incidental structure. Keep audit histories, issue progress, test logs and unnecessary protocol internals out of consumer guides.
 - Synchronize Supported Wallets, Adapters overview, installation and relevant client/browser examples. Check published package versions before claiming npm/CDN availability.
 - Choose default, opt-in, or standalone registration explicitly. Exporting a factory does not require including the wallet in default lists or `wallets: "all"`.
 - Use optimized official icons and the kit's embedded data-URI convention where applicable.
@@ -192,6 +192,7 @@ Mock tests do not establish production readiness. Report remaining live acceptan
 Read these only when needed:
 
 - `references/adapter-checklist.md` when reviewing or approving an adapter.
+- `references/adapter-docs.md` when adding or updating a public adapter guide.
 - `references/scaffold.md` when creating a new official adapter package inside this monorepo.
 - `references/hardware-adapters.md` when implementing Ledger, Trezor, or any USB/HID/hardware transport adapter.
 - `references/chain-support.md` when declaring chain support or implementing Xahau/protocol-aware connection, signing and submission.

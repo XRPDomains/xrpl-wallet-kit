@@ -67,7 +67,7 @@ npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-ghostsig xrpl@^4
 GhostSig is opt-in: the default client list and `wallets: "all"` exclude it.
 
 Install Xyra with core and the XRPL peer dependency, then follow the
-[Xyra quick start](/docs/adapters/xyra#quick-start):
+[Xyra connection guide](/docs/adapters/xyra#connect):
 
 ```sh
 npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-xyra xrpl@^4

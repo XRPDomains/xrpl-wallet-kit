@@ -1,125 +1,153 @@
 # Xaman Adapter
 
-[Xaman](https://xaman.app) (formerly XUMM) is the most popular XRPL mobile wallet. It connects via OAuth 2.0 PKCE + QR code on desktop, or a deep link on mobile. No browser extension required.
+[Xaman](https://xaman.app) connects a mobile wallet using browser authorization, QR codes and deep links. No browser extension is required.
+
+| Integration | Value |
+|---|---|
+| Package | `@xrpl-wallet-kit/adapter-xaman` |
+| Adapter ID | `xaman` |
+| Wallet type | Mobile app |
+| Client registration | Included when `xamanClientId` is provided |
 
 ## Installation
 
-For Xahau mainnet/testnet configuration and transaction examples in v0.2.0+,
-see the [Xahau guide](/docs/configuration/xahau). The examples below target XRPL.
-
-```bash
-npm install @xrpl-wallet-kit/adapter-xaman
+```sh
+npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-xaman xrpl@^4
 ```
 
-Get an API key from [apps.xaman.dev](https://apps.xaman.dev) and whitelist your domain.
+For the Client tab below, install `@xrpl-wallet-kit/client` instead. Create an API key at [apps.xaman.dev](https://apps.xaman.dev) and allow your dApp's domain.
 
-## Quick Start
+<div id="quick-start"></div>
+<div id="connection-flow"></div>
 
-```ts
+## Connect
+
+::: code-group
+
+```ts [Client]
+import { createWalletKit } from "@xrpl-wallet-kit/client";
+
+const kit = createWalletKit({
+  network: "mainnet",
+  wallets: ["xaman"],
+  xamanClientId: "YOUR_XAMAN_CLIENT_ID",
+});
+const { manager } = kit;
+const { account } = await kit.connect("xaman");
+```
+
+```ts [Core]
+import { WalletManager } from "@xrpl-wallet-kit/core";
 import { createXamanAdapter } from "@xrpl-wallet-kit/adapter-xaman";
 
-const adapter = createXamanAdapter({
-  apiKey: import.meta.env.VITE_XAMAN_API_KEY,
+const manager = new WalletManager({
+  network: "mainnet",
+  adapters: [createXamanAdapter({ apiKey: "YOUR_XAMAN_CLIENT_ID" })],
 });
+const { account } = await manager.connect("xaman");
 ```
 
-## Options
+:::
 
-| Option | Type | Description |
-|---|---|---|
-| `apiKey` | `string` | Your Xaman OAuth2 API key (required when `auth` and `sdk` are not provided) |
-| `auth` | `XamanPkceAuth` | Inject a pre-built PKCE auth handler (alternative to `apiKey`) |
-| `sdk` | `XamanSdkLike` | Inject an already-initialised Xaman SDK instance |
-| `icon` | `string` | Override the default Xaman icon (data-URI or URL) |
-| `deeplink` | `(uri: string) => string` | Generate a wallet deep link URL from the Xaman payload URI |
-| `onQr` | `(event) => void` | Callback with `{ adapterId, uri, deeplink?, qrPng? }` each time a payload is created — use to render QR in your own UI |
-| `recoveryStorage` | `WalletStorage` | Custom storage for the pending-recovery marker (default: localStorage) |
-| `maxLastLedgerSequenceExtension` | `number` | Maximum ledgers Xaman may extend a supplied `LastLedgerSequence` in sign-only requests. Default: `50`; use `0` for exact preservation |
+Start connection from a user action. On desktop, approve the browser authorization and scan the QR when shown; on mobile, open Xaman using the deep link. For custom QR UI, listen to manager `qr` events or provide `onQr`.
 
-## Connection Flow
+## Networks
 
-**Desktop:** Modal shows a QR code. User scans it with the Xaman app and approves the connection request. The adapter polls for approval via the Xaman SDK.
-
-**Mobile:** Modal shows an "Open Xaman" deep link button. Tapping it launches the Xaman app directly for approval.
-
-The adapter triggers a Xaman OAuth2 PKCE authorize flow internally. After approval, the Xaman SDK provides the account address.
+Supports XRPL and Xahau. With the full client, set `network: "xahau-mainnet"` or `"xahau-testnet"` and a positive `preflight.maxFeeDrops`; the client configures the protocol automatically. Core/selective integrations must register the Xahau protocol and adapter chain filter explicitly. See [Xahau Configuration](/docs/configuration/xahau).
 
 ## Capabilities
 
-| Capability | Supported |
-|---|:---:|
-| connect | ✅ |
-| disconnect | ✅ |
-| signMessage | ✅ |
-| signAndSubmit | ✅ |
-| qr | ✅ |
-| deeplink | ✅ |
-| nftOffers | ✅ |
-| payments | ✅ |
-| sessionRestore | ✅ |
+This table describes manager-level operations on XRPL. Xahau connection and signing requirements are documented in the network guide above.
 
-## Message Signing
+| Operation | Support |
+|---|---|
+| Connect | Yes |
+| Disconnect | Yes; clears the Xaman authorization/session |
+| Session restore | Yes, with matching saved SDK account on XRPL |
+| `signTransaction()` | Yes, through the declared sign-only fallback |
+| `signAndSubmit()` | Yes |
+| `signMessage()` | Yes; `signedTx` proof |
+| `signIn()` | Not exposed |
+| `switchNetwork()` | Not exposed; reconnect for the selected network |
+| Payment / NFT transactions | Yes, through `txJson` |
+| QR / deep link | Yes |
 
-Xaman does **not** return a compact ECDSA/Ed25519 signature. Instead it creates a `SignIn` payload with the message encoded as a hex Memo, sends a push notification to the user's phone for approval, and returns the signed transaction blob as the proof.
+## Options
 
-```ts
-const result = await manager.signMessage({ message: "Sign in to My dApp" });
+These options apply to `createXamanAdapter()`, not directly to `createWalletKit()`.
 
-// result.signatureKind === "signedTx"
-// result.proof   — the signed Xaman SignIn transaction hex blob
-// result.txBlob  — same value (alias for proof)
-```
-
-::: warning Server-side verification
-`proof` is an XRPL transaction blob, not a bare signature. Server verification must decode the blob and check the transaction signature against the account's public key. If your auth flow expects a compact `signature`, use GemWallet or Crossmark instead.
-:::
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `apiKey` | `string` | Required unless `auth` or `sdk` is supplied | Xaman OAuth client/API key; the client helper calls this `xamanClientId` |
+| `auth` | `XamanPkceAuth` | Not set | Custom authorization handler |
+| `sdk` | `XamanSdkLike` | Not set | Existing Xaman SDK instance |
+| `icon` | `string` | Embedded Xaman icon | Custom icon URL or data URI |
+| `deeplink` | `(uri: string) => string` | Wallet default | Build a deep link for a payload |
+| `onQr` | `(event) => void` | Not set | Receive `{ adapterId, uri, deeplink?, qrPng? }` |
+| `recoveryStorage` | `WalletStorage` | Browser storage | Storage for pending mobile-return recovery |
+| `supportedChains` | `WalletChainFilter` | XRPL integration | Restrict allowed chains for protocol-aware integrations |
+| `maxLastLedgerSequenceExtension` | `number` | `50` | Maximum permitted expiry extension; set `0` for exact preservation |
 
 ## Transactions
 
-Pass standard XRPL `txJson` to `signAndSubmit`. The adapter wraps it in a Xaman payload and sends a push notification to the user's phone:
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#introduction-->
 
-```ts
-const result = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "Payment",
-    Account: session.account.address,
-    Destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe",
-    Amount: "1000000",
-  },
-});
-// result.hash — the transaction hash once submitted
-```
+### Payment
 
-NFT offers, TrustSet, and other transaction types follow the same pattern — pass any valid XRPL `txJson`. Xaman handles submission after user approval.
-
-::: tip Sign-only requests
-Xaman does not expose a separate `signTransaction` method, but `manager.signTransaction()` can route through `signAndSubmit({ submit: false })`. When your `txJson` includes `LastLedgerSequence`, the adapter rejects signed responses that widen that value beyond `maxLastLedgerSequenceExtension`.
+::: code-group
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-submit-->
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-sign-only-->
 :::
 
-## Session Restore / Mobile Return Recovery
+Xaman implements sign-only through `signAndSubmit({ submit: false })` internally. DApps still call the standard `manager.signTransaction()` and receive `txBlob` without submission.
 
-**Session restore** (`restoreSession`): on page reload, the adapter checks `sdk.state.signedIn` and retrieves the current account address. If the Xaman SDK still reports a valid session, no re-approval is needed. Restore verifies account ownership only; it preserves the manager's stored network context and does not treat Xaman refresh metadata as proof that the mobile app changed networks.
+### NFT Transactions
 
-**Mobile return recovery** (`recoverSession`): when a user taps the deep link and returns to the dApp, the adapter checks for a pending-recovery marker in storage. If found (within 3 minutes), it re-runs the OAuth authorize flow to complete the connection without a fresh QR.
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#nft-->
+
+For sign-only NFT requests, pass the same `txJson` to `manager.signTransaction()`.
+
+<div id="message-signing"></div>
+
+## Authentication
+
+`signMessage()` returns a signed `SignIn` transaction with the message in a Memo, not a compact signature:
 
 ```ts
-// On app startup — handles both restore and mobile return
-await manager.autoReconnect();
+const proof = await manager.signMessage({ message: "Verify wallet ownership" });
+console.log(proof.signatureKind); // "signedTx"
+console.log(proof.txBlob);
 ```
 
-## Known Limitations
+Verify the transaction proof on your backend using the [Message Authentication guide](/docs/auth/introduction). The adapter does not expose the separate wallet-native `signIn()` operation.
 
-- No separate adapter `signTransaction` method; manager sign-only requests use the explicitly declared `sign-only` fallback and return `txBlob`.
-- Message signing produces a transaction blob proof, not a compact signature.
-- Requires a browser environment with popup/redirect support for the OAuth2 flow.
-- Domain must be whitelisted in the Xaman developer portal.
+<div id="session-restore-mobile-return-recovery"></div>
+
+## Sessions and Disconnect
+
+Call `manager.autoReconnect()` on startup to restore a matching XRPL SDK account or complete a pending mobile return. Mobile recovery markers expire after three minutes. Stored network context is not proof that the mobile wallet changed networks; reconnect explicitly on Xahau after reload.
+
+Use `manager.disconnect()` to clear the active session and authorization.
+
+<div id="known-limitations"></div>
+
+## Integration Notes
+
+- Allow browser authorization popups/redirects and register the dApp domain in the Xaman developer portal.
+- Xaman may extend a transaction's expiry within `maxLastLedgerSequenceExtension`; other requested transaction fields must remain consistent.
+- Message proofs and sign-only transactions must not be submitted as authentication requests.
 
 ## Troubleshooting
 
-**QR code not showing?** Check that your API key is correct and the domain is whitelisted in the Xaman developer portal.
+| Symptom | Action |
+|---|---|
+| Authorization or QR does not appear | Check `apiKey`/`xamanClientId`, the allowed domain and popup permissions |
+| Connection times out | Start a new connection and approve it in Xaman |
+| Mobile return cannot recover | Start a fresh connection if the recovery marker expired |
+| Wrong chain/network | Select the requested network in Xaman and reconnect |
 
-**"Connection timed out"?** The user did not approve within the timeout window. The modal shows a retry button automatically.
+## Related Guides
 
-**Mobile deep link not working?** Xaman must be installed on the device. If not installed, the browser redirects to the App Store / Google Play.
-
-**`recoverSession` not completing?** The pending-recovery marker expires after 3 minutes. If the user takes longer than that to return from Xaman, a fresh QR scan is required.
+- [Adapters Overview](/docs/adapters/overview)
+- [Xahau Configuration](/docs/configuration/xahau)
+- [Message Authentication](/docs/auth/introduction)

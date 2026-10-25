@@ -1,122 +1,145 @@
 # XRPL Snap Adapter
 
-[XRPL Snap](https://snaps.metamask.io) brings XRPL support to MetaMask via the Snaps extension system. Users who already have MetaMask can manage XRPL accounts without installing a separate wallet.
+[XRPL Snap](https://snaps.metamask.io) connects XRPL accounts through MetaMask's Snaps APIs. The wallet appears as MetaMask in the connect UI.
+
+| Integration | Value |
+|---|---|
+| Package | `@xrpl-wallet-kit/adapter-xrpl-snap` |
+| Adapter ID | `xrplsnap` |
+| Wallet type | MetaMask Snap |
+| Client registration | Included in default XRPL wallet lists; `xrpl-snap` is a client alias |
+
+<div id="requirements"></div>
 
 ## Installation
 
-```bash
-npm install @xrpl-wallet-kit/adapter-xrpl-snap
+```sh
+npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-xrpl-snap xrpl@^4
 ```
 
-## Quick Start
+For the Client tab below, install `@xrpl-wallet-kit/client` instead. MetaMask must expose Snaps APIs such as `wallet_getSnaps` and `wallet_requestSnaps`.
 
-```ts
+<div id="quick-start"></div>
+<div id="connection-flow"></div>
+
+## Connect
+
+::: code-group
+
+```ts [Client]
+import { createWalletKit } from "@xrpl-wallet-kit/client";
+
+const kit = createWalletKit({ network: "mainnet", wallets: ["xrplsnap"] });
+const { manager } = kit;
+const { account } = await kit.connect("xrplsnap");
+```
+
+```ts [Core]
+import { WalletManager } from "@xrpl-wallet-kit/core";
 import { createXrplSnapAdapter } from "@xrpl-wallet-kit/adapter-xrpl-snap";
 
-const adapter = createXrplSnapAdapter({
-  snapId: "npm:xrpl-snap",  // default, can be overridden for custom snaps
+const manager = new WalletManager({
+  network: "mainnet",
+  adapters: [createXrplSnapAdapter()],
 });
+const { account } = await manager.connect("xrplsnap");
 ```
 
-## Requirements
+:::
 
-- MetaMask **v11+** (Flask or production with Snaps enabled)
-- The XRPL Snap is installed automatically on first connect if not already present
-- The active EIP-1193 provider must support MetaMask Snaps methods such as `wallet_getSnaps` and `wallet_requestSnaps`
+Start connection from a user action. MetaMask requests permission to install the Snap if needed, then returns the selected account. The adapter prefers a detected MetaMask provider over another extension occupying `window.ethereum`.
 
-## Options
+## Networks
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `snapId` | `string` | `"npm:xrpl-snap"` | The Snap ID to install and invoke |
-| `ethereum` | `Eip1193Provider` | `window.ethereum` | Override the EIP-1193 provider (useful for testing) |
-| `icon` | `string` | — | Override the default MetaMask icon (data-URI or URL) |
-| `signMessageDestination` | `string` | connected account | XRPL destination address for the 1-drop Payment used in `signMessage` |
-| `signMessageMethods` | `string[]` | `["xrpl_sign", "xrpl_signTransaction", "npm:xrpl-snap"]` | Snap methods to try in order when signing a message |
-
-## Connection Flow
-
-1. User clicks XRPL Snap in the connect modal
-2. MetaMask prompts to install the XRPL Snap (if not already installed)
-3. User approves the Snap installation and permissions
-4. MetaMask shows a connection approval popup
-5. Adapter receives the XRPL account address
-
-The Snap is installed once and stays available for future connections.
+XRPL `mainnet`, `testnet` and `devnet` map to Snap chain IDs 0, 1 and 2. Network selection/verification depends on the installed Snap's network methods. Xahau is not supported by this adapter.
 
 ## Capabilities
 
-| Capability | Supported |
-|---|:---:|
-| connect | ✅ |
-| signMessage | ✅ |
-| signAndSubmit | ✅ |
-| payments | ✅ |
-| nftOffers | ✅ |
-| sessionRestore | ✅ |
-| disconnect | ❌ |
-| signTransaction | ❌ |
+This table describes Kit's Snap integration, not all possible methods of custom Snaps.
 
-## Message Signing
+| Operation | Support |
+|---|---|
+| Connect | Yes |
+| Disconnect | Local Kit cleanup; no provider-level disconnect |
+| Session restore | Cached account with an available Snaps provider; not fresh account verification |
+| `signTransaction()` | Not exposed |
+| `signAndSubmit()` | Yes |
+| `signMessage()` | Yes; `signedTx` proof |
+| `signIn()` | Not exposed |
+| `switchNetwork()` | Not exposed as a manager operation |
+| Payment / NFT transactions | Generic `txJson`; installed Snap dependent |
+| QR / deep link | No |
 
-XRPL Snap does **not** support raw cryptographic message signing. Instead, `signMessage` constructs a **1-drop Payment** transaction (Amount: `"1"`, Fee: `"15"`) with the message encoded as a hex Memo, and asks the Snap to sign it. The signed blob is returned **without submitting** to the network.
+## Options
 
-```ts
-const result = await manager.signMessage({ message: "Verify wallet ownership" });
+These options apply to `createXrplSnapAdapter()`. Pass a configured adapter through the client's `adapters` option when needed.
 
-// result.signatureKind === "signedTx"
-// result.proof   — the signed XRPL Payment transaction hex blob
-// result.txBlob  — same value (alias for proof)
-```
-
-::: warning Server-side verification
-`proof` is a signed XRPL transaction blob, not a compact signature. Server verification must decode the blob and validate the transaction signature against the account's public key. Do not attempt to verify it as a compact ECDSA/Ed25519 signature.
-:::
-
-The adapter tries multiple sign methods in order (`signMessageMethods`) to accommodate different Snap versions. `signMessageDestination` sets the Payment destination; it defaults to the connected account (self-transfer).
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `ethereum` | `Eip1193Provider` | Detected MetaMask provider | Supply a specific Snaps-capable provider |
+| `snapId` | `string` | `"npm:xrpl-snap"` | Snap to install and invoke |
+| `icon` | `string` | Embedded MetaMask icon | Custom icon URL or data URI |
+| `signMessageDestination` | `string` | Connected account | Destination of the sign-only message-proof Payment |
+| `signMessageMethods` | `string[]` | `xrpl_signMessage`, `xrpl_sign`, `xrpl_signTransaction`, `npm:xrpl-snap` | Signing methods tried in order |
+| `providerDiscoveryTimeoutMs` | `number` | `1000` | Time to wait for provider discovery |
+| `snapRequestRetryDelaysMs` | `number[]` | `[120, 350, 800]` | Retry delays for Snap keyring hydration errors only |
 
 ## Transactions
 
-Standard XRPL `txJson` is passed to the Snap via `invokeSnap("xrpl_signAndSubmit", txJson)`:
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#introduction-->
+
+### Payment
+
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-submit-->
+
+Submission uses the Snap's `xrpl_signAndSubmit` method. The adapter does not expose generic `manager.signTransaction()`; message-proof signing does not make transaction sign-only generally available.
+
+### NFT Transactions
+
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#nft-->
+
+The installed Snap must understand the requested transaction type and fields. Do not infer universal amendment or Batch support.
+
+<div id="message-signing"></div>
+
+## Authentication
 
 ```ts
-const result = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "Payment",
-    Account: session.account.address,
-    Destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe",
-    Amount: "1000000",
-  },
-});
-// result.hash   — transaction hash
-// result.signed — boolean
+const proof = await manager.signMessage({ message: "Verify wallet ownership" });
+console.log(proof.signatureKind); // "signedTx"
+console.log(proof.txBlob);
 ```
 
-The Snap handles autofill and submission. All standard XRPL transaction types are supported.
+Kit builds a 1-drop Payment containing the message in a Memo and asks the Snap to sign without submitting. This is a signed transaction proof, not a compact signature. Use [Message Authentication](/docs/auth/introduction) for server verification. Native `signIn()` is not exposed; never broadcast the authentication transaction.
 
-## Session Restore / Mobile Return Recovery
+<div id="session-restore-mobile-return-recovery"></div>
 
-**Session restore**: the adapter checks `window.ethereum` (or the injected provider) for MetaMask availability. If MetaMask is present, it sets `activeAddress` from the stored session. The Snap itself does not provide a passive `isConnected()` check, so the stored address is accepted without re-verification unless `getAddress()` fails.
+## Sessions and Disconnect
 
-There is no mobile return / deeplink recovery — XRPL Snap is a desktop MetaMask extension.
+`manager.autoReconnect()` restores cached account metadata only when a Snaps-capable MetaMask provider is available. This path does not freshly verify the cached account against a passive Snap account query; it must not establish a backend login session.
 
-## Known Limitations
+`manager.disconnect()` clears Kit state, not MetaMask/Snap site permissions.
 
-- No `signTransaction` (sign without submit) via the standard snap API.
-- No `disconnect()` — MetaMask/Snap sessions do not expose a disconnect method to dApps.
-- `signMessage` produces a Payment transaction blob, not a compact ECDSA/Ed25519 signature. If your backend expects a compact signature, use GemWallet, Crossmark, or DropFi instead.
-- Method availability depends on the installed Snap version; the adapter tries a method fallback chain.
+<div id="known-limitations"></div>
+
+## Integration Notes
+
+- Provider discovery considers `window.ethereum.providers` and EIP-6963 announcements before falling back to `window.ethereum`.
+- When another extension overrides MetaMask, pass the intended `ethereum` provider explicitly.
+- Generic submission and message-proof methods depend on the installed Snap. Keep `signMessageMethods` aligned with the Snap you select.
 
 ## Troubleshooting
 
-**MetaMask not detected?** Ensure MetaMask is installed and that `window.ethereum` is present. MetaMask Flask is required for Snap support in older MetaMask versions.
+| Symptom | Action |
+|---|---|
+| MetaMask is not detected | Enable a Snaps-capable MetaMask provider for the site |
+| `wallet_requestSnaps` is unavailable | The active provider/environment does not support Snaps; select the correct provider |
+| Installation is rejected | Retry only after the user chooses to grant Snap permissions |
+| Signing method is missing | Check the installed Snap's supported methods and your `signMessageMethods` |
+| Snap network cannot be verified | Check its network API support and the network selected in the wallet |
 
-**`wallet_requestSnaps` does not exist/is not available?** The active provider is not a MetaMask Snaps-capable provider. This can happen in unsupported MetaMask environments, in-app browsers, or when another extension takes over `window.ethereum`. The adapter checks `wallet_getSnaps` and treats this case as unavailable instead of trying to install the Snap.
+## Related Guides
 
-When multiple browser wallets are installed, the adapter prefers MetaMask from `window.ethereum.providers` or cached EIP-6963 provider announcements before falling back to `window.ethereum`. This avoids using non-Snaps providers when wallets such as OKX take over `window.ethereum`. If another wallet still takes over the provider, pass the MetaMask EIP-1193 provider explicitly through `createXrplSnapAdapter({ ethereum })`.
-
-**Snap installation failed?** The user denied the installation prompt. MetaMask requires explicit permission to install each Snap. Try the connection flow again.
-
-**`signMessage` fails with "method not found"?** Your installed Snap version may not support the default method. Override `signMessageMethods` with methods supported by your Snap version.
-
-**`signAndSubmit` returns null/undefined?** Check that the Snap's `xrpl_signAndSubmit` method is available in the installed version. Verify by calling `wallet_getSnaps` in MetaMask to see installed Snap capabilities.
+- [Adapters Overview](/docs/adapters/overview)
+- [Message Authentication](/docs/auth/introduction)
+- [MetaMask Snaps](https://snaps.metamask.io)

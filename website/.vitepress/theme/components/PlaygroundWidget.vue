@@ -73,7 +73,7 @@ import { loadWalletKit } from '../loadWalletKit'
 
 // ── Config state ─────────────────────────────────────────────
 const config = reactive({
-  layout:      'list',
+  layout:      'auto',
   mode:        'light',
   size:        'default',
   accent:      '#0078ae',   // lightTheme.accent default
@@ -84,8 +84,8 @@ const config = reactive({
 })
 
 const layouts = [
+  { value: 'auto',  label: 'Auto' },
   { value: 'list',  label: 'List' },
-  { value: 'grid',  label: 'Grid' },
   { value: 'card',  label: 'Card' },
   { value: 'icon',  label: 'Icon' },
 ]
@@ -164,6 +164,7 @@ function buildMockManager() {
   const {
     WalletManager,
     createGemWalletAdapter,
+    createJoeyWalletAdapter,
     createCrossmarkAdapter,
     createDropFiAdapter,
     createXrplSnapAdapter,
@@ -177,6 +178,7 @@ function buildMockManager() {
   // Note: Xaman option is `apiKey`, not `clientId`
   try { adapters.push(createXamanAdapter({ apiKey: '1c7dfba7-aadd-4b03-bafb-ca5c8f84bb4f' })) } catch {}
   try { adapters.push(createGemWalletAdapter()) } catch {}
+  try { adapters.push(createJoeyWalletAdapter()) } catch {}
   try { adapters.push(createCrossmarkAdapter()) } catch {}
   try { adapters.push(createDropFiAdapter()) } catch {}
   try { adapters.push(createXrplSnapAdapter()) } catch {}

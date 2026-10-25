@@ -1,175 +1,125 @@
 # Adapters Overview
 
-An adapter is the only layer in XRPL Wallet Kit that talks directly to a wallet or provider. Core and UI consume only the adapter's `metadata`, `capabilities`, manager events, and normalized results — they never touch wallet-specific APIs.
+An adapter connects Kit's standard manager API to a wallet provider. DApps use the same connection and signing methods, while each adapter declares the operations its wallet can actually perform.
 
 ## Built-In Adapters
 
-| Adapter | Package | Wallet Type | Runtime |
+| Adapter | Adapter ID | Package | Wallet type |
 |---|---|---|---|
-| [Xaman](/docs/adapters/xaman) | `@xrpl-wallet-kit/adapter-xaman` | Mobile app (OAuth2 + QR / deep link) | Browser |
-| [GemWallet](/docs/adapters/gemwallet) | `@xrpl-wallet-kit/adapter-gemwallet` | Browser extension | Browser |
-| [Joey Wallet](/docs/adapters/joey-wallet) | `@xrpl-wallet-kit/adapter-joey-wallet` | Browser extension (opt-in) | Browser |
-| [WalletConnect](/docs/adapters/walletconnect) | `@xrpl-wallet-kit/adapter-walletconnect` | Multi-wallet QR protocol | Browser |
-| [Crossmark](/docs/adapters/crossmark) | `@xrpl-wallet-kit/adapter-crossmark` | Browser extension | Browser |
-| [Ledger](/docs/adapters/ledger) | `@xrpl-wallet-kit/adapter-ledger` | Hardware wallet (USB/HID) | Browser |
-| [DropFi](/docs/adapters/dropfi) | `@xrpl-wallet-kit/adapter-dropfi` | Extension + Mobile App | Browser / Mobile |
-| [XRPL Snap](/docs/adapters/xrpl-snap) | `@xrpl-wallet-kit/adapter-xrpl-snap` | MetaMask Snap | Browser |
-| [GhostSig](/docs/adapters/ghostsig) | `@xrpl-wallet-kit/adapter-ghostsig` | Hosted web / popup (opt-in) | Browser |
-| [Xyra](/docs/adapters/xyra) | `@xrpl-wallet-kit/adapter-xyra` | Hosted web / popup (opt-in) | Browser |
+| [Xaman](/docs/adapters/xaman) | `xaman` | `@xrpl-wallet-kit/adapter-xaman` | Mobile app |
+| [GemWallet](/docs/adapters/gemwallet) | `gemwallet` | `@xrpl-wallet-kit/adapter-gemwallet` | Extension |
+| [Joey Wallet](/docs/adapters/joey-wallet) | `joey-wallet` | `@xrpl-wallet-kit/adapter-joey-wallet` | Extension |
+| [Crossmark](/docs/adapters/crossmark) | `crossmark` | `@xrpl-wallet-kit/adapter-crossmark` | Extension |
+| [DropFi](/docs/adapters/dropfi) | `dropfi` | `@xrpl-wallet-kit/adapter-dropfi` | Extension / mobile in-app browser |
+| [GhostSig](/docs/adapters/ghostsig) | `ghostsig` | `@xrpl-wallet-kit/adapter-ghostsig` | Hosted popup |
+| [Xyra](/docs/adapters/xyra) | `xyra` | `@xrpl-wallet-kit/adapter-xyra` | Hosted popup |
+| [Ledger](/docs/adapters/ledger) | `ledger` | `@xrpl-wallet-kit/adapter-ledger` | Hardware device |
+| [XRPL Snap](/docs/adapters/xrpl-snap) | `xrplsnap` | `@xrpl-wallet-kit/adapter-xrpl-snap` | MetaMask Snap |
+| [WalletConnect](/docs/adapters/walletconnect) | `walletconnect` | `@xrpl-wallet-kit/adapter-walletconnect` | Multi-wallet protocol |
+
+Use `joey-wallet` for the native Joey extension. The WalletConnect detail entry `joey` is a different connection path. The client also accepts `xrpl-snap` as an alias; the registered Snap adapter ID is `xrplsnap`.
+
+## Client Registration and Networks
+
+| Adapter | Default XRPL client | Xahau client |
+|---|---|---|
+| Xaman | With `xamanClientId` | With `xamanClientId` |
+| GemWallet | Included | Included |
+| Joey Wallet | Explicit opt-in | Not supported |
+| Crossmark | Included | Not supported |
+| DropFi | Included | Not supported |
+| GhostSig | Explicit opt-in | Not supported |
+| Xyra | Explicit opt-in | Included |
+| Ledger | Included | Explicit opt-in; device app dependent |
+| XRPL Snap | Included | Not supported |
+| WalletConnect | With `walletConnectProjectId` | Not supported |
+
+`wallets: "all"` follows the defaults above; it does not add opt-in Joey Wallet, GhostSig or XRPL Xyra. Select their IDs explicitly. Wallets unsupported on the selected chain are filtered from the modal.
+
+For Xahau presets, protocol setup and the required positive fee ceiling, see [Xahau Configuration](/docs/configuration/xahau). Ledger uses XRP on XRPL and XAH on Xahau; connection alone is not proof of support for every transaction type.
 
 ## Capability Matrix
 
-These capabilities describe XRPL integration. For Xahau support since v0.2.0 in
-Xaman, GemWallet, Xyra and opt-in Ledger, see the
-[Xahau wallet matrix](/docs/configuration/xahau#wallets).
+This matrix describes manager-level XRPL operations, not identical provider APIs or every wallet version.
 
-| Adapter | connect | disconnect | signMessage | signTx | signAndSubmit | signMessage proof type |
-|:---|:---:|:---:|:---:|:---:|:---:|:---|
-| Xaman | ✅ | ✅ | ✅ | — | ✅ | `signedTx` (SignIn blob) |
-| GemWallet | ✅ | — | ✅ | ✅* | ✅ | `signature` (compact) |
-| Joey Wallet | ✅ | ✅ | — | ✅ | ✅ | — |
-| WalletConnect | ✅ | ✅ | ✅ | ✅ | ✅ | `signedTx` (Payment blob) |
-| Crossmark | ✅ | ✅ | ✅ | ✅ | ✅ | `signature` (compact) |
-| Ledger | ✅ | ✅ | — | ✅ | ✅ | — |
-| DropFi | ✅ | ✅ | ✅ | — | ✅ | `signature` (compact) |
-| XRPL Snap | ✅ | — | ✅ | — | ✅ | `signedTx` (Payment blob) |
-| GhostSig | ✅ | ✅ | — | ✅ | ✅ | — |
-| Xyra | ✅ | ✅ | — | ✅ | ✅ | — |
+| Adapter | Sign only | Sign and submit | `signMessage()` proof | Native `signIn()` | Session restore |
+|---|---|---|---|---|---|
+| Xaman | Yes, fallback | Yes | `signedTx` | No | Matching XRPL SDK account |
+| GemWallet | Provider dependent | Yes | `signature` | No | Matching passive XRPL account |
+| Joey Wallet | Yes | Yes | Not exposed | Yes | Existing grant and matching network |
+| Crossmark | Not exposed | Yes | `signature` | No | Matching passive account |
+| DropFi | Not exposed | Yes | `signature` | No | Matching passive account |
+| GhostSig | Yes | Yes | Not exposed | No | Cached account/key, not fresh authentication |
+| Xyra | Yes | Yes | Not exposed | No | Reconnect required |
+| Ledger | Yes | Yes | Not exposed | No | Fresh device connection required |
+| XRPL Snap | Not exposed | Yes | `signedTx` | No | Cached account, not fresh verification |
+| WalletConnect | Wallet dependent | Wallet dependent | `signedTx`, wallet dependent | No | Active generic session; not detail entries |
 
-> **signMessage proof types:** `signature` = compact ECDSA/Ed25519 hex; `signedTx` = signed XRPL transaction blob. Read `signatureKind` on the result to know which you received.
+Xaman routes `manager.signTransaction()` through its declared sign-only transaction mode. GemWallet needs a provider with `signTransaction`; WalletConnect needs a wallet that returns a blob without broadcasting. Ledger and Snap transaction types depend on the installed app/Snap.
 
-\* GemWallet sign-only requires a provider with `signTransaction`. Xaman exposes
-sign-only through the manager's declared transaction-mode fallback rather than
-a separate adapter method. Use `manager.can()` for the active wallet's capabilities.
+All integrations can clear the local Kit session using `manager.disconnect()`. This is different from a provider-level disconnect or revoking site permissions: GemWallet, Crossmark and XRPL Snap do not expose such a provider operation through Kit.
 
-### Joey Wallet Opt-In
-
-[Joey Wallet](/docs/adapters/joey-wallet) connects directly to the browser
-extension, without WalletConnect. Enable `wallets: ["joey-wallet"]` or add
-`createJoeyWalletAdapter()` to your manager. Default lists and
-`wallets: "all"` exclude it. XRPL Mainnet, Testnet and Devnet support connection,
-passive granted-session restore, sign-only and sign-and-submit. The `joey`
-WalletConnect entry is unchanged. Message signing and Xahau are not supported
-by the extension adapter.
-
-Joey Wallet exposes native `signIn()` separately from `signMessage()`. Check
-`manager.can("signIn")` and use the
-[native sign-in flow and server verifier](/docs/auth/native-sign-in); the
-message-signing capability stays disabled.
-
-### GhostSig Opt-In
-
-[GhostSig](/docs/adapters/ghostsig) is published in npm **v0.1.20**, with its
-factory exported by the client and browser bundle. It supports connect,
-disconnect, cached restore, sign-only, sign-and-submit, Payment and NFT offers;
-it does not support `signMessage()`. Enable it explicitly using
-`wallets: ["ghostsig"]` or a named adapter. Default wallet lists and
-`wallets: "all"` do not include it. An omitted `SourceTag` defaults to `0`;
-explicit tags must be uint32. See its guide for popup constraints.
-
-### Xyra Opt-In
-
-[Xyra](/docs/adapters/xyra) supports XRPL mainnet/testnet connection,
-sign-only and sign-and-submit through a hosted popup. Add
-`createXyraAdapter()` explicitly to `adapters`; see its guide for installation
-and examples. It does not expose message signing or passive session restore.
-Use the named adapter package or `wallets: ["xyra"]` with client v0.2.0+.
-The browser bundle also exports `createXyraAdapter()`. XRPL-only default lists
-still require explicit Xyra selection; Xahau configurations include it by default.
-
-## Recommended Setup
-
-Most apps should use `createWalletKit()` or `WalletManager` directly:
+Check the active adapter before offering an action:
 
 ```ts
-import { WalletManager } from "@xrpl-wallet-kit/core";
-import { createXamanAdapter } from "@xrpl-wallet-kit/adapter-xaman";
-import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
-import { createWalletConnectAdapter } from "@xrpl-wallet-kit/adapter-walletconnect";
+const canSignOnly = manager.can("signTransaction");
+const canSignMessage = manager.can("signMessage");
+const canSignIn = manager.can("signIn");
+```
 
-const manager = new WalletManager({
-  autoReconnect: true,
-  adapters: [
-    createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_API_KEY }),
-    createGemWalletAdapter(),
-    createWalletConnectAdapter({
-      projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-    }),
-  ],
+Generic `txJson` signing does not automatically imply Batch, multisigning or support for every amendment. See the adapter's Capabilities and Integration Notes sections.
+
+<div id="recommended-setup"></div>
+
+## Connect
+
+```ts
+import { createWalletKit } from "@xrpl-wallet-kit/client";
+
+const kit = createWalletKit({
   network: "mainnet",
+  wallets: ["xaman", "gemwallet", "joey-wallet"],
+  xamanClientId: "YOUR_XAMAN_CLIENT_ID",
+  ui: { walletList: { layout: "auto" } },
 });
+
+const { account } = await kit.connect("gemwallet");
 ```
 
-Pass adapters in the order you want them listed in the modal.
+Each adapter guide provides equivalent Client and Core examples. Use the Client helper for automatic registration or construct a `WalletManager` with explicit adapters for a selective integration. Connect and sign from user actions so wallet approval UI can open.
 
-## WalletConnect Modes
+## Transactions
 
-WalletConnect supports two factory functions:
+Use `manager.signAndSubmit({ txJson })` or `manager.signTransaction({ txJson })` when supported. Adapter guides use the same Payment and NFT examples, with wallet-specific limits stated beside them. A hash or preliminary `submitted` result is not validated ledger success; observe [WalletManager events](/docs/api/wallet-manager#events) before declaring completion.
 
-```ts
-// Single generic entry — AppKit QR modal, desktop + mobile (default behavior)
-import { createWalletConnectAdapter } from "@xrpl-wallet-kit/adapter-walletconnect";
-const adapter = createWalletConnectAdapter({ projectId: "..." });
+For Xahau payments, URI tokens, Invoke and Hook parameters, use the [Xahau examples](/docs/configuration/xahau) rather than assuming XRPL NFT transaction names apply unchanged.
 
-// Per-wallet entries (Bitget, Girin, Bifrost, Joey, StaticBit …)
-import { createWalletConnectAdapters } from "@xrpl-wallet-kit/adapter-walletconnect";
-const adapters = createWalletConnectAdapters({ projectId: "...", mode: "details" });
-```
+<div id="message-signing-result-shape"></div>
 
-Only `mode: "details"` wallet entries use `modalMode: "mobile-only"` or `"never"` by default, routing desktop users to a custom QR panel. The generic entry and `mode: "default"` always use `modalMode: "always"`.
+## Authentication
 
-## Message Signing Result Shape
+`signMessage()` and native `signIn()` solve different integration cases:
 
-`signMessage()` always returns a `SignMessageResult`. Read `signatureKind` to know what kind of proof you received:
+- **Message authentication:** GemWallet, Crossmark and DropFi return compact `signature` proofs. Xaman, WalletConnect and XRPL Snap return `signedTx` transaction proofs. Inspect `signatureKind` and use the correct [backend verifier](/docs/auth/introduction).
+- **Wallet-native sign-in:** Joey Wallet exposes a separate `signIn()` flow with CAIP-122 or Ledger-backed challenge proofs. Use its [native sign-in verifier](/docs/auth/native-sign-in), not the message-auth verifier.
 
-```ts
-const result = await manager.signMessage({ message: "Sign in to My dApp" });
+A successful connection or restored account is not a server login session. Authentication requires a server-issued challenge, signature/account/context verification and replay protection. Never broadcast a transaction used only as an authentication proof.
 
-if (result.signatureKind === "signature") {
-  // Compact ECDSA/Ed25519 hex — verify with the account's public key
-  console.log(result.proof);       // hex signature
-  console.log(result.publicKey);   // may be provided by the wallet
-} else {
-  // signatureKind === "signedTx"
-  // Signed XRPL transaction blob — verify by decoding the transaction
-  console.log(result.proof);       // hex tx blob
-  console.log(result.txBlob);      // same value
-}
-```
+<div id="session-restore"></div>
+<div id="availability-detection"></div>
 
-Adapters that return `signedTx`: Xaman (uses `SignIn` tx), WalletConnect, XRPL Snap (both use a 1-drop Payment with message in Memos).
+## Sessions and Availability
 
-Adapters that return `signature`: GemWallet, Crossmark, DropFi.
+Call `manager.autoReconnect()` on startup where restore is supported. Read each adapter's Sessions and Disconnect section: passive provider verification, cached metadata and explicit reconnect are different guarantees. Xahau integrations require reconnecting after reload.
 
-## Session Restore
+The Installed badge reports passive availability, not permission to sign or an authenticated account. A provider may appear after initial page load; allow detection to refresh and verify extension site access before reporting it missing.
 
-Restore behavior varies by wallet type. On page reload the manager calls `autoReconnect()` and each adapter decides whether a previously stored session can be verified safely:
+<div id="walletconnect-modes"></div>
 
-```ts
-// On app startup, restore a previous session when the adapter can verify it safely.
-await manager.autoReconnect();
-```
+## Related Guides
 
-Restore behavior varies by wallet type:
-
-These restore paths describe XRPL sessions. For Xahau, reconnect explicitly
-after a reload; see [Xahau connection behavior](/docs/configuration/xahau#connection-and-message-signing).
-
-- **Browser extensions** (GemWallet, Crossmark, Joey Wallet): check whether the extension still reports the same active address — passive, no popup.
-- **DropFi**: same passive check via `isConnected()` — works identically for both the Chrome extension and the mobile in-app browser.
-- **Xaman**: verify via saved SDK state; no new QR or deep link needed.
-- **WalletConnect**: look up the stored session topic in the SignClient store; restore without re-approval if still valid.
-- **Hardware (Ledger)**: USB device must be re-connected and unlocked — no silent restore.
-- **GhostSig**: restore cached account state without a popup; this is not fresh authentication. The next signature verifies the stored address and key.
-- **Xyra**: reconnect from a user action; passive session restore is not available.
-
-## Availability Detection
-
-```ts
-const adapter = createGemWalletAdapter();
-if (!await adapter.isAvailable()) {
-  window.open("https://gemwallet.app", "_blank");
-}
-```
-
-The manager uses this automatically to show **"Installed"** badges in the wallet list.
+- [Installation](/docs/installation)
+- [WalletManager](/docs/api/wallet-manager)
+- [Message Authentication](/docs/auth/introduction)
+- [Wallet-Native Sign In](/docs/auth/native-sign-in)
+- [Xahau Configuration](/docs/configuration/xahau)

@@ -1,163 +1,160 @@
 # Ledger Adapter
 
-The Ledger adapter connects to a hardware Ledger device via WebHID (preferred) or WebUSB. The XRP app on the Ledger handles transaction signing; private keys never leave the device.
+[Ledger](https://www.ledger.com) connects to the hardware device through WebHID or WebUSB. Transaction approval happens on the device; private keys do not leave it.
+
+| Integration | Value |
+|---|---|
+| Package | `@xrpl-wallet-kit/adapter-ledger` |
+| Adapter ID | `ledger` |
+| Wallet type | Hardware wallet |
+| Client registration | Included on XRPL; explicit opt-in on Xahau |
 
 ## Installation
 
-The [Xahau integration](/docs/configuration/xahau#wallets) in v0.2.0+ uses the
-XAH app on the device and requires explicit opt-in. The XRP app instructions
-below apply to XRPL, not Xahau. Transaction support depends on the device app.
-
-```bash
-npm install @xrpl-wallet-kit/adapter-ledger
+```sh
+npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-ledger xrpl@^4
 ```
 
-## Quick Start
+For the Client tab below, install `@xrpl-wallet-kit/client` instead. Use a browser with WebHID or WebUSB, connect/unlock the device and install the chain's device app.
 
-```ts
+<div id="quick-start"></div>
+<div id="connection-flow"></div>
+
+## Connect
+
+::: code-group
+
+```ts [Client]
+import { createWalletKit } from "@xrpl-wallet-kit/client";
+
+const kit = createWalletKit({ network: "mainnet", wallets: ["ledger"] });
+const { manager } = kit;
+const { account } = await kit.connect("ledger");
+```
+
+```ts [Core]
+import { WalletManager } from "@xrpl-wallet-kit/core";
 import { createLedgerAdapter } from "@xrpl-wallet-kit/adapter-ledger";
 
-const adapter = createLedgerAdapter({
-  accountIndex: 0,  // BIP44 account index (default: 0)
+const manager = new WalletManager({
+  network: "mainnet",
+  adapters: [createLedgerAdapter({ accountIndex: 0 })],
 });
+const { account } = await manager.connect("ledger");
 ```
 
-## Options
-
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `accountIndex` | `number` | `0` | BIP44 account index (`44'/144'/<index>'/0/0`) |
-| `derivationPath` | `string` | `44'/144'/0'/0/0` | Full custom derivation path (overrides `accountIndex`) |
-| `preferWebHID` | `boolean` | `true` | Prefer WebHID transport; fall back to WebUSB if unavailable |
-| `timeout` | `number` | `60000` | Timeout in ms for device operations (connect + sign) |
-| `autoOpenApp` | `boolean` | `true` | Request XRP directly on the hardware during explicit connection; available since 0.1.23 |
-| `onDeviceState` | `(state: LedgerDeviceState) => void` | — | Observe `OPENING_APP` / `READY` during the default connection flow |
-| `connectLedger` | `() => Promise<LedgerSession>` | — | Inject a custom connection flow (useful for custom account pickers) |
-| `icon` | `string` | — | Override the default Ledger icon |
-
-## Connection Flow
-
-1. User clicks Ledger in the connect modal
-2. Browser shows a WebHID or WebUSB device picker — user selects their Ledger
-3. With `autoOpenApp`, the adapter checks the active device app and requests XRP; approve opening it on the hardware if prompted
-4. After XRP is ready, the adapter reads its address and public key
-5. The adapter returns the account address and public key
-
-::: warning Requirements
-- Ledger device must be **connected** via USB
-- Ledger must be **unlocked** (PIN entered)
-- **XRP app** must be installed; open it manually when automatic launch is unsupported
-- Browser must support WebHID (`navigator.hid`) or WebUSB (`navigator.usb`)
 :::
 
-Automatic opening targets the **Ledger hardware**, not Ledger Live desktop.
-Set `autoOpenApp: false` to keep manual app selection. Already-open XRP is not
-restarted. Switching apps can reset USB: only the selected device handle is
-reopened. If the browser requires permission again, select the device again after
-opening XRP manually. Custom `connectLedger` integrations remain responsible for
-their own app-opening behavior. Signing logic is unchanged; no transaction is
-signed or submitted by the app-opening commands.
+Start connection from a user action and select the device in the browser picker. With `autoOpenApp`, Kit requests the chain's app on the hardware and reads the address/public key once it is ready. It does not launch Ledger Live desktop or approve transactions for the user.
+
+## Networks
+
+XRPL uses the XRP device app. Xahau uses the XAH device app and is opt-in: configure `network: "xahau-mainnet"` or `"xahau-testnet"`, include `"ledger"` explicitly in `wallets`, and set a positive `preflight.maxFeeDrops` with the full client. Core/selective integrations must register the protocol and chain filter. See [Xahau Configuration](/docs/configuration/xahau).
+
+Connection success does not establish support for every transaction type or field. Keep the device app up to date and do not enable blind signing to bypass unsupported fields.
 
 ## Capabilities
 
-| Capability | Supported |
-|---|:---:|
-| connect | ✅ |
-| disconnect | ✅ |
-| signTransaction | ✅ |
-| signAndSubmit | ✅ |
-| sessionRestore | ❌ |
-| signMessage | ❌ |
-| payments | ❌ (standard txJson works) |
-| nftOffers | ❌ (standard txJson works) |
+Operations below depend on the connected device app supporting the transaction being signed.
 
-## Message Signing
+| Operation | Support |
+|---|---|
+| Connect | Yes |
+| Disconnect | Yes; closes device/session resources |
+| Session restore | No; fresh device connection required |
+| `signTransaction()` | Yes |
+| `signAndSubmit()` | Yes |
+| `signMessage()` | Not exposed |
+| `signIn()` | Not exposed by the direct Ledger adapter |
+| `switchNetwork()` | Not exposed; reconnect for the selected network |
+| Payment / NFT transactions | Generic `txJson`; device app/version dependent |
+| QR / deep link | No |
 
-Ledger **does not support** arbitrary message signing. There is no `signMessage` method. If your flow requires message signing, use a software wallet such as GemWallet or Crossmark.
+## Options
+
+These options apply to `createLedgerAdapter()`. Pass a configured adapter through the client's `adapters` option for custom device/account handling.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `accountIndex` | `number` | `0` | Account in `44'/144'/<index>'/0/0` |
+| `derivationPath` | `string` | `44'/144'/0'/0/0` | Full path; overrides `accountIndex` |
+| `preferWebHID` | `boolean` | `true` | Prefer WebHID, fall back to WebUSB |
+| `timeout` | `number` | `60000` | Device operation timeout in milliseconds |
+| `autoOpenApp` | `boolean` | `true` | Request the selected chain's app on the device |
+| `deviceApp` | `"XRP"` or `"XAH"` | Selected chain's app | Explicit device app override; must be compatible with the selected chain |
+| `onDeviceState` | `(state: LedgerDeviceState) => void` | Not set | Observe device states such as `OPENING_APP` and `READY` |
+| `connectLedger` | `() => Promise<LedgerSession>` | Built-in connection | Custom device/account connection flow |
+| `supportedChains` | `WalletChainFilter` | XRPL integration | Restrict chains in a protocol-aware integration |
+| `icon` | `string` | Embedded Ledger icon | Custom icon URL or data URI |
 
 ## Transactions
 
-The adapter autofills the transaction via an `xrpl.js` client connection, then sends it to the Ledger for signing. The user must confirm the transaction on the device screen.
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#introduction-->
 
-The default signing flow verifies the device signature
-locally before returning or submitting it. It preserves RPC errors, rejects
-already-signed input, and stops submission if the Ledger session changes.
-Single-sign requests set `tfFullyCanonicalSig` for compatibility with XRP app
-2.3.2 while preserving transaction-specific flags. For NFT transactions, use an
-up-to-date XRP app; the transaction types supported depend on that app version.
-Generic signing does not imply Batch support; see the
-[Batch compatibility requirements](/docs/configuration/batch#wallet-compatibility).
+### Payment
 
-```ts
-// Sign-only (no broadcast)
-const signed = await manager.signTransaction({
-  txJson: {
-    TransactionType: "Payment",
-    Account: session.account.address,
-    Destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe",
-    Amount: "1000000",
-  },
-});
-// signed.txBlob — hex blob ready for submission
-// signed.signed — boolean
+::: code-group
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-submit-->
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-sign-only-->
+:::
 
-// Sign + submit
-const result = await manager.signAndSubmit({
-  txJson: { TransactionType: "Payment", ... },
-});
-// result.hash   — transaction hash
-// result.status — e.g. "tesSUCCESS"
-```
+The default path fills required transaction fields using the selected network, requests device approval and verifies the returned signature. XRPL single-sign requests include the canonical-signature flag for compatibility with the XRP app.
 
-The adapter requires a network URL (`options.network.rpcUrl`) to autofill and submit. It connects and disconnects from the XRPL network per transaction.
+### NFT Transactions
 
-### Multisign
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#nft-->
 
-For multisign sign-only requests, set `SigningPubKey: ""` and provide the fully
-prepared source `Account`, `Sequence`/ticket fields, `Fee`, `LastLedgerSequence`
-and network-specific fields. Omit `Signers` and `TxnSignature`. The default
-multisign path signs these exact fields without autofill or an RPC connection.
-Changing them requires collecting all signatures again. Custom sessions must
-implement `signMultisignTransaction`. Multisign submission through the adapter
-remains unsupported: use [core multisign coordination](../configuration/multisign).
+Use a current device app that can display the requested NFT transaction. For sign-only NFT requests, pass the same `txJson` to `manager.signTransaction()`.
+
+<div id="message-signing"></div>
+
+## Authentication
+
+The direct Ledger adapter does not expose arbitrary `signMessage()` or native `signIn()`. Joey Wallet's Ledger-backed sign-in challenge belongs to the [Joey Wallet adapter](/docs/adapters/joey-wallet), not this adapter. Do not submit a Payment as a substitute login proof.
+
+<div id="session-restore-mobile-return-recovery"></div>
+
+## Sessions and Disconnect
+
+Passive restore returns no session. After reload, reconnect and select the device again. `manager.disconnect()` closes the active transport and clears local session state.
+
+<div id="known-limitations"></div>
+
+## Integration Notes
+
+### Device App Selection
+
+`autoOpenApp: false` keeps manual app selection. If switching apps resets USB or requires browser permission again, open the requested XRP/XAH app on the hardware and select the device again. A custom `connectLedger` implementation owns its device-opening behavior. Only one transport should use the device at a time.
 
 ### Multiple Accounts
-
-Use `getAccounts()` to browse multiple Ledger accounts before connecting:
 
 ```ts
 import { LedgerAdapter } from "@xrpl-wallet-kit/adapter-ledger";
 
 const ledger = new LedgerAdapter();
-const accounts = await ledger.getAccounts(5); // first 5 accounts
-// [{ address, publicKey, path, index }, ...]
-
-// Connect to a specific account
-const adapter = createLedgerAdapter({ accountIndex: 2 });
+const accounts = await ledger.getAccounts(5);
+console.log(accounts); // address, publicKey, path, index
 ```
 
-## Session Restore / Mobile Return Recovery
+Use `accountIndex` or `derivationPath` when creating the adapter for the selected account.
 
-Session restore always returns `null`. Hardware wallets require a fresh device prompt — there is no safe passive state to verify a stored session. On page reload, the user must reconnect by selecting their Ledger device again.
+### Multisigning
 
-## Known Limitations
-
-- No `signMessage` — Ledger XRP app does not support arbitrary message signing.
-- No session restore — requires a fresh device connection every page load.
-- A live XRPL network connection is required for autofill (`rpcUrl` must be set on the connected `XrplNetwork`).
-- Browser must support WebHID or WebUSB — Firefox and Safari have partial or no support.
-- Only one Ledger transport can be open at a time; concurrent adapter instances may conflict.
+Sign-only multisign requests require a fully prepared source `Account`, `Sequence`/ticket, `Fee`, `LastLedgerSequence` and network fields, with `SigningPubKey: ""` and no `Signers`/`TxnSignature`. The default multisign path preserves those exact fields without autofill. Custom sessions must implement `signMultisignTransaction`. Use [Core Multisign Coordination](/docs/configuration/multisign) for submission; the adapter does not expose multisign submission. Generic signing does not imply [Batch compatibility](/docs/configuration/batch#wallet-compatibility).
 
 ## Troubleshooting
 
-**"No device found" / "Cannot open device"?** The USB cable is not connected or the device is locked. Connect the Ledger and enter the PIN, then retry.
+| Symptom | Action |
+|---|---|
+| Device is not detected | Check USB connection, unlock the device and use a browser with WebHID/WebUSB |
+| Requested app does not open | Open XRP for XRPL or XAH for Xahau on the device, then reconnect |
+| Device is busy | Close other applications or transports using it |
+| Transaction fields/type are unsupported | Update the device app and confirm support; do not bypass with blind signing |
+| Device approval times out | Approve on the device or configure a suitable `timeout` |
 
-**"Please open the XRP app"?** The Ledger is unlocked but the XRP app is not running. Navigate to the XRP app on the device and open it.
+## Related Guides
 
-**"Ledger is locked"?** Enter your PIN on the device to unlock it, then retry.
-
-**"Request timed out"?** The default timeout is 60 seconds. If the user takes longer to confirm on device, increase `timeout` in options.
-
-**User rejected the transaction?** The adapter throws a `WalletError` with code `SIGN_REJECTED` when the user presses the Reject button on the Ledger.
-
-**Browser not supported?** Chrome and Edge support WebHID/WebUSB. Firefox has limited WebUSB support. Safari does not support either transport.
+- [Adapters Overview](/docs/adapters/overview)
+- [Xahau Configuration](/docs/configuration/xahau)
+- [Multisigning](/docs/configuration/multisign)
+- [Batch](/docs/configuration/batch)

@@ -1,136 +1,142 @@
 # GemWallet Adapter
 
-[GemWallet](https://gemwallet.app) is a browser extension wallet for XRPL. It injects a `window.gemWallet` API into the page. No credentials or API keys required.
+[GemWallet](https://gemwallet.app) connects through its browser extension API. No API key or WalletConnect project ID is required.
+
+| Integration | Value |
+|---|---|
+| Package | `@xrpl-wallet-kit/adapter-gemwallet` |
+| Adapter ID | `gemwallet` |
+| Wallet type | Browser extension |
+| Client registration | Included in default wallet lists |
 
 ## Installation
 
-For Xahau mainnet/testnet configuration and transaction examples in v0.2.0+,
-see the [Xahau guide](/docs/configuration/xahau). The examples below target XRPL.
-
-```bash
-npm install @xrpl-wallet-kit/adapter-gemwallet
+```sh
+npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-gemwallet xrpl@^4
 ```
 
-## Quick Start
+For the Client tab below, install `@xrpl-wallet-kit/client` instead. Enable the GemWallet extension for the dApp's origin.
 
-```ts
+<div id="quick-start"></div>
+<div id="connection-flow"></div>
+
+## Connect
+
+::: code-group
+
+```ts [Client]
+import { createWalletKit } from "@xrpl-wallet-kit/client";
+
+const kit = createWalletKit({ network: "mainnet", wallets: ["gemwallet"] });
+const { manager } = kit;
+const { account } = await kit.connect("gemwallet");
+```
+
+```ts [Core]
+import { WalletManager } from "@xrpl-wallet-kit/core";
 import { createGemWalletAdapter } from "@xrpl-wallet-kit/adapter-gemwallet";
 
-const adapter = createGemWalletAdapter();
+const manager = new WalletManager({
+  network: "mainnet",
+  adapters: [createGemWalletAdapter()],
+});
+const { account } = await manager.connect("gemwallet");
 ```
 
-## Options
+:::
 
-| Option | Type | Description |
-|---|---|---|
-| `provider` | `GemWalletProvider` | Override the injected provider (useful for testing) |
+Start connection from a user action and approve access in the extension.
 
-## Connection Flow
+## Networks
 
-1. User clicks GemWallet in the connect modal (shows "Installed" badge when detected)
-2. GemWallet opens a browser popup asking for permission
-3. On approval, the adapter returns the XRPL account address
-
-The adapter waits up to 2.5 seconds for the extension to hydrate before reporting `isAvailable()`.
+Supports XRPL and Xahau; select the matching chain and network in GemWallet. For Xahau, the full client accepts `network: "xahau-mainnet"` or `"xahau-testnet"` with a positive `preflight.maxFeeDrops`. Core/selective integrations must configure the protocol and chain filter explicitly. See [Xahau Configuration](/docs/configuration/xahau).
 
 ## Capabilities
 
-| Capability | Supported |
-|---|:---:|
-| connect | ✅ |
-| signMessage | ✅ |
-| signAndSubmit | ✅ |
-| nftOffers | ✅ |
-| payments | ✅ |
-| sessionRestore | ✅ |
-| disconnect | ❌ |
-| signTransaction | ✅ when exposed by the provider |
+This table describes manager-level operations on XRPL. Xahau signing uses the chain-aware protocol path.
 
-## Message Signing
+| Operation | Support |
+|---|---|
+| Connect | Yes |
+| Disconnect | Local Kit cleanup; no provider-level disconnect |
+| Session restore | Yes, with matching passive XRPL account; reconnect on Xahau |
+| `signTransaction()` | Yes, if the provider exposes `signTransaction` |
+| `signAndSubmit()` | Yes |
+| `signMessage()` | Yes; `signature` proof |
+| `signIn()` | Not exposed |
+| `switchNetwork()` | Not exposed; select in GemWallet and reconnect |
+| Payment / NFT transactions | Yes, through `txJson` |
+| QR / deep link | No |
 
-GemWallet returns a **compact ECDSA/Ed25519 message signature** — the proof a server can verify directly against the account's public key.
+## Options
 
-```ts
-const result = await manager.signMessage({ message: "Verify wallet ownership" });
+These options apply to `createGemWalletAdapter()`. For custom adapter options with the client, pass a configured adapter through `adapters`.
 
-// result.signatureKind === "signature"
-// result.proof      — same as result.signature
-// result.signature  — compact hex signature
-// result.publicKey  — account public key (if GemWallet exposes it)
-```
-
-Use GemWallet (or Crossmark/DropFi) when your backend expects a standard compact signature rather than an XRPL transaction blob.
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `provider` | `GemWalletProvider` | Detected provider | Supply a specific extension provider |
+| `supportedChains` | `WalletChainFilter` | XRPL integration | Restrict chains in a protocol-aware integration |
+| `xrplMaxFeeDrops` | `string` | `"1000000"` | Fee ceiling for XRPL sign-only; a request ceiling can lower it |
+| `maxLastLedgerSequenceExtension` | `number` | `50` | Allowed expiry extension in the external-protocol path |
 
 ## Transactions
 
-GemWallet exposes separate provider APIs per transaction type. The adapter maps `TransactionType` automatically:
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#introduction-->
 
-| XRPL TransactionType | GemWallet method | Field notes |
-|---|---|---|
-| `Payment` | `sendPayment()` | PascalCase → camelCase: `Amount`→`amount`, `Destination`→`destination`, `DestinationTag`→`destinationTag` |
-| `TrustSet` | `setTrustline()` | `LimitAmount`→`limitAmount`, `QualityIn`→`qualityIn`, `QualityOut`→`qualityOut` |
-| `NFTokenCreateOffer` | `createNFTOffer()` | raw `txJson` passed through |
-| `NFTokenAcceptOffer` | `acceptNFTOffer()` | raw `txJson` passed through |
-| `NFTokenCancelOffer` | `cancelNFTOffer()` | raw `txJson` passed through |
-| `NFTokenBurn` | `burnNFT()` | `NFTokenID`→`NFTokenID`, `Owner`→`owner` |
-| all others | `signAndSubmit()` | raw `txJson` passed through |
+### Payment
 
-```ts
-// Payment — fields auto-mapped for you
-const tx = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "Payment",
-    Account: session.account.address,
-    Destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe",
-    Amount: "1000000",
-  },
-});
-console.log(tx.hash);
+::: code-group
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-submit-->
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-sign-only-->
+:::
 
-// Override method detection explicitly
-await manager.signAndSubmit({
-  txJson: { TransactionType: "TrustSet", ... },
-  methodHint: "setTrustline",
-});
-```
+On XRPL, submission maps `Payment` to `sendPayment()` and `TrustSet` to `setTrustline()`, including camelCase field conversion. NFT offers map to their provider methods; other transactions use generic signing. Set `methodHint` only when you need to override detection. On Xahau, Kit prepares and verifies the generic signed transaction before RPC submission.
 
-For sign-only requests, use the generic transaction API:
+### NFT Transactions
+
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#nft-->
+
+For sign-only NFT requests, pass the same `txJson` to `manager.signTransaction()` if `manager.can("signTransaction")` is true.
+
+<div id="message-signing"></div>
+
+## Authentication
 
 ```ts
-const signed = await manager.signTransaction({
-  txJson: {
-    TransactionType: "Payment",
-    Account: session.account.address,
-    Destination: "<recipient_address>",
-    Amount: "1000000", // 1 XRP
-  },
-});
-console.log(signed.txBlob); // Not broadcast
+const proof = await manager.signMessage({ message: "Verify wallet ownership" });
+console.log(proof.signatureKind); // "signature"
+console.log(proof.signature, proof.publicKey);
 ```
 
-Check `manager.can("signTransaction")` when using a custom or older provider.
-On XRPL, normal sign-and-submit requests use GemWallet's transaction methods.
-On Xahau, the kit prepares and verifies the generic transaction before RPC
-submission; use the [Xahau configuration and examples](/docs/configuration/xahau).
+GemWallet returns a compact message signature. Use a server-issued challenge and backend verification for login; see [Message Authentication](/docs/auth/introduction). Native `signIn()` is not exposed.
 
-## Session Restore / Mobile Return Recovery
+<div id="session-restore-mobile-return-recovery"></div>
 
-**XRPL session restore**: on page reload, the adapter calls `getAddress()` via the GemWallet provider. If the returned address matches the stored session address, the session is silently restored. Xahau requires an explicit reconnect after reload.
+## Sessions and Disconnect
 
-There is no mobile return / deeplink recovery — GemWallet is a desktop browser extension only.
+`manager.autoReconnect()` checks that GemWallet still reports the stored XRPL account before restoring it. Xahau requires an explicit reconnect after reload.
 
-## Known Limitations
+`manager.disconnect()` clears Kit's session. It does not revoke the extension's site permissions.
 
-- No `disconnect()` — GemWallet does not expose a provider-level disconnect method. The session is cleared from the kit's internal storage only.
-- Sign-only requires the provider's `signTransaction` method; unsupported providers return `UNSUPPORTED_METHOD`.
-- Payment and TrustSet fields are automatically converted to GemWallet's camelCase format; other transaction types are passed as-is.
+<div id="known-limitations"></div>
+
+## Integration Notes
+
+- Availability and the Installed badge do not mean the wallet is connected. Allow time for extension injection and grant site access.
+- Sign-only requires a provider version with `signTransaction`; check `manager.can("signTransaction")` when supplying a custom provider.
+- Xahau fees require a positive request or global ceiling; do not treat the XRPL adapter ceiling as a Xahau fee policy.
 
 ## Troubleshooting
 
-**Extension not detected?** Verify GemWallet is installed and the extension is enabled for the current site (check browser extension permissions / site access).
+| Symptom | Action |
+|---|---|
+| Extension or Installed badge is missing | Enable GemWallet for this site and let detection refresh |
+| Network mismatch | Select the requested chain/network in the extension and reconnect |
+| Sign-only is unavailable | Update the extension or check your custom provider's methods |
+| Wrong specialized transaction method | Use standard `txJson`, or specify an appropriate `methodHint` |
 
-**"Installed" badge not showing?** Allow the extension access to the current site. Keep the wallet list open briefly while detection refreshes; the badge indicates availability, not a connected session.
+## Related Guides
 
-**User rejected the request?** The adapter throws a `WalletError` with code `CONNECTION_REJECTED`. The connect modal shows a user-friendly error and a retry option.
-
-**Transaction failed to infer method?** Pass `methodHint` explicitly if the auto-detection picks the wrong GemWallet API for your transaction type.
+- [Adapters Overview](/docs/adapters/overview)
+- [Xahau Configuration](/docs/configuration/xahau)
+- [Message Authentication](/docs/auth/introduction)

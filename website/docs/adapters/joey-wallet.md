@@ -1,7 +1,13 @@
-# Joey Wallet
+# Joey Wallet Adapter
 
-Connect to the Joey Wallet browser extension through its official SDK. This
-adapter uses `joey-wallet`; `joey` remains the separate WalletConnect wallet.
+[Joey Wallet](https://joeywallet.xyz/) connects directly to the browser extension through its official SDK. This adapter uses `joey-wallet`; the separate `joey` entry connects through WalletConnect.
+
+| Integration | Value |
+|---|---|
+| Package | `@xrpl-wallet-kit/adapter-joey-wallet` |
+| Adapter ID | `joey-wallet` |
+| Wallet type | Browser extension |
+| Client registration | Opt-in; excluded from default lists and `wallets: "all"` |
 
 ## Installation
 
@@ -9,160 +15,140 @@ adapter uses `joey-wallet`; `joey` remains the separate WalletConnect wallet.
 npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-joey-wallet xrpl@^4
 ```
 
+For the Client tab below, install `@xrpl-wallet-kit/client` instead. Enable the Joey Wallet extension for the dApp.
+
 ## Connect
 
-```ts
+::: code-group
+
+```ts [Client]
+import { createWalletKit } from "@xrpl-wallet-kit/client";
+
+const kit = createWalletKit({ network: "mainnet", wallets: ["joey-wallet"] });
+const { manager } = kit;
+const { account } = await kit.connect("joey-wallet");
+```
+
+```ts [Core]
 import { WalletManager } from "@xrpl-wallet-kit/core";
 import { createJoeyWalletAdapter } from "@xrpl-wallet-kit/adapter-joey-wallet";
 
 const manager = new WalletManager({
   network: "mainnet",
-  autoReconnect: true,
   adapters: [createJoeyWalletAdapter({
     onDisconnected: () => manager.emitDisconnected("joey-wallet"),
   })],
 });
-
-await manager.connect("joey-wallet");
+const { account } = await manager.connect("joey-wallet");
 ```
 
-Select the same XRPL network in Joey and the dApp. Mainnet, Testnet and Devnet
-are supported; Xahau is not. Restoring a session reads already granted accounts
-and the current network without opening an approval popup. An account/network
-change requires reconnecting.
+:::
 
-### All-in-One Client
+Call connect from a user action. The client wires disconnection events automatically; core integrations should provide `onDisconnected` so revoked access or account/network changes invalidate the manager session.
 
-```ts
-import { createWalletKit } from "@xrpl-wallet-kit/client";
+## Networks
 
-const kit = createWalletKit({
-  network: "mainnet",
-  wallets: ["joey-wallet"],
-});
+Supports the standard XRPL Mainnet, Testnet and Devnet presets (`mainnet`, `testnet`, `devnet`). Select the same network in Joey and the dApp. Custom RPC/network definitions and Xahau are not supported by this adapter.
 
-await kit.connect("joey-wallet");
-```
+## Capabilities
 
-Joey Wallet is opt-in: default wallet lists and `wallets: "all"` do not
-include it. Use `joey` instead when connecting the mobile wallet through
-[WalletConnect](/docs/adapters/walletconnect).
+This table describes the native extension adapter, not the Joey WalletConnect entry.
 
-## Payment
+| Operation | Support |
+|---|---|
+| Connect | Yes |
+| Disconnect | Yes |
+| Session restore | Yes, for an existing grant on the same network |
+| `signTransaction()` | Yes |
+| `signAndSubmit()` | Yes |
+| `signMessage()` | Not exposed |
+| `signIn()` | Yes; CAIP-122 or Ledger transaction challenge |
+| `switchNetwork()` | Not exposed; select in Joey and reconnect |
+| Payment / NFT transactions | Through generic `txJson` signing |
+| QR / deep link | No; use the WalletConnect entry for that flow |
 
-```ts
-const payment = {
-  TransactionType: "Payment" as const,
-  Destination: recipientAddress,
-  Amount: "10000",
-};
+## Options
 
-// Sign without broadcasting.
-const signed = await manager.signTransaction({ txJson: payment, maxFeeDrops: "50000" });
+These options apply to `createJoeyWalletAdapter()`. Pass a configured adapter through the client's `adapters` option when custom options are needed.
 
-// Ask Joey to sign and submit a separate transaction.
-const submitted = await manager.signAndSubmit({ txJson: payment, maxFeeDrops: "50000" });
-```
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `provider` | `JoeyInjectedProvider` | Detected Joey provider | Supply a specific provider |
+| `maxFeeDrops` | `string` | `"1000000"` | Adapter fee ceiling; a request can lower it |
+| `onDisconnected` | `() => void` | Not set | Invalidate the manager session after access, account or network changes |
 
-The adapter checks the returned signed blob, account, signature, transaction
-hash, requested fields and fee ceiling. A `submitted` result is not a validated
-ledger receipt; wait for confirmation before treating it as complete.
+## Transactions
 
-## NFT Offers
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#introduction-->
 
-Pass XRPL transaction JSON through the same manager API:
+### Payment
 
-```ts
-// Create a sell offer. Amount is in drops.
-await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "NFTokenCreateOffer",
-    NFTokenID: tokenId,
-    Amount: "1000000",
-    Flags: 1,
-  },
-  maxFeeDrops: "50000",
-});
+::: code-group
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-submit-->
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-sign-only-->
+:::
 
-// Accept an existing sell offer.
-await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "NFTokenAcceptOffer",
-    NFTokenSellOffer: offerId,
-  },
-  maxFeeDrops: "50000",
-});
+The adapter verifies the returned blob, signer, transaction hash, requested fields and fee ceiling.
 
-// Cancel offers owned by the connected account.
-await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "NFTokenCancelOffer",
-    NFTokenOffers: [offerId],
-  },
-  maxFeeDrops: "50000",
-});
-```
+<div id="nft-offers"></div>
 
-Replace `tokenId` and `offerId` with the corresponding ledger object IDs.
-Use `manager.signTransaction()` instead to sign without submission.
+### NFT Transactions
 
-## Native Sign In
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#nft-->
+
+For sign-only NFT requests, pass the same `txJson` to `manager.signTransaction()`. Generic signing does not enable Batch, bulk signing or multisigning in this adapter.
+
+<div id="native-sign-in"></div>
+
+## Authentication
+
+Obtain `nonceFromServer` from your backend, then use the separate native `signIn()` API, not `signMessage()`:
 
 ```ts
-// Obtain this nonce from your backend; never generate login challenges only in the browser.
 const proof = await manager.signIn({
   nonce: nonceFromServer,
   statement: "Sign in to My dApp",
 });
-// Send proof to your backend and verify before establishing a login session.
+// Send proof to your backend before establishing a login session.
 ```
 
-Joey Wallet returns a CAIP-122 message signature for software accounts, or a
-signed transaction challenge for Ledger accounts. Kit preserves the actual
-proof type. Use `verifyWalletSignIn()` on your backend, not the existing
-message-auth verifier. See [Wallet-Native Sign In](/docs/auth/native-sign-in)
-for nonce handling, server verification and choosing between `signIn()` and
-`signMessage()`. This adapter still does not support arbitrary `signMessage()`.
+Joey returns a CAIP-122 message signature for software accounts or a transaction challenge for Ledger accounts. Verify the actual proof with `verifyWalletSignIn()` and atomically consume the nonce on the server. See [Wallet-Native Sign In](/docs/auth/native-sign-in). Arbitrary `signMessage()` remains unsupported; do not substitute one API for the other.
 
-## Capabilities
+## Sessions and Disconnect
 
-| Feature | Support |
-|---|---|
-| Connect / disconnect | Yes |
-| Passive session restore | Yes, for an existing grant on the same network |
-| Sign transaction without submitting | Yes |
-| Sign and submit | Yes |
-| Native sign-in | Yes, CAIP-122 or Ledger challenge |
-| Networks | XRPL Mainnet, Testnet, Devnet |
-| Switch network | Select the network in Joey, then reconnect |
-| Message signing, Batch, bulk signing, multisigning | Not exposed |
-| Xahau | Not supported |
+`manager.autoReconnect()` reads already granted accounts and the current network without an approval popup. It restores only a matching account/network. Account changes, network changes and revoked access require reconnecting.
 
-## Options
+`manager.disconnect()` clears the Kit session and calls Joey's disconnect API.
 
-| Option | Purpose |
-|---|---|
-| `maxFeeDrops` | Adapter fee ceiling; defaults to `"1000000"`. A request may lower it. |
-| `provider` | Override the injected Joey provider. |
-| `onDisconnected` | Notify the manager when access is revoked or the account/network changes. |
+## Integration Notes
 
-Message signing, Batch, bulk signing and multisigning are not exposed by this
-adapter. Joey's `signIn` API is not a generic `signMessage` replacement.
+### Wallet Standard Discovery
 
-## Wallet Standard Discovery
-
-When combining native adapters and Wallet Standard discovery, use discovery's
-`resolveId` filter to exclude Joey from discovery and avoid duplicate entries:
+If you also enable Wallet Standard discovery, exclude the native Joey entry from discovery to avoid duplicate listings:
 
 ```ts
 import { startWalletStandardDiscovery } from "@xrpl-wallet-kit/core";
 
 startWalletStandardDiscovery(manager, {
-  resolveId: wallet => wallet.name === "Joey" ? null : `standard-${wallet.name.toLowerCase().replace(/[^a-z0-9-]/g, "-")}`,
+  resolveId: wallet => wallet.name === "Joey" ? null
+    : `standard-${wallet.name.toLowerCase().replace(/[^a-z0-9-]/g, "-")}`,
 });
 ```
 
-This display-name filter only controls listing; it does not authenticate wallets
-or permit restoring discovered sessions.
+This display-name filter controls listing only; it is not wallet authentication. Use `joey-wallet` for the extension and `joey` for [WalletConnect](/docs/adapters/walletconnect).
 
-[Joey browser extension documentation](https://joeywallet.xyz/docs/browser-extension)
+## Troubleshooting
+
+| Symptom | Action |
+|---|---|
+| Joey is not in the wallet list | Add `"joey-wallet"` explicitly to `wallets` |
+| Network mismatch | Select the matching standard XRPL network in Joey and reconnect |
+| Two Joey entries appear | Distinguish native/WalletConnect entries or filter Wallet Standard discovery |
+| Message signing is unavailable | Use native `signIn()` for login; arbitrary `signMessage()` is not exposed |
+
+## Related Guides
+
+- [Adapters Overview](/docs/adapters/overview)
+- [Wallet-Native Sign In](/docs/auth/native-sign-in)
+- [WalletConnect](/docs/adapters/walletconnect)
+- [Joey Extension API](https://joeywallet.xyz/docs/browser-extension)

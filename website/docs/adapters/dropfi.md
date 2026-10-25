@@ -1,79 +1,126 @@
 # DropFi Adapter
 
-[DropFi](https://dropfi.app) is a non-custodial XRPL wallet available as a **Chrome extension** and a **mobile app** (iOS & Android). Both platforms inject the wallet provider at `window.xrpl`. The adapter detects whichever platform is active — browser extension or mobile WebView — using the same `isDropFi` feature guard.
+[DropFi](https://dropfi.app) connects through its browser extension or the injected provider inside the DropFi mobile app's browser. Both use the same adapter.
 
-XRPL Wallet Kit also checks `window.__xwk_dropfi` and `window.dropfi` first so host apps can preserve the DropFi provider before loading `xrpl.js` or other injected wallets.
+| Integration | Value |
+|---|---|
+| Package | `@xrpl-wallet-kit/adapter-dropfi` |
+| Adapter ID | `dropfi` |
+| Wallet type | Browser extension / mobile in-app browser |
+| Client registration | Included in default XRPL wallet lists |
 
 ## Installation
 
-```bash
-npm install @xrpl-wallet-kit/adapter-dropfi
+```sh
+npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-dropfi xrpl@^4
 ```
 
-## Quick Start
+For the Client tab below, install `@xrpl-wallet-kit/client` instead. Mobile users must open the dApp inside DropFi's built-in browser.
 
-```ts
+<div id="quick-start"></div>
+<div id="connection-flow"></div>
+<div id="supported-platforms"></div>
+
+## Connect
+
+::: code-group
+
+```ts [Client]
+import { createWalletKit } from "@xrpl-wallet-kit/client";
+
+const kit = createWalletKit({ network: "mainnet", wallets: ["dropfi"] });
+const { manager } = kit;
+const { account } = await kit.connect("dropfi");
+```
+
+```ts [Core]
+import { WalletManager } from "@xrpl-wallet-kit/core";
 import { createDropFiAdapter } from "@xrpl-wallet-kit/adapter-dropfi";
 
-const adapter = createDropFiAdapter();
+const manager = new WalletManager({
+  network: "mainnet",
+  adapters: [createDropFiAdapter()],
+});
+const { account } = await manager.connect("dropfi");
 ```
 
-## Options
-
-| Option | Type | Description |
-|---|---|---|
-| `provider` | `DropFiProvider` | Override the injected provider (useful for testing) |
-| `icon` | `string` | Override the default DropFi icon (data-URI or URL) |
-
-## Supported Platforms
-
-| Platform | How it works |
-|---|---|
-| **Chrome Extension** | Injects `window.xrpl` via content script on page load |
-| **Mobile App (iOS / Android)** | Injects `window.xrpl` via React Native WebView when the DApp is opened inside the DropFi in-app browser |
-
-::: tip Mobile users
-Users on mobile open your DApp URL inside DropFi's built-in browser. The app injects `window.xrpl` into the WebView automatically — no QR code, no deeplink required.
 :::
 
-## Connection Flow
+Start connect from a user action. The adapter initializes the provider and opens DropFi's approval UI: an extension popup on desktop or an approval sheet in the mobile app.
 
-1. User clicks DropFi in the connect modal
-2. The adapter resolves the DropFi provider from the injection point (see Provider Detection below)
-3. `provider.initialize()` is called to hydrate the provider state
-4. `provider.connect()` opens the DropFi approval UI (extension popup on desktop; native approval sheet on mobile)
-5. On approval, the adapter returns the XRPL account address
+## Networks
 
-## Provider Detection
-
-The adapter resolves the DropFi provider in this priority order:
-
-1. `options.provider` — injected directly (useful for testing or embedding)
-2. `window.__xwk_dropfi` — optional private alias for host apps that preserve the DropFi provider before loading `xrpl.js`
-3. `window.dropfi` — optional legacy/private alias
-4. `window.xrpl` — the official DropFi injection point, accepted only when it passes the DropFi feature guard (must expose `isDropFi` or specific DropFi methods: `connect`, `sendTransaction`, `initialize`, etc.) to avoid collision with `xrpl.js` or other XRPL extension providers
-
-Both the Chrome extension and the mobile app inject at `window.xrpl` with `isDropFi: true`. The adapter does not distinguish between them — the same detection and API path is used for both.
-
-**Mobile-specific injection detail:** The mobile app first checks `window.ReactNativeWebView` exists and skips injection if `window.xrpl.isDropFi` is already set, preventing double-injection in nested WebViews.
-
-The official provider exposes: `selectedAddress`, `connectedAccounts`, `selectedNetwork`, `network`, `endpoint`, `connect`, `disconnect`, `signMessage`, `sendTransaction`, `switchNetwork`, `changeAccount`, `initialize`, and `isConnected`. It emits events: `xrpl_selectedAddress`, `xrpl_connectedAccounts`, `xrpl_selectedNetwork`, `xrpl_disconnect`.
+Supports the standard XRPL `mainnet`, `testnet` and `devnet` networks, including `manager.switchNetwork()` when connected. Xahau is not supported by this adapter.
 
 ## Capabilities
 
-| Capability | Extension | Mobile App |
-|---|:---:|:---:|
-| connect | ✅ | ✅ |
-| disconnect | ✅ | ✅ |
-| signMessage | ✅ | ✅ |
-| signAndSubmit | ✅ | ✅ |
-| payments | ✅ | ✅ |
-| nftOffers | ✅ | ✅ |
-| sessionRestore | ✅ | ✅ |
-| switchNetwork | ✅ | ✅ |
-| signTransaction | ❌ | ❌ |
+The extension and mobile in-app provider use the same manager operations.
 
-The adapter advertises `supportedNetworks: ["mainnet", "testnet", "devnet"]` and `transactionModes: ["sign-and-submit"]` through granular capability metadata.
+| Operation | Support |
+|---|---|
+| Connect | Yes |
+| Disconnect | Yes; provider disconnect when available, otherwise local cleanup |
+| Session restore | Yes, with a matching passive account |
+| `signTransaction()` | Not exposed |
+| `signAndSubmit()` | Yes |
+| `signMessage()` | Yes; `signature` proof |
+| `signIn()` | Not exposed |
+| `switchNetwork()` | Yes, for supported XRPL networks |
+| Payment / NFT transactions | Yes, through `txJson` |
+| QR / deep link | Not exposed; mobile uses the in-app browser |
+
+## Options
+
+These options apply to `createDropFiAdapter()`. Pass a configured adapter through the client's `adapters` option when needed.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `provider` | `DropFiProvider` | Detected provider | Supply a specific DropFi provider |
+| `icon` | `string` | Embedded DropFi icon | Custom icon URL or data URI |
+
+## Transactions
+
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#introduction-->
+
+### Payment
+
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-submit-->
+
+DropFi uses `sendTransaction()`. This adapter does not expose sign-only; do not call `manager.signTransaction()` for this wallet.
+
+### NFT Transactions
+
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#nft-->
+
+<div id="message-signing"></div>
+
+## Authentication
+
+```ts
+const proof = await manager.signMessage({ message: "Verify wallet ownership" });
+console.log(proof.signatureKind); // "signature"
+console.log(proof.signature, proof.publicKey);
+```
+
+DropFi returns a compact signature and public key. Missing proof fields are rejected; do not fall through to another signing prompt after approval. Use server-side challenge verification as described in [Message Authentication](/docs/auth/introduction). Native `signIn()` is not exposed.
+
+<div id="session-restore"></div>
+
+## Sessions and Disconnect
+
+`manager.autoReconnect()` initializes passive provider state and restores only a matching current address, without a fresh approval prompt. This applies to the extension and mobile in-app browser.
+
+`manager.disconnect()` clears Kit state and calls the provider's disconnect method when available.
+
+<div id="known-limitations"></div>
+
+## Integration Notes
+
+### Provider Detection
+
+Provider lookup uses `options.provider`, then `window.__xwk_dropfi`, `window.dropfi` and the official `window.xrpl` injection point. The fallback must pass the DropFi feature guard so `xrpl.js` or another wallet is not mistaken for DropFi. Preserve the provider through an alias or pass it explicitly if another script overwrites `window.xrpl`.
+
+### Network Switching
 
 ```ts
 if (manager.can("switchNetwork", "dropfi")) {
@@ -81,74 +128,23 @@ if (manager.can("switchNetwork", "dropfi")) {
 }
 ```
 
-The manager validates the requested network before calling DropFi, persists the selected network in the active session, and emits `networkChanged` after success.
-
-## Message Signing
-
-DropFi returns a **compact message signature** and public key:
-
-```ts
-const result = await manager.signMessage({ message: "Verify wallet ownership" });
-
-// result.signatureKind === "signature"
-// result.proof      — same as result.signature
-// result.signature  — compact hex signature
-// result.publicKey  — public key returned by DropFi
-```
-
-Use DropFi (or GemWallet/Crossmark) when your backend expects a compact verifiable signature rather than an XRPL transaction blob. DropFi's auth docs require the server to receive the original `message`, `signature`, and `publicKey`, convert the UTF-8 message to hex, and verify with `ripple-keypairs.verify(messageHex, signature, publicKey)`.
-
-If DropFi returns no `signature` or no `publicKey`, the adapter raises `SIGN_REJECTED`. Apps should not fall through to a different signing method after the user has already seen a DropFi signing prompt.
-
-## Transactions
-
-Pass standard XRPL `txJson` to `signAndSubmit`. The adapter calls `provider.sendTransaction(txJson)` and returns the normalized result:
-
-```ts
-const result = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "Payment",
-    Account: session.account.address,
-    Destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe",
-    Amount: "1000000",
-  },
-});
-// result.hash   — transaction hash
-// result.signed — boolean
-```
-
-All standard XRPL transaction types (Payment, TrustSet, NFT offers, etc.) are passed through as-is via `sendTransaction`.
-
-## Session Restore
-
-On page reload, the adapter calls `provider.isConnected()`. If connected, it fetches the current address via `provider.getAddress()` and compares with the stored session. If they match, the session is silently restored without re-approval.
-
-This works identically for both the Chrome extension and the mobile in-app browser.
-
-## Known Limitations
-
-- No `signTransaction` (sign without submit) on either platform.
-- The `window.xrpl` fallback only activates when the provider passes the DropFi feature guard — it will not pick up `xrpl.js` global or other XRPL extension providers at `window.xrpl`.
-- DropFi `signMessage` is not GemWallet's `{ result: { signedMessage } }` shape. Treat the canonical DropFi shape as `{ signature, publicKey }`.
-- Mobile: the DApp must be opened inside DropFi's **in-app browser** for injection to work. Opening the DApp in an external browser (Safari, Chrome) on mobile will not detect the provider.
+The manager checks network support and updates the active session after switching. Mobile users browsing in external Safari/Chrome will not have the DropFi injected provider.
 
 ## Troubleshooting
 
-**Extension not detected?** DropFi must be installed and enabled for the current site. Verify the extension injects `window.__xwk_dropfi` or `window.dropfi` on your domain. Open DevTools and run `console.log(window.__xwk_dropfi)`.
+| Symptom | Action |
+|---|---|
+| Mobile wallet is not detected | Open the dApp inside DropFi's in-app browser |
+| Another wallet takes over `window.xrpl` | Pass the DropFi provider explicitly or preserve its alias |
+| Restore fails after reload | Check that the provider has hydrated and still reports the same address |
+| Sign-only is unavailable | Use sign-and-submit; sign-only is not exposed by this adapter |
 
-**Mobile not detected?** The user must be browsing your DApp from inside the DropFi mobile app's built-in browser, not an external browser. Share a link that users can paste into DropFi's browser, or add a "Open in DropFi" button.
+<div id="references"></div>
 
-**Provider resolves to wrong wallet?** If another wallet extension also injects at `window.xrpl`, inject the DropFi provider explicitly via `options.provider` or use the `window.__xwk_dropfi` injection point.
+## Related Guides
 
-**"Connection rejected"?** The user dismissed the DropFi approval UI. The adapter throws a `WalletError` with code `CONNECTION_REJECTED`.
-
-**`isConnected()` returns false on reload?** The extension may not have hydrated yet. The adapter's session restore path runs after a short delay. If the issue is consistent, file a bug on the DropFi extension repository.
-
-## References
-
+- [Adapters Overview](/docs/adapters/overview)
+- [Message Authentication](/docs/auth/introduction)
 - [DropFi Extension](https://www.dropfi.app/docs/dropfi-extension)
 - [DropFi Mobile App](https://www.dropfi.app/docs/dropfi-mobile-app)
-- [DropFi Web Injection Script](https://www.dropfi.app/docs/dropfi-web-injection-script)
-- [DropFi Mobile Injection Script](https://www.dropfi.app/docs/dropfi-mobile-injection-script)
-- [XRPL Injection API](https://www.dropfi.app/docs/xrpl-injection-api)
-- [Authentication with Message Hashing](https://www.dropfi.app/docs/authentication-with-message-hashing)
+- [DropFi Provider API](https://www.dropfi.app/docs/xrpl-injection-api)

@@ -1,9 +1,13 @@
 # GhostSig Adapter
 
-[GhostSig](https://ghostsig.dev/) is a hosted XRPL wallet. The adapter opens a
-popup for connection and transaction approval; no browser extension or
-WalletConnect project ID is required. Available starting in **v0.1.20** as an
-opt-in adapter.
+[GhostSig](https://ghostsig.dev/) opens a hosted wallet popup for connection and transaction approval. No extension, API key or WalletConnect project ID is required.
+
+| Integration | Value |
+|---|---|
+| Package | `@xrpl-wallet-kit/adapter-ghostsig` |
+| Adapter ID | `ghostsig` |
+| Wallet type | Hosted web / popup |
+| Client registration | Opt-in; excluded from default lists and `wallets: "all"` |
 
 ## Installation
 
@@ -11,9 +15,23 @@ opt-in adapter.
 npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-ghostsig xrpl@^4
 ```
 
-## Quick Start
+For the Client tab below, install `@xrpl-wallet-kit/client` instead.
 
-```ts
+<div id="quick-start"></div>
+
+## Connect
+
+::: code-group
+
+```ts [Client]
+import { createWalletKit } from "@xrpl-wallet-kit/client";
+
+const kit = createWalletKit({ network: "mainnet", wallets: ["ghostsig"] });
+const { manager } = kit;
+const { account } = await kit.connect("ghostsig");
+```
+
+```ts [Core]
 import { WalletManager } from "@xrpl-wallet-kit/core";
 import { createGhostsigAdapter } from "@xrpl-wallet-kit/adapter-ghostsig";
 
@@ -21,178 +39,89 @@ const manager = new WalletManager({
   network: "mainnet",
   adapters: [createGhostsigAdapter()],
 });
-
-// Call from a connect button's click handler.
 const { account } = await manager.connect("ghostsig");
-console.log(account.address);
 ```
 
-With the all-in-one client:
+:::
 
-```ts
-import { createWalletClient } from "@xrpl-wallet-kit/client";
+Connect and sign from user actions so the browser can open GhostSig's approval popup.
 
-const manager = createWalletClient({
-  network: "mainnet",
-  wallets: ["ghostsig"],
-  ghostsig: { timeoutMs: 60000 },
-});
-```
+## Networks
 
-GhostSig is not included in the default wallet list or `wallets: "all"`.
-For plain HTML, the browser bundle exports
-`XRPLWalletKit.createGhostsigAdapter(options)`.
-
-## Options
-
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `timeoutMs` | `number` | `60000` | Timeout for connection and signing requests, in milliseconds |
-| `url` | `string` | `https://ghostsig.dev/?connect` | Wallet popup URL; only the GhostSig origin or explicit HTTP localhost development is allowed |
+Supports the standard XRPL Mainnet, Testnet and Devnet presets (`mainnet`, `testnet`, `devnet`). Custom RPC/network definitions and Xahau are not supported by this adapter.
 
 ## Capabilities
 
-| Capability | Supported |
-|---|:---:|
-| connect / disconnect | Yes |
-| signTransaction (sign-only) | Yes |
-| signAndSubmit | Yes |
-| payments / nftOffers | Yes |
-| signMessage | No |
+This table describes manager-level operations available through the adapter.
 
-Supports the kit's standard mainnet, testnet and devnet configurations.
-Custom RPC/network definitions are not supported.
+| Operation | Support |
+|---|---|
+| Connect | Yes |
+| Disconnect | Yes; local session/popup cleanup |
+| Session restore | Cached account state only; not fresh authentication |
+| `signTransaction()` | Yes |
+| `signAndSubmit()` | Yes |
+| `signMessage()` | Not exposed |
+| `signIn()` | Not exposed |
+| `switchNetwork()` | Not exposed |
+| Payment / NFT transactions | Yes, through `txJson` |
+| QR / deep link | No |
+
+## Options
+
+These options apply to `createGhostsigAdapter()`. The full client also accepts them under `ghostsig`.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `timeoutMs` | `number` | `60000` | Connection and signing timeout in milliseconds |
+| `url` | `string` | `https://ghostsig.dev/?connect` | Wallet popup URL; restricted to the GhostSig origin or explicit HTTP localhost development |
 
 ## Transactions
 
-The examples below use `manager` and the connected `account` from Quick Start.
-Run each request separately from a button's click handler so GhostSig can open
-its approval popup. Replace the recipient and NFT/offer IDs before signing.
-Starting in **0.1.22**, when `SourceTag` is omitted or `undefined`, the adapter adds `SourceTag: 0` to
-a copy of `txJson` before sending and verifying it. It does not modify the dApp's
-object. Explicit uint32 tags are preserved; invalid or wallet-modified tags are rejected.
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#introduction-->
 
 ### Payment
 
 ::: code-group
-
-```ts [Sign Only]
-const result = await manager.signTransaction({
-  txJson: {
-    TransactionType: "Payment",
-    Account: account.address,
-    Destination: "<recipient_address>",
-    Amount: "1000000", // 1 XRP in drops
-    SourceTag: 0,
-  },
-});
-
-console.log(result.txBlob); // Signed transaction; not submitted
-```
-
-```ts [Sign and Submit]
-const result = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "Payment",
-    Account: account.address,
-    Destination: "<recipient_address>",
-    Amount: "1000000", // 1 XRP in drops
-    SourceTag: 0,
-  },
-  submit: true,
-});
-
-console.log(result.hash, result.status);
-```
-
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-submit-->
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-sign-only-->
 :::
 
-`signAndSubmit` broadcasts the transaction and spends real funds on mainnet.
-Use `signTransaction` when you only need a signed `txBlob`.
-If the recipient requires a destination tag, include its `DestinationTag`
-in the Payment; `SourceTag` does not replace it.
+If `SourceTag` is omitted or `undefined`, the adapter adds `SourceTag: 0` to a copy used for dispatch and verification. It does not mutate your `txJson`. Explicit tags must be uint32. `SourceTag` never replaces a recipient's `DestinationTag`.
 
 ### NFT Transactions
 
-These examples sign **and submit**. For a signature without submission, use
-`manager.signTransaction({ txJson: ... })` with the same transaction fields.
-NFT and offer IDs are 64-character hexadecimal strings.
+<!--@include: ../../.vitepress/snippets/adapter-transactions.md#nft-->
 
-::: code-group
+For sign-only NFT requests, pass the same `txJson` to `manager.signTransaction()`.
 
-```ts [Mint]
-const result = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "NFTokenMint",
-    Account: account.address,
-    NFTokenTaxon: 0,
-    Flags: 8, // tfTransferable
-    SourceTag: 0,
-  },
-});
-console.log(result.hash);
-```
+## Authentication
 
-```ts [Create Sell Offer]
-const result = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "NFTokenCreateOffer",
-    Account: account.address,
-    NFTokenID: "<nft_id>",
-    Amount: "1000000", // Sell for 1 XRP
-    Flags: 1, // tfSellNFToken
-    SourceTag: 0,
-  },
-});
-console.log(result.hash);
-```
+Neither arbitrary `signMessage()` nor wallet-native `signIn()` is exposed. A cached account or successful popup connection is not a backend login proof. Choose an adapter with the authentication method your application requires.
 
-```ts [Accept Sell Offer]
-const result = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "NFTokenAcceptOffer",
-    Account: account.address, // Buyer's connected account
-    NFTokenSellOffer: "<sell_offer_id>",
-    SourceTag: 0,
-  },
-});
-console.log(result.hash);
-```
+## Sessions and Disconnect
 
-```ts [Cancel Offer]
-const result = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "NFTokenCancelOffer",
-    Account: account.address, // Offer creator's connected account
-    NFTokenOffers: ["<offer_id>"],
-    SourceTag: 0,
-  },
-});
-console.log(result.hash);
-```
+`manager.autoReconnect()` can restore cached, unexpired account/key state without a popup. This is not fresh wallet authentication; the next signed result must verify the account and key.
 
-```ts [Burn]
-const result = await manager.signAndSubmit({
-  txJson: {
-    TransactionType: "NFTokenBurn",
-    Account: account.address, // NFT owner's connected account
-    NFTokenID: "<nft_id>",
-    SourceTag: 0,
-  },
-});
-console.log(result.hash);
-```
-
-:::
-
-Burning permanently destroys the NFT. See the
-[NFT Marketplace guide](/docs/use-cases/nft-marketplace) for more transaction fields.
+`manager.disconnect()` clears local account state and pending popup work. It does not erase wallet credentials.
 
 ## Integration Notes
 
-- Connect and signing popups request 560 x 720 px and remain resizable; browsers may adjust dimensions or open a tab on mobile.
-- Open connection and signing popups from a user action, using HTTPS or localhost.
-- Omitted or `undefined` `SourceTag` defaults to `0`; explicit tags must be uint32.
-- GhostSig does not support message signing for the kit's wallet sign-in flow.
-- If your site sets COOP, use `Cross-Origin-Opener-Policy: same-origin-allow-popups` so the wallet can reply.
-- If a submit request times out or is cancelled, check its transaction hash before retrying; the transaction may already have been submitted.
+- Use HTTPS or localhost and allow popups. The requested window is 560 x 720 px and resizable; browsers may adjust it or use a tab on mobile.
+- If setting COOP, use `Cross-Origin-Opener-Policy: same-origin-allow-popups` so the wallet can reply.
+- After a timeout/cancellation following submit dispatch, check the transaction hash before retrying; the transaction may already have been broadcast.
+
+## Troubleshooting
+
+| Symptom | Action |
+|---|---|
+| GhostSig is not in the wallet list | Add `"ghostsig"` explicitly to `wallets` |
+| Popup is blocked | Start the request from a user action and allow popups |
+| Popup approves but the page gets no reply | Check COOP and popup permissions |
+| Submission outcome is unknown | Check the hash on the ledger before starting another request |
+
+## Related Guides
+
+- [Adapters Overview](/docs/adapters/overview)
+- [NFT Marketplace](/docs/use-cases/nft-marketplace)
+- [GhostSig](https://ghostsig.dev/)
