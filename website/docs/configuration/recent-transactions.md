@@ -57,6 +57,11 @@ console.log(result.hash);
 
 The manager emits `tx_submitted` first. If transaction confirmation polling is enabled and the ledger result can be resolved, the transaction may later move to `confirmed` or `failed`.
 
+If your application SDK already confirms transactions, disable Kit's
+`transactionConfirmation` poller and feed validated receipts into this store.
+Do not mark preliminary `tesSUCCESS` or an unresolved submit error as confirmed.
+See [Signing and RPC](/docs/advanced/bundle-performance#signing-and-rpc).
+
 ## Manual Entries
 
 Use `manager.addTransaction()` for custom flows, externally submitted transactions, or signed transactions that your app submits separately.
@@ -92,21 +97,19 @@ kit.manager.addTransaction({
 
 ## Explorer Links
 
-By default, the kit builds explorer links from the connected network when possible. You can provide a custom link builder.
+By default, the kit builds explorer links from the connected network, including
+Xahau's mainnet/testnet presets. Prefer the shared helper when overriding links
+so XAH transactions are not sent to an XRPL explorer.
 
 ```ts
+import { getExplorerTxUrl } from "@xrpl-wallet-kit/core";
+
 const button = new WalletButton({
   manager,
   modal,
   target,
   showRecentTransactions: true,
-  transactionExplorerUrl: (hash, network) => {
-    if (network?.id === "mainnet") {
-      return `https://livenet.xrpl.org/transactions/${hash}`;
-    }
-
-    return `https://testnet.xrpl.org/transactions/${hash}`;
-  },
+  transactionExplorerUrl: (hash, network) => getExplorerTxUrl(network, hash),
 });
 ```
 

@@ -45,7 +45,6 @@ const { manager, openModal } = createWalletKit({
   connectButton: "#connect-btn",   // CSS selector for your button element
 });
 
-await manager.autoReconnect();
 ```
 
 ```html
@@ -53,7 +52,8 @@ await manager.autoReconnect();
 <button id="connect-btn"></button>
 ```
 
-That's it. The button renders itself, the modal opens on click, and sessions are restored on reload.
+The button renders itself and opens the modal on click. `autoReconnect: true`
+schedules restoration for eligible wallets; do not also call it manually.
 
 ## Manual Setup
 
@@ -76,13 +76,7 @@ const manager = new WalletManager({
       projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
     }),
   ],
-  network: {
-    id: "mainnet",
-    networkType: "MAINNET",
-    rpcUrl: "wss://xrplcluster.com",
-    nativeAsset: "XRP",
-    nativeAssetDecimals: 6,
-  },
+  network: "mainnet",
 });
 
 // 2. Create the modal
@@ -131,8 +125,6 @@ const result = await manager.signAndSubmit({
     Account: manager.getAccount()!.address,
     Destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe",
     Amount: "1000000", // 1 XRP in drops
-    Fee: "12",
-    Sequence: 1,
   },
 });
 
@@ -153,6 +145,11 @@ toast.mount();
 Toasts appear automatically when a transaction is submitted, confirmed, or fails — no extra wiring needed.
 
 ## Next Steps
+
+For Xahau, use the full client's `network: "xahau-mainnet"` plus a positive
+`preflight.maxFeeDrops`. Manual core setup requires the Xahau protocol and chain
+filters; see [Xahau Configuration](/docs/configuration/xahau). To include the
+new XRPL wallets, select `"ghostsig"`, `"xyra"` or `"joey-wallet"` explicitly.
 
 - [Theming](/docs/configuration/theming) — customize colors and fonts
 - [Adapters](/docs/adapters/overview) — configure individual wallets

@@ -1,7 +1,10 @@
 # Nuxt
 
-Use the Vue plugin once per Nuxt application. The bindings below are available
-since 0.1.23.
+Use the Vue plugin once per Nuxt application, with matching package versions.
+
+```sh
+npm install @xrpl-wallet-kit/vue @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-ghostsig xrpl@^4
+```
 
 ## Provider
 
@@ -63,3 +66,16 @@ auto-reconnection is explicit opt-in.
 
 Session restoration does not restore checkout state or resubmit a payment.
 Keep order reconciliation in your application.
+
+## Xahau
+
+For a core-based provider, register the Xahau networks/protocol when constructing
+the manager and declare the supported chains on Xaman, GemWallet, Xyra or Ledger.
+Keep the manager app/request-scoped and register browser adapters in the client
+plugin. The full client can configure Xahau automatically instead; see
+[Xahau setup](/docs/configuration/xahau#core-selective-integration) for the two paths.
+Do not only change the network ID on the XRPL-only example above.
+
+GhostSig and Joey Wallet's native extension are XRPL-only. Xyra supports XRPL
+and Xahau. Check [adapter capabilities](/docs/adapters/overview) and use
+`manager.signIn()` only for wallets with native sign-in support.

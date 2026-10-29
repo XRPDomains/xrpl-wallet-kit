@@ -59,7 +59,7 @@ This table describes manager-level operations on XRPL. Xahau signing uses the ch
 |---|---|
 | Connect | Yes |
 | Disconnect | Local Kit cleanup; no provider-level disconnect |
-| Session restore | Yes, with matching passive XRPL account; reconnect on Xahau |
+| Session restore | XRPL and Xahau, with matching current account/network |
 | `signTransaction()` | Yes, if the provider exposes `signTransaction` |
 | `signAndSubmit()` | Yes |
 | `signMessage()` | Yes; `signature` proof |
@@ -114,7 +114,9 @@ GemWallet returns a compact message signature. Use a server-issued challenge and
 
 ## Sessions and Disconnect
 
-`manager.autoReconnect()` checks that GemWallet still reports the stored XRPL account before restoring it. Xahau requires an explicit reconnect after reload.
+`manager.autoReconnect()` checks that GemWallet still reports the stored account and requested network. On Xahau, the manager also restores the registered protocol context so subsequent signing and submission use the Xahau codec and verification flow. The full client provides this runtime automatically; core/selective integrations must register it.
+
+If GemWallet cannot report its current account or network, reconnect explicitly. A stored session or configured network alone is not sufficient proof for restoration.
 
 `manager.disconnect()` clears Kit's session. It does not revoke the extension's site permissions.
 

@@ -30,7 +30,7 @@ interface WalletAdapter {
   connect: (options: ConnectOptions) => Promise<ConnectResult>;
   disconnect?: () => Promise<void>;
 
-  restoreSession?: (session: WalletSession) => Promise<ConnectResult | null>;
+  restoreSession?: (session: WalletSession, options?: ConnectOptions) => Promise<ConnectResult | null>;
   canRecoverSession?: (options: ConnectOptions) => boolean | Promise<boolean>;
   recoverSession?: (options: ConnectOptions) => Promise<ConnectResult | null>;
   cancelPendingConnection?: () => void | Promise<void>;
@@ -148,7 +148,7 @@ Per-adapter examples:
 
 `WalletManager.autoReconnect()` owns session storage, stale-session cleanup, and event emission. Core does not know how a wallet extension, mobile SDK, WalletConnect client, snap, or hardware device proves that a previously stored session is still usable.
 
-Adapters own that proof through `restoreSession(session)`.
+Adapters own that proof through `restoreSession(session, options?)`. Existing one-argument implementations remain compatible. The manager supplies its registered network and protocol context through `options`, not through serialized storage. Protocol-backed adapters must restore this context as well as the account, verify the current provider account/network, and return `null` if either proof or runtime is unavailable. Honor `options.signal` and reject late results after cancellation; never recreate executable protocol context from local storage.
 
 `restoreSession()` must:
 

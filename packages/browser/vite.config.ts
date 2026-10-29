@@ -35,7 +35,7 @@ function prependBundleBanner(): Plugin {
 
 function assertLazyXahau(): Plugin {
   return { name: "assert-lazy-xahau", generateBundle() {
-    const leaked = [...this.getModuleIds()].filter(id => /(?:xahau-binary-codec|xahau-address-codec)[/\\]|packages[/\\]xahau[/\\](?:src|dist)[/\\]index\.[jt]s$/.test(id));
+    const leaked = [...this.getModuleIds()].filter(id => /(?:@xahauname[/\\]sdk|xahau-binary-codec|xahau-address-codec)[/\\]|packages[/\\]xahau[/\\](?:src|dist)[/\\]index\.[jt]s$/.test(id));
     if (leaked.length) this.error(`Xahau runtime leaked into the base IIFE: ${leaked.join(", ")}`);
   } };
 }
@@ -70,6 +70,7 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: {
+        "./xahauname-loader": resolve(__dirname, "src/xahauname-lazy.ts"),
         "@xrpl-wallet-kit/xahau/lazy": resolve(__dirname, "src/xahau-lazy.ts"),
         "@xrpl-wallet-kit/client": resolve(__dirname, "../client/src/index.ts"),
         "@xrpl-wallet-kit/core": resolve(__dirname, "../core/src/index.ts"),

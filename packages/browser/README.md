@@ -61,6 +61,12 @@ IIFE with a regular external script tag so its URL can be captured; inline or
 eval-based embedding cannot resolve the Xahau asset. ESM applications should
 use the client package instead.
 
+XahauName identity reads load a second minified ESM asset,
+`xrpl-wallet-kit-xahauname.runtime.js`, only when needed. Keep this file beside
+the IIFE from the same release when self-hosting. Xahau Testnet displays verified
+Primary names automatically; Mainnet requires a trusted name-service deployment.
+Identity lookup is read-only and never opens a wallet approval.
+
 After `build:browser`, run `npm run smoke:browser:xahau` with Playwright available
 (`PLAYWRIGHT_MODULE_PATH` and `PLAYWRIGHT_EXECUTABLE_PATH` can select an external
 installation). This checks lazy loading, signed Invoke, shared error types, CSP,

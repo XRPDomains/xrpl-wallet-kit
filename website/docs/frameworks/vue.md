@@ -1,7 +1,11 @@
 # Vue 3
 
 `@xrpl-wallet-kit/vue` provides app-scoped state, composables and a wallet button.
-These bindings are available since 0.1.23.
+Use matching versions of the framework, client and adapter packages.
+
+```sh
+npm install @xrpl-wallet-kit/vue @xrpl-wallet-kit/client
+```
 
 ## Setup
 
@@ -37,6 +41,16 @@ const { openAndWait } = useWalletModal()
 `connect`, `disconnect`, `signMessage`, `signTransaction` and `signAndSubmit` preserve
 manager result and error types. `openAndWait()` resolves a session or rejects when
 the user closes the picker. `refreshAvailability()` refreshes wallet detection.
+
+For Xahau, configure the full client's `network: 'xahau-mainnet'` and a positive
+`preflight.maxFeeDrops`. Select `['xaman', 'gemwallet', 'xyra', 'ledger']` to offer
+all four supported adapters and provide `xamanClientId` for Xaman. See
+[Xahau Configuration](/docs/configuration/xahau). GemWallet supports verified
+Xahau restore; other adapters require explicit reconnect.
+
+On XRPL, GhostSig, Xyra and Joey Wallet are opt-in through `wallets` or explicit
+adapter factories. Native Joey login uses `manager.signIn()`; see
+[Wallet-Native Sign In](/docs/auth/native-sign-in).
 
 ## Lifecycle
 

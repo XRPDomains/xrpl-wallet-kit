@@ -17,6 +17,12 @@ interface WalletManagerConfig {
   adapters?: WalletAdapter[];
   network?: WalletNetworkId;
   networks?: WalletNetwork[];
+  protocols?: readonly WalletProtocol[];
+  preflight?: TransactionPreflightPolicy;
+  batch?: { adapterIds: readonly string[] };
+  persistTransactions?: boolean | WalletTransactionPersistenceConfig;
+  accountStatus?: { enabled?: boolean; timeoutMs?: number };
+  transactionConfirmation?: { enabled?: boolean; attempts?: number; intervalMs?: number; timeoutMs?: number };
   storage?: WalletStorage;
   autoReconnect?: boolean;
   recoveryRetryDelaysMs?: number[];
@@ -66,6 +72,11 @@ interface WalletSession {
   connectedAt: number;
 }
 ```
+
+`network` in manager configuration is a registered **ID**, not a network object.
+An individual `connect()` call can receive a trusted `WalletNetwork` override.
+For Xahau with core, register the protocol and adapter chain filter explicitly;
+the full client handles this automatically. See [Xahau](/docs/configuration/xahau).
 
 ### disconnect()
 
@@ -136,13 +147,16 @@ const restored = await manager.autoReconnect();
 
 ### getCapabilities() and getCapabilityDetails()
 
-Inspect both legacy boolean flags and the granular capability metadata added in `0.1.17`.
+Inspect boolean flags and granular capability metadata. Manager-level sign-only
+support can include a declared fallback (for example Xaman), so consult the
+[adapter matrix](/docs/adapters/overview#capability-matrix) as well.
 
 ```ts
 const capabilities = manager.getCapabilities();
 const details = manager.getCapabilityDetails();
 
 details?.supportedNetworks;
+details?.supportedChains; // families, networkIds, networkTypes
 details?.supportedTransactionTypes;
 details?.supportedMethods;
 details?.transactionModes; // sign-only | sign-and-submit | multisign
@@ -173,7 +187,12 @@ Check which adapters are available (wallet installed in browser).
 ```ts
 const availability = await manager.getWalletAvailability();
 // { xaman: true, gemwallet: false, crossmark: true, ... }
+await manager.getWalletAvailability({ refresh: true }); // bypass short-lived cache
 ```
+
+`getWallets()` returns registered wallet metadata. For a custom picker, filter
+with `adapterSupportsNetwork(manager.getAdapter(id)!, manager.getNetwork())`.
+Availability is a detection hint, not permission, authentication or chain support.
 
 ### addTransaction()
 

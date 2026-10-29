@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/xahau",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Opt-in Xahau protocol runtime for XRPL Wallet Kit.",
   "license": "MIT",
   "type": "module",
@@ -30,7 +30,7 @@
   ],
   "dependencies": {
     "@noble/hashes": "^1.8.0",
-    "@xrpl-wallet-kit/core": "0.3.1",
+    "@xrpl-wallet-kit/core": "0.3.2",
     "ripple-keypairs": "^2.0.0",
     "xahau-address-codec": "^5.0.0",
     "xahau-binary-codec": "2.3.0"

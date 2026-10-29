@@ -74,7 +74,8 @@ await manager.signAndSubmit({
       value: "10.00",       // exact amount recipient gets
     },
     SendMax: "20000000",    // maximum XRP to spend (in drops)
-    Flags: 131072,          // tfNoRippleDirect — use DEX/AMM path
+    Flags: 65536,           // tfNoRippleDirect; provide valid Paths from path-finding
+    Paths: quotedPaths,    // Fetch a quote independently before wallet approval
   },
 });
 ```
@@ -106,10 +107,19 @@ await manager.signAndSubmit({
 | WalletConnect | ✅ | ✅ | ✅ | ✅ |
 | XRPL Snap | ✅ | ✅ | ✅ | ✅ |
 | Ledger | ✅ | ✅ | ✅ | ✅ |
+| [GhostSig](/docs/adapters/ghostsig) | ✅ | Wallet dependent | Wallet dependent | Wallet dependent |
+| [Xyra](/docs/adapters/xyra) | ✅ | Wallet dependent | Wallet dependent | Wallet dependent |
+| [Joey Wallet](/docs/adapters/joey-wallet) | ✅ | Wallet dependent | Wallet dependent | Wallet dependent |
+
+These are XRPL flows; generic signing does not guarantee every provider/version
+supports every field. Enable the three opt-in adapters explicitly on XRPL.
+For XAH and HookParameters, use the four-wallet [Xahau guide](/docs/configuration/xahau).
 
 ## Tips
 
-**Always autofill `Sequence` and `Fee` before submitting.** Use `xrpl.js` `client.autofill(txJson)` to populate these fields, or rely on the adapter's built-in autofill.
+**Do not hardcode `Sequence` or `Fee`.** Rely on the adapter's preparation path,
+or use `xrpl.js` autofill when the wallet requires prepared fields. Xahau uses
+its own protocol preparation, fee ceiling and post-sign verification.
 
 **Missing `DestinationTag` can cause permanent fund loss.** If a destination requires a tag (check via `account_info` flag `RequireDestTag`), omitting it will cause the payment to fail — which is safe. However, sending to a custodial address without the correct tag may result in unrecoverable funds.
 
@@ -118,6 +128,10 @@ await manager.signAndSubmit({
 **3-character currency codes vs. 160-bit hex.** Standard currencies use 3-letter codes (`USD`, `EUR`, `XRP`). Non-standard tokens use a 40-character hex string — your DEX or issuer will provide the correct format.
 
 ## Next Steps
+
+See the official [Payment reference](https://xrpl.org/docs/references/protocol/transactions/types/payment)
+for path fields and flag combinations. A payment hash/preliminary result is not
+validated settlement; check the receipt before fulfilling an order.
 
 - [DEX & AMM](/docs/use-cases/dex-amm) — trading tokens on-ledger
 - [Sign In with XRPL](/docs/auth/introduction) — wallet-based authentication

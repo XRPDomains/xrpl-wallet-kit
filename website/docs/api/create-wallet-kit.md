@@ -1,6 +1,7 @@
 # createWalletKit
 
-`createWalletKit` is the all-in-one convenience entry point from `@xrpl-wallet-kit/client`. It creates a `WalletManager`, a `WalletModal`, a `WalletButton`, and a `WalletToast` in a single call with sensible defaults.
+`createWalletKit` is the all-in-one entry point from `@xrpl-wallet-kit/client`.
+It creates a manager and optional modal, button and transaction toast.
 
 If you need more control, use [`createWalletClient`](#createwalletclient) instead — it only creates the `WalletManager`.
 
@@ -16,6 +17,7 @@ npm install @xrpl-wallet-kit/client
 import { createWalletKit } from "@xrpl-wallet-kit/client";
 
 const { manager, modal, button, toast, openModal } = createWalletKit({
+  autoReconnect: true,
   metadata: {
     name: "My XRPL dApp",
     description: "Wallet connection for My XRPL dApp",
@@ -28,7 +30,6 @@ const { manager, modal, button, toast, openModal } = createWalletKit({
   connectButton: "#connect-btn",
 });
 
-await manager.autoReconnect();
 ```
 
 ```html
@@ -36,7 +37,9 @@ await manager.autoReconnect();
 <button id="connect-btn"></button>
 ```
 
-That's all you need. The connect button renders itself, the modal opens on click, toasts appear for transactions, and sessions are restored on reload.
+The connect button renders itself and opens the modal on click. Toasts are
+opt-in through `ui.toast`; restoration is opt-in through `autoReconnect`.
+In the example above, the kit schedules restoration once after page load.
 
 ## Options
 
@@ -52,31 +55,37 @@ interface CreateWalletKitOptions extends CreateWalletClientOptions {
   // Connect button — CSS selector, DOM element, or button config object
   connectButton?: string | HTMLElement | WalletKitConnectButtonConfig;
 
-  // Identity resolver for on-chain display names (XRP Domains, etc.)
+  // Display-name preferences; custom resolver belongs in ui.identity.resolver
   identity?: {
-    resolve: WalletIdentityResolver;
-    cacheMs?: number;
+    web3Name?: boolean;
+    fallbackToAddress?: boolean;
   };
 }
 
 interface WalletKitConnectButtonConfig {
   target?: string | HTMLElement;
   label?: string;
-  icon?: false
-    | { type: "default" }
+  icon?: { type: "default" }
     | { type: "image"; src: string; alt?: string }
     | { type: "html"; html: string; ariaLabel?: string };
   size?: "sm" | "md" | "lg";
   variant?: "default" | "pill" | "minimal" | "outline";
   showAdapterIcon?: boolean;
   showChevron?: boolean;
+  showBalance?: boolean | { smallScreen?: boolean; largeScreen?: boolean };
+  accountStatus?: "full" | "address" | "icon"
+    | { smallScreen?: "full" | "address" | "icon"; largeScreen?: "full" | "address" | "icon" };
 }
 ```
+
+The button config also accepts other
+[`WalletButton` options](/docs/configuration/connect-button), including
+`balanceResolver`, `identityResolver` and `showRecentTransactions`.
 
 ### `CreateWalletClientOptions`
 
 ```ts
-interface CreateWalletClientOptions {
+interface CreateWalletClientOptions extends Omit<WalletManagerConfig, "adapters" | "storage"> {
   // dApp identity shown in WalletConnect/AppKit and future auth prompts
   metadata?: {
     name: string;
@@ -91,7 +100,7 @@ interface CreateWalletClientOptions {
   appUrl?: string;
   appIcons?: string[];
 
-  // Adapters to register — defaults to all installed adapters when "all" is used
+  // Runtime selection; "all" uses the default list, not every exported adapter
   wallets?: "all" | WalletKitAdapterId[];
 
   // Provide pre-built adapter instances instead of auto-creation
@@ -107,9 +116,14 @@ interface CreateWalletClientOptions {
   xamanClientId?: string;
 
   // Network config
-  network?: WalletNetwork;
+  network?: WalletNetworkId; // "mainnet", "xahau-mainnet", etc.
+  networks?: WalletNetwork[];
+  protocols?: readonly WalletProtocol[];
+  preflight?: TransactionPreflightPolicy;
+  ghostsig?: GhostsigAdapterOptions;
+  xahau?: { request?: XahauRpcRequest };
 
-  // Auto-reconnect on page load (default: true)
+  // Auto-reconnect on page load (default: false)
   autoReconnect?: boolean;
 
   // UI config — shared theme/locale applied to modal, button, and toast
@@ -143,15 +157,21 @@ const kit = createWalletKit(options);
 kit.manager        // WalletManager instance
 kit.modal          // WalletModal instance (undefined if modal: false)
 kit.button         // WalletButton instance (undefined if no connectButton)
-kit.toast          // WalletToast instance (undefined if no modal)
+kit.toast          // WalletToast instance (undefined unless toast is enabled)
 kit.openModal()    // () => void — open the modal programmatically
 kit.closeModal()   // () => void — close the modal
-kit.disconnect()   // () => void — disconnect the active wallet
+kit.disconnect()   // Promise<void> — disconnect the active wallet
 kit.switchNetwork("testnet") // switch through the active adapter when supported
 kit.getSession()   // () => WalletSession | null — current session
 kit.signAndSubmit  // manager.signAndSubmit (bound)
 kit.signTransaction// manager.signTransaction (bound)
 kit.signMessage    // manager.signMessage (bound)
+kit.signIn         // wallet-native login proof (bound; capability dependent)
+kit.connect("gemwallet") // explicit wallet connection
+kit.on            // manager.on (bound; returns unsubscribe)
+kit.off           // manager.off (bound; requires the same handler)
+kit.once          // subscribe for one event
+kit.subscribe     // event subscription or immediate state snapshot + updates
 kit.refreshAccount()    // force-refresh account data shown in button
 kit.refreshBalance()    // force-refresh balance in button
 kit.refreshIdentity()   // force-refresh identity (name/avatar) in button
@@ -250,11 +270,6 @@ kit.manager.addTransaction({
 
 ## Selecting Specific Wallets
 
-The kit also exposes `kit.signIn(request)` for wallet-native authentication.
-Check `kit.manager.can("signIn")` and follow the
-[native sign-in guide](/docs/auth/native-sign-in). It is separate from
-`kit.signMessage()` and does not establish a server session by itself.
-
 ```ts
 createWalletKit({
   wallets: ["xaman", "gemwallet", "ledger", "walletconnect"],
@@ -264,11 +279,47 @@ createWalletKit({
 
 Available IDs: `"xaman"`, `"gemwallet"`, `"walletconnect"`, `"crossmark"`, `"ledger"`, `"dropfi"`, `"xrpl-snap"`, `"ghostsig"`, `"xyra"`, `"joey-wallet"`.
 
-[Joey Wallet](/docs/adapters/joey-wallet) is opt-in: select
-`wallets: ["joey-wallet"]`. Default lists and `wallets: "all"` exclude it.
-The separate `"joey"` ID connects through WalletConnect, not the extension.
+[GhostSig](/docs/adapters/ghostsig), [Xyra](/docs/adapters/xyra) and
+[Joey Wallet](/docs/adapters/joey-wallet) can be enabled explicitly:
 
-`ledger` is included in `wallets: "all"` by default. It uses WebHID/WebUSB and never silently restores after a reload; users must reconnect the device and open the XRP app.
+```ts
+const kit = createWalletKit({
+  network: "mainnet",
+  wallets: ["gemwallet", "ghostsig", "xyra", "joey-wallet"],
+  ui: { walletList: { layout: "auto" } },
+});
+```
+
+Default XRPL lists and `wallets: "all"` exclude all three. Xyra is included by
+default when Xahau is configured. The separate `"joey"` ID uses WalletConnect,
+not the extension. See [Adapters Overview](/docs/adapters/overview) for defaults.
+
+`ledger` is included on XRPL by default and requires explicit selection on Xahau.
+It uses WebHID/WebUSB and never silently restores after reload. The device app
+is XRP for XRPL or XAH for Xahau; connection can request the app on the hardware.
+
+## Xahau
+
+```ts
+const kit = createWalletKit({
+  network: "xahau-mainnet",
+  wallets: ["xaman", "gemwallet", "xyra", "ledger"],
+  xamanClientId: "YOUR_XAMAN_CLIENT_ID",
+  preflight: { maxFeeDrops: "50000" }, // Application ceiling, not a fixed fee
+  connectButton: "#connect-wallet",
+});
+```
+
+The full client registers presets and lazily loads the protocol; no extra import
+is needed. Core and `client/selective` require explicit setup. See
+[Xahau Configuration](/docs/configuration/xahau) for Payment, Invoke,
+HookParameters, URITokens and browser runtime hosting.
+
+## Authentication
+
+Check `kit.manager.can("signIn")` before using `kit.signIn(request)` for
+[wallet-native authentication](/docs/auth/native-sign-in), currently Joey Wallet.
+It is separate from `kit.signMessage()` and does not establish a server session.
 
 ## Custom Adapters
 
@@ -290,12 +341,18 @@ When `adapters` is provided, the `wallets` and `walletConnectProjectId` fields a
 
 ## Session Restore
 
-Call `autoReconnect()` once on startup:
+`createWalletKit({ autoReconnect: true })` schedules restoration. Do not also
+call it from a startup effect. With a headless client, enable restoration and
+call it once yourself:
 
 ```ts
-const { manager } = createWalletKit({ wallets: "all", autoReconnect: true, ... });
+const manager = createWalletClient({ wallets: ["gemwallet"], autoReconnect: true });
 await manager.autoReconnect();
 ```
+
+Restore guarantees are wallet-dependent. On Xahau, GemWallet can restore a verified
+account/network with the registered protocol; other adapters require reconnect.
+Cached account metadata is not backend authentication.
 
 ## `createWalletClient`
 

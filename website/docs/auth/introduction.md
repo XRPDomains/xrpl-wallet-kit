@@ -52,6 +52,7 @@ The adapter is how the auth package talks to your backend. You provide three met
 
 ```ts
 import type { WalletAuthAdapter } from "@xrpl-wallet-kit/auth";
+import { formatAuthMessage } from "@xrpl-wallet-kit/auth";
 
 const authAdapter: WalletAuthAdapter = {
   // Ask your server for a one-time nonce
@@ -155,7 +156,6 @@ app.post("/api/auth/verify", async (req, res) => {
 
 ## Message Format
 
-The helper above is available since 0.1.23.
 `db.consumeIssuedChallenge` is application code: atomically consume an issued,
 unexpired challenge bound to this request's browser session and identity. Return
 false for unknown or already-used nonces, including simultaneous requests.
@@ -273,13 +273,12 @@ interface SignatureVerifier {
 Supports both signature kinds:
 
 - **`"signature"`** — compact hex signature from `signMessage`. Uses `ripple-keypairs` to verify.
-- **`"signedTx"`** — a signed XRPL transaction blob with the message in `Memos[0]`. Starting in v0.1.20, default verification uses modern `xrpl` encoding and `ripple-keypairs`, binding the signature's derived address, transaction Account and first memo.
+- **`"signedTx"`** — a signed XRPL transaction blob with the message in `Memos[0]`. Verification binds the signature's derived address, transaction Account and first memo using `xrpl` and `ripple-keypairs`.
 
 ### Verifier Migration (v0.1.20)
 
-Version 0.1.20 removes the `verify-xrpl-signature` peer requirement. Normal
-`createXrplSignatureVerifier()` calls and the two proof formats are unchanged.
-Custom `loadPeer` implementations only need `xrpl` and `ripple-keypairs`.
+The current verifier requires only `xrpl` and `ripple-keypairs`; the legacy
+`verify-xrpl-signature` package is not a peer requirement.
 Explicit `dependencies.verifyXrplSignature` injection remains supported; its
 result must affirm validity with `true` or `signatureValid: true`. Empty or
 ambiguous results and malformed transaction/memo proofs are rejected.
@@ -289,11 +288,12 @@ account; it does not resolve RegularKey/delegated authorization or ledger
 multisign quorum. A multisign proof uses the first signer's identity, as before.
 Use a reviewed injected verifier for custom network definitions or authorization.
 Remove the legacy package from your server only if nothing else uses it.
-For v0.1.20, install only `ripple-keypairs@^3` and `xrpl@^4` alongside auth.
+Install `ripple-keypairs@^3` and `xrpl@^4` alongside auth.
 
 ## Security Notes
 
 - **Always validate nonces server-side** — mark each nonce as used immediately after the first successful verify to prevent replay attacks.
 - **Set `expiresIn` to a short window** — 5–15 minutes for login flows, 1 hour for long sessions.
-- **The verifier does not use `RegularKey`** — it verifies against the account's master public key only, as returned by `account_data.PublicKey` on the ledger.
-- **Never trust `publicKey` from the client alone** — for highest security, resolve the public key from the ledger (`nodeUrl` option) rather than trusting the wallet-provided value.
+- **Account-key binding is mandatory** — the verified public key must derive the authenticated address. RegularKey/delegated authority and multisign quorum are not resolved by the default verifier.
+- **Public keys are not secrets** — a supplied key is checked cryptographically and bound to the address. `nodeUrl` is only an optional fallback when a compact proof omits a key; signed transaction proofs carry their signing key.
+- **Keep chains separate** — this verifier handles XRPL message proofs, not Xahau authentication. Native Joey proofs require [the native verifier](/docs/auth/native-sign-in).

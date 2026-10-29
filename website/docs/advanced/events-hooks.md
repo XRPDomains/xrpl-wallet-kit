@@ -106,7 +106,8 @@ manager.on("networkChanged", ({ network, previousNetwork }) => {
 
 ### `tx_submitted`
 
-Fired when a transaction is broadcast to the XRPL network.
+Fired when a transaction is reported submitted on the selected network. It is
+not validated success; Xahau uses the same lifecycle events.
 
 ```ts
 manager.on("tx_submitted", ({ hash, account, transaction }) => {
@@ -143,7 +144,7 @@ Fired when a sign request is sent to the wallet.
 
 ```ts
 manager.on("signing", ({ adapterId, kind }) => {
-  // kind: "message" | "transaction"
+  // kind: "message" | "transaction" | "sign-in"
   showSignPrompt();
 });
 ```
@@ -221,7 +222,7 @@ offClose();
 If you use the React package, consume events through hooks instead of `manager.on()` directly — the provider re-renders React state automatically:
 
 ```tsx
-import { useWalletKit, useWalletStatus, useWalletAccount } from "@xrpl-wallet-kit/react";
+import { useWalletKit, useWalletStatus, useWalletAccount, useWalletSession } from "@xrpl-wallet-kit/react";
 
 function MyApp() {
   const { status } = useWalletKit();       // "disconnected" | "connecting" | "connected"
@@ -237,6 +238,10 @@ See the [React guide](/docs/frameworks/react) for the full hook reference.
 | Event | Payload | Description |
 |---|---|---|
 | `connecting` | `{ adapterId }` | Connection attempt started |
+| `walletsChanged` | `{ wallets }` | Adapter registry changed |
+| `destroyed` | `{}` | Manager was destroyed |
+| `request_changed` | `{ request }` | Request progress/status changed |
+| `transaction_preflight` | `{ adapterId, mode, report }` | Application transaction preflight report |
 | `connected` | `{ adapterId, account, session }` | Connection successful |
 | `disconnected` | `{ adapterId }` | Disconnected |
 | `session_restored` | `{ adapterId, account, session, stale? }` | Session recovered on load |

@@ -22,16 +22,19 @@ function minifyStandaloneRuntime(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [minifyStandaloneRuntime()],
-  build: {
-    outDir: "dist", emptyOutDir: false, minify: false, sourcemap: false,
-    lib: { entry: resolve(__dirname, "src/xahau-runtime.ts"), formats: ["es"], fileName: () => "xrpl-wallet-kit-xahau.runtime.js" },
-    rollupOptions: {
-      plugins: [inject({ Buffer: ["buffer", "Buffer"] })],
-      output: { inlineDynamicImports: true, banner: `/*! @xrpl-wallet-kit/browser Xahau runtime v${version} | MIT */` }
-    }
-  },
-  resolve: { alias: { "@xrpl-wallet-kit/core": resolve(__dirname, "src/runtime-core.ts") } },
-  define: { __XWK_BROWSER_VERSION__: JSON.stringify(version), "process.env": {} }
+export default defineConfig(({ mode }) => {
+  const name = mode === "xahauname" ? "xahauname" : "xahau";
+  return {
+    plugins: [minifyStandaloneRuntime()],
+    build: {
+      outDir: "dist", emptyOutDir: false, minify: false, sourcemap: false,
+      lib: { entry: resolve(__dirname, `src/${name}-runtime.ts`), formats: ["es"], fileName: () => `xrpl-wallet-kit-${name}.runtime.js` },
+      rollupOptions: {
+        plugins: [inject({ Buffer: ["buffer", "Buffer"] })],
+        output: { inlineDynamicImports: true, banner: `/*! @xrpl-wallet-kit/browser ${name} runtime v${version} | MIT */` }
+      }
+    },
+    resolve: { alias: { "@xrpl-wallet-kit/core": resolve(__dirname, "src/runtime-core.ts") } },
+    define: { __XWK_BROWSER_VERSION__: JSON.stringify(version), "process.env": {} }
+  };
 });

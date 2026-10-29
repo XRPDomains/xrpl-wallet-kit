@@ -1,32 +1,30 @@
 # Going Live
 
-Before shipping your XRPL dApp to production, run through this checklist.
+Before shipping your XRPL or Xahau dApp, review the configuration and ownership
+of wallet, RPC and authentication flows.
 
 ## ✅ Credentials & Config
 
 - [ ] Replace `VITE_WALLETCONNECT_PROJECT_ID` with your own project ID from [WalletConnect Cloud](https://cloud.walletconnect.com) — the development key rate-limits you
 - [ ] Register your public Xaman API key at [apps.xaman.dev](https://apps.xaman.dev) and replace the example key
-- [ ] Set `network` to **MAINNET** — remove any testnet/devnet network config
+- [ ] Select the intended preset: `"mainnet"` for XRPL or `"xahau-mainnet"` for Xahau
 - [ ] Verify `storage` prefix doesn't conflict if you have multiple apps on the same domain
 
 ```ts
 // ✅ Production
-const manager = new WalletManager({
-  autoReconnect: true,
-  network: {
-    id: "mainnet",
-    networkType: "MAINNET",
-    rpcUrl: "wss://xrplcluster.com",
-    nativeAsset: "XRP",
-    nativeAssetDecimals: 6,
-  },
+const kit = createWalletKit({
+  network: "xahau-mainnet",
+  wallets: ["xaman", "gemwallet", "xyra", "ledger"],
+  xamanClientId: "YOUR_XAMAN_CLIENT_ID",
+  preflight: { maxFeeDrops: "50000" }, // App ceiling, not a fixed fee
 });
 ```
 
 ## ✅ Bundle
 
-- [ ] Using **individual packages** (`@xrpl-wallet-kit/core`, `@xrpl-wallet-kit/ui`, individual adapters), not the IIFE browser bundle
-- [ ] Tree-shaking is enabled — only the adapters you use are in the output
+- [ ] Choose full client, selective imports or browser IIFE deliberately; `wallets` filters at runtime, not at bundle time
+- [ ] Inspect emitted modules/chunks rather than assuming tree-shaking removed unused adapter SDKs
+- [ ] Self-host the matching minified Xahau runtime beside the IIFE when using Xahau
 - [ ] WalletConnect SDK is in a separate async chunk (verify in `dist/assets/`)
 - [ ] Source maps are disabled or private for production builds
 
@@ -36,7 +34,9 @@ const manager = new WalletManager({
 - [ ] Test in **dark mode** — both auto-detect and forced dark
 - [ ] Wallet **not installed** state shows the install link (GemWallet, Crossmark, MetaMask Snap)
 - [ ] Connect button has a visible **loading state** during connection
-- [ ] **Session restore** works on page reload without flickering
+- [ ] Eligible sessions restore once; Xahau and hardware flows show explicit reconnect where required
+- [ ] Opt into GhostSig, Xyra and Joey Wallet on XRPL when your app needs them
+- [ ] `showBalance` uses a CORS-enabled RPC/custom resolver and stays compact at the app's button width
 
 ## ✅ Error Handling
 
@@ -48,7 +48,9 @@ import { WalletKitError, WalletKitErrorCode } from "@xrpl-wallet-kit/core";
 manager.on("error", ({ error }) => {
   if (error instanceof WalletKitError) {
     switch (error.code) {
-      case WalletKitErrorCode.USER_REJECTED:
+      case WalletKitErrorCode.CONNECTION_REJECTED:
+      case WalletKitErrorCode.SIGN_REJECTED:
+      case WalletKitErrorCode.REQUEST_CANCELLED:
         // User closed the wallet prompt — don't show an error toast
         break;
       case WalletKitErrorCode.NOT_CONNECTED:
@@ -56,7 +58,7 @@ manager.on("error", ({ error }) => {
         showConnectPrompt();
         break;
       case WalletKitErrorCode.SIGN_FAILED:
-        showError("Signing failed — please try again");
+        showError("Signing failed. Check the request and wallet.");
         break;
       default:
         showError(error.message);
@@ -65,9 +67,9 @@ manager.on("error", ({ error }) => {
 });
 ```
 
-- [ ] `USER_REJECTED` is handled silently (no toast) — this is normal UX
+- [ ] Connection/signing rejection and cancellation are handled without unnecessary error toasts
 - [ ] `NOT_CONNECTED` redirects to connect flow
-- [ ] Network/submission errors are shown clearly with a retry option
+- [ ] Unknown submission outcomes are reconciled by hash/provider ID before any retry
 - [ ] Unexpected errors are reported to your error tracking service (Sentry, etc.)
 
 ## ✅ Security
@@ -89,7 +91,10 @@ manager.on("error", ({ error }) => {
 
 - [ ] `manager.autoReconnect()` is called once on startup — not on every render
 - [ ] `WalletToast` is mounted once, not per component
-- [ ] No wallet-related network requests fire before user initiates connect
+- [ ] Wallet approval requests start from user actions; passive detection does not prompt
+- [ ] One service owns confirmation polling; reuse application balance data where available
+- [ ] Xahau post-sign intent, sequence, expiry and fee checks remain enabled
+- [ ] Native `signIn()` and message-auth proofs use their own server verifier and atomically consumed nonce
 
 ## Monitoring
 

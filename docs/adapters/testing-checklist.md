@@ -26,6 +26,7 @@
 - [ ] `restoreSession()` is passive-only and never opens connect/sign-in/QR/deeplink/hardware approval UI.
 - [ ] `restoreSession()` verifies a current provider address or equivalent passive account signal before returning a restored session.
 - [ ] `restoreSession()` returns `null` when the passive address is missing or differs from the stored session address.
+- [ ] Protocol-backed restore uses the manager's network/runtime, verifies provider network identity, and rejects missing context or canceled results before activating signing state.
 - [ ] `restoreSession()` returns `null` without throwing for normal stale, unavailable, locked, or not-yet-hydrated sessions.
 - [ ] If an adapter intentionally omits `restoreSession()`, README explains that autoReconnect requires manual reconnect.
 - [ ] `WalletManager.autoReconnect()` emits `session_restored` and `connected` for the adapter when restore succeeds.

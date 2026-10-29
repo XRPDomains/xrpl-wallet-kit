@@ -5,7 +5,7 @@ export default defineConfig({
 
   title: "XRPL Wallet Kit",
   description:
-    "Framework-agnostic wallet adapter toolkit for XRPL browser dApps. Headless TypeScript core with optional prebuilt UI.",
+    "Framework-agnostic wallet adapter toolkit for XRPL and Xahau browser dApps. Headless TypeScript core with optional prebuilt UI.",
   ignoreDeadLinks: true,
 
   head: [
@@ -20,7 +20,7 @@ export default defineConfig({
       "meta",
       {
         property: "og:description",
-        content: "Wallet adapter toolkit for XRPL browser dApps",
+        content: "Wallet adapter toolkit for XRPL and Xahau browser dApps",
       },
     ],
     // XRPDomains theme fonts — Plus Jakarta Sans (body) + JetBrains Mono (headings/code)
@@ -53,7 +53,7 @@ export default defineConfig({
       { text: "Theme Builder", link: "/docs/theme-builder" },
       { text: "API Reference", link: "/docs/api/wallet-manager" },
         {
-          text: "v0.3.1",
+          text: "v0.3.2",
         items: [
           {
             text: "Changelog",

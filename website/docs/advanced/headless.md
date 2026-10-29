@@ -6,8 +6,8 @@
 
 - Building a custom connect button or modal in your own design system
 - Integrating with Radix UI, shadcn/ui, Headless UI, or similar libraries
-- Server-side utilities — nonce generation, message validation, session parsing
-- React Native or Electron apps where the DOM-based UI doesn't apply
+- Server-side auth utilities through the separate `@xrpl-wallet-kit/auth` package
+- Custom hosts such as Electron, where the chosen provider/transport is available
 - Testing or scripting — automating wallet interactions without UI
 
 ## Install
@@ -30,13 +30,7 @@ const manager = new WalletManager({
     createGemWalletAdapter(),
     createXamanAdapter({ apiKey: import.meta.env.VITE_XAMAN_API_KEY }),
   ],
-  network: {
-    id: "mainnet",
-    networkType: "MAINNET",
-    rpcUrl: "wss://xrplcluster.com",
-    nativeAsset: "XRP",
-    nativeAssetDecimals: 6,
-  },
+  network: "mainnet",
 });
 ```
 
@@ -48,8 +42,8 @@ Connect using a specific adapter ID, or let the user choose with your own UI:
 
 ```ts
 // List available adapters to build your own picker UI
-const adapters = manager.getAdapters();
-// [{ id: "gemwallet", name: "GemWallet", icon: "...", isAvailable: true }, ...]
+const wallets = manager.getWallets(); // WalletMetadata[]
+const availability = await manager.getWalletAvailability(); // { [id]: boolean }
 
 // Connect to a specific adapter
 const result = await manager.connect("gemwallet");
@@ -69,9 +63,8 @@ if (session) {
   const adapterId = session.adapterId;
 }
 
-// Get current connection status
-const status = manager.getStatus();
-// "idle" | "connecting" | "connected" | "disconnecting" | "error"
+// The core exposes sessions/events, not a getStatus() method.
+const connected = manager.getSession() !== null;
 ```
 
 ## Subscribing to events
@@ -94,7 +87,7 @@ const off = manager.on("connected", handler);
 off(); // remove
 
 // Remove all listeners for an event
-manager.off("connected");
+manager.removeAllListeners("connected"); // Only if this code owns all subscribers
 ```
 
 ## Signing transactions
@@ -104,16 +97,14 @@ manager.off("connected");
 const { txBlob } = await manager.signTransaction({
   txJson: {
     TransactionType: "Payment",
-    Account: session.account.address,
+    Account: manager.getAccount()!.address,
     Destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe",
     Amount: "1000000",   // 1 XRP in drops
-    Fee: "12",
-    Sequence: 1,
   },
 });
 
-// Sign and submit — returns hash + result
-const { hash, result } = await manager.signAndSubmit({
+// Sign and submit — returns hash/status and provider data in raw
+const { hash, status, raw } = await manager.signAndSubmit({
   txJson: { /* ... */ },
 });
 ```
@@ -123,78 +114,49 @@ const { hash, result } = await manager.signAndSubmit({
 Here's a minimal example of a custom adapter picker + connect flow:
 
 ```ts
-class WalletPickerUI {
-  private manager: WalletManager;
-  private root: HTMLElement;
+import { adapterSupportsNetwork } from "@xrpl-wallet-kit/core";
 
-  constructor(manager: WalletManager, root: HTMLElement) {
-    this.manager = manager;
-    this.root = root;
-    this.subscribeToManager();
-    this.render();
-  }
-
-  private subscribeToManager() {
-    this.manager.on("connecting",   () => this.render());
-    this.manager.on("connected",    () => this.render());
-    this.manager.on("disconnected", () => this.render());
-    this.manager.on("error",        () => this.render());
-  }
-
-  private render() {
-    const status  = this.manager.getStatus();
-    const session = this.manager.getSession();
-
-    if (status === "connected" && session) {
-      this.root.innerHTML = `
-        <div class="wallet-info">
-          <span>${session.account.address.slice(0, 10)}…</span>
-          <button id="wk-disconnect">Disconnect</button>
-        </div>`;
-      this.root.querySelector("#wk-disconnect")
-        ?.addEventListener("click", () => this.manager.disconnect());
+function mountWalletPicker(manager: WalletManager, root: HTMLElement) {
+  const render = () => {
+    root.replaceChildren();
+    const account = manager.getAccount();
+    if (account) {
+      const label = document.createElement("span");
+      label.textContent = account.address;
+      const disconnect = document.createElement("button");
+      disconnect.textContent = "Disconnect";
+      disconnect.onclick = () => { void manager.disconnect().catch(console.error); };
+      root.append(label, disconnect);
       return;
     }
-
-    if (status === "connecting") {
-      this.root.innerHTML = `<div class="wallet-loading">Connecting…</div>`;
-      return;
+    for (const wallet of manager.getWallets()) {
+      const adapter = manager.getAdapter(wallet.id)!;
+      if (!adapterSupportsNetwork(adapter, manager.getNetwork())) continue;
+      const button = document.createElement("button");
+      button.textContent = wallet.name;
+      button.onclick = () => { void manager.connect(wallet.id).catch(console.error); };
+      root.append(button);
     }
-
-    // Show adapter list
-    const adapters = this.manager.getAdapters();
-    this.root.innerHTML = `
-      <div class="wallet-picker">
-        <h3>Connect Wallet</h3>
-        ${adapters.map(a => `
-          <button class="adapter-btn" data-id="${a.id}" ${!a.isAvailable ? "disabled" : ""}>
-            <img src="${a.icon}" width="24" height="24" alt="" />
-            ${a.name}
-            ${!a.isAvailable ? " (not installed)" : ""}
-          </button>
-        `).join("")}
-      </div>`;
-
-    this.root.querySelectorAll<HTMLButtonElement>(".adapter-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        this.manager.connect(btn.dataset.id!).catch(console.error);
-      });
-    });
-  }
-
-  destroy() {
-    this.manager.off("connecting");
-    this.manager.off("connected");
-    this.manager.off("disconnected");
-    this.manager.off("error");
-    this.root.innerHTML = "";
-  }
+  };
+  const unsubscribe = [
+    manager.on("connected", render), manager.on("disconnected", render),
+    manager.on("session_restored", render), manager.on("walletsChanged", render),
+    manager.on("accountChanged", render), manager.on("networkChanged", render),
+  ];
+  render();
+  return () => { unsubscribe.forEach(off => off()); root.replaceChildren(); };
 }
 ```
 
+Availability checks can add detection hints but are not authentication. Do not
+disable mobile/web/hardware choices merely because no injected extension exists.
+Keep text in `textContent` rather than interpolating provider metadata into HTML.
+
 ## Session restore on startup
 
-Always call `autoReconnect()` once on app load to restore the previous session without prompting the user:
+With `autoReconnect: true`, call `autoReconnect()` once on startup to attempt
+eligible restoration. Ledger needs an explicit reconnect. On Xahau, only
+GemWallet supports verified restore, with the protocol registered:
 
 ```ts
 const restored = await manager.autoReconnect();
@@ -208,16 +170,18 @@ if (restored) {
 If you're in React but don't want `@xrpl-wallet-kit/react`, you can use a `useSyncExternalStore`-based hook:
 
 ```ts
-import { useSyncExternalStore, useEffect, useRef } from "react";
+import { useSyncExternalStore, useCallback } from "react";
 import type { WalletManager, WalletSession } from "@xrpl-wallet-kit/core";
 
 export function useWalletSession(manager: WalletManager): WalletSession | null {
-  const subscribe = useRef((cb: () => void) => {
+  const subscribe = useCallback((cb: () => void) => {
     const off1 = manager.on("connected",    cb);
     const off2 = manager.on("disconnected", cb);
     const off3 = manager.on("session_restored", cb);
-    return () => { off1(); off2(); off3(); };
-  }).current;
+    const off4 = manager.on("accountChanged", cb);
+    const off5 = manager.on("networkChanged", cb);
+    return () => { off1(); off2(); off3(); off4(); off5(); };
+  }, [manager]);
 
   return useSyncExternalStore(
     subscribe,
@@ -238,6 +202,7 @@ manager.destroy();
 ## See also
 
 - [WalletManager API](/docs/api/wallet-manager) — full method reference
-- [Events & Hooks](/docs/advanced/events-hooks) — all 17 events with payloads
+- [Events & Hooks](/docs/advanced/events-hooks) — lifecycle events and payloads
+- [Xahau](/docs/configuration/xahau#core-selective-integration) - explicit protocol setup for headless integrations
 - [React integration](/docs/frameworks/react) — if you want the React package
 - [Writing a Custom Adapter](/docs/advanced/custom-adapter)

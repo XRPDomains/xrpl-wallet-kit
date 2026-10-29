@@ -2,6 +2,12 @@
 
 Framework-agnostic UI components for XRPL Wallet Kit.
 
+The default connect button and account panel resolve XRPName on XRPL Mainnet
+and verified XahauName Primary names on Xahau Testnet. Name lookup is read-only;
+missing names fall back to the address. Use `createDefaultWalletIdentityResolver`
+to configure a trusted Xahau Mainnet deployment or disable XahauName, and
+`button.refreshIdentity()` after a validated Primary change.
+
 ## Install
 
 ```sh

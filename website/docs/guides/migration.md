@@ -2,7 +2,30 @@
 
 ## v0.1.x to v0.2.0
 
-No breaking changes yet. Updates will be listed here when v0.2.0 is released.
+Existing XRPL integrations retain their manager and signing entry points.
+To enable Xahau with the full client, select `"xahau-mainnet"` or
+`"xahau-testnet"` and a positive `preflight.maxFeeDrops`. Core/selective setups
+must register the protocol explicitly; see [Xahau](/docs/configuration/xahau).
+
+## v0.2.x to v0.3.x
+
+- Keep Wallet Kit package versions aligned.
+- Enable GhostSig, Xyra and Joey Wallet explicitly on XRPL; exported factories
+  do not imply membership in `wallets: "all"`.
+- Joey's extension uses `joey-wallet`, not the WalletConnect ID `joey`.
+- Native `signIn()` is additive. Keep existing `signMessage()` authentication
+  flows; use the [native verifier](/docs/auth/native-sign-in) only for native proofs.
+- Set `ui.walletList.layout: "auto"` to switch overflowing lists to Card.
+  Explicit layouts remain fixed; `grid` is retained for compatibility, but
+  website controls offer Auto, List, Card and Icon.
+- Remove host CSS that forces inline balances onto a new line or always visible.
+  Kit hides the inline balance when constrained, keeping it in the account panel.
+- The footer identifies chain/network; do not add a second Testnet/Devnet badge.
+
+These additions do not require changing existing XRPL transaction calls. Check
+[adapter capabilities](/docs/adapters/overview) before offering an operation,
+and [Bundle & Performance](/docs/advanced/bundle-performance) for lazy Xahau
+loading, selective imports and confirmation ownership.
 
 ---
 

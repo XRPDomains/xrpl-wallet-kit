@@ -45,7 +45,7 @@ This matrix describes manager-level XRPL operations, not identical provider APIs
 | Adapter | Sign only | Sign and submit | `signMessage()` proof | Native `signIn()` | Session restore |
 |---|---|---|---|---|---|
 | Xaman | Yes, fallback | Yes | `signedTx` | No | Matching XRPL SDK account |
-| GemWallet | Provider dependent | Yes | `signature` | No | Matching passive XRPL account |
+| GemWallet | Provider dependent | Yes | `signature` | No | Matching current XRPL/Xahau account and network |
 | Joey Wallet | Yes | Yes | Not exposed | Yes | Existing grant and matching network |
 | Crossmark | Not exposed | Yes | `signature` | No | Matching passive account |
 | DropFi | Not exposed | Yes | `signature` | No | Matching passive account |
@@ -110,7 +110,7 @@ A successful connection or restored account is not a server login session. Authe
 
 ## Sessions and Availability
 
-Call `manager.autoReconnect()` on startup where restore is supported. Read each adapter's Sessions and Disconnect section: passive provider verification, cached metadata and explicit reconnect are different guarantees. Xahau integrations require reconnecting after reload.
+Call `manager.autoReconnect()` on startup where restore is supported. Read each adapter's Sessions and Disconnect section: passive provider verification, cached metadata and explicit reconnect are different guarantees. On Xahau, GemWallet supports verified restore with a registered protocol; other adapters require reconnecting after reload.
 
 The Installed badge reports passive availability, not permission to sign or an authenticated account. A provider may appear after initial page load; allow detection to refresh and verify extension site access before reporting it missing.
 

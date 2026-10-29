@@ -4,10 +4,10 @@
 
 Use matching versions for Wallet Kit packages when pinning dependencies.
 
-- Node.js 18 or later
+- Node.js 20 or later (required by the XahauName SDK used for Primary-name display)
 - TypeScript 5.0 or later (if using TypeScript)
 - A bundler (Vite, webpack, Rollup) — **recommended for production**
-- Or a plain HTML page — use the [IIFE bundle](#plain-html--legacy) instead
+- Or a plain HTML page — use the [IIFE bundle](#html-legacy-cdn) instead
 
 ## Recommended: Modular Install
 
@@ -57,8 +57,7 @@ All available adapters:
 | `@xrpl-wallet-kit/adapter-ghostsig` | GhostSig (hosted popup, opt-in) |
 | `@xrpl-wallet-kit/adapter-xyra` | [Xyra](/docs/adapters/xyra) (hosted popup, opt-in) |
 
-The [GhostSig adapter](/docs/adapters/ghostsig) is published starting in v0.1.20.
-Install its XRPL peer dependency alongside it:
+Install the [GhostSig adapter](/docs/adapters/ghostsig) with its XRPL peer dependency:
 
 ```sh
 npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-ghostsig xrpl@^4
@@ -100,6 +99,13 @@ pnpm add @xrpl-wallet-kit/client
 :::
 
 The client package re-exports core, UI, and all adapters for convenience. For a smaller production bundle, use `@xrpl-wallet-kit/client/selective` with named adapter packages; importing the default client can retain adapter SDKs that cannot be fully tree-shaken.
+
+The full client also configures Xahau automatically when `network` is
+`"xahau-mainnet"` or `"xahau-testnet"`; its signing runtime loads on demand.
+Xaman, GemWallet and Xyra are available on that path; Ledger is explicit opt-in.
+Configure a positive fee ceiling as shown in [Xahau](/docs/configuration/xahau).
+For core/selective setups, also install `@xrpl-wallet-kit/xahau` and register its
+protocol and networks explicitly.
 
 ## React / Next.js
 
@@ -151,6 +157,11 @@ The bundle exposes a global `XRPLWalletKit` object:
 ```js
 const { createWalletKit, createXamanAdapter } = XRPLWalletKit;
 ```
+
+On Xahau, the IIFE automatically loads the minified
+`xrpl-wallet-kit-xahau.runtime.js` beside the main script on first preparation
+or lookup. Self-host both files from the same release; no second script tag is
+needed. See [Browser / CDN](/docs/configuration/xahau#browser-cdn).
 
 ::: warning Bundle size
 The IIFE bundle is large because it includes all adapters and polyfills. For production sites, prefer the modular install with a bundler.

@@ -1,6 +1,8 @@
 # Quick Start
 
-Connect your first XRPL wallet in under 5 minutes.
+Connect an XRPL wallet with the headless manager and optional UI. For the
+all-in-one entry point, see [createWalletKit](/docs/api/create-wallet-kit).
+For XAH payments and Hooks, use the [Xahau quick start](/docs/configuration/xahau#quick-start).
 
 ## 1. Create the WalletManager
 
@@ -21,13 +23,7 @@ const manager = new WalletManager({
       projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
     }),
   ],
-  network: {
-    id: "mainnet",
-    networkType: "MAINNET",
-    rpcUrl: "wss://xrplcluster.com",
-    nativeAsset: "XRP",
-    nativeAssetDecimals: 6,
-  },
+  network: "mainnet",
 });
 ```
 
@@ -42,6 +38,7 @@ import { WalletModal, WalletButton } from "@xrpl-wallet-kit/ui";
 const modal = new WalletModal({
   manager,
   title: "Connect Wallet",
+  layout: "auto",
   footerText: "Powered by XRPL Wallet Kit",
 });
 
@@ -72,8 +69,8 @@ manager.on("disconnected", () => {
   console.log("Disconnected");
 });
 
-manager.on("error", (error) => {
-  console.error("Wallet error:", error.message);
+manager.on("error", ({ error }) => {
+  console.error("Wallet error:", error);
 });
 ```
 
@@ -86,10 +83,8 @@ const result = await manager.signAndSubmit({
   txJson: {
     TransactionType: "Payment",
     Account: manager.getSession()?.account.address,
-    Destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe",
+    Destination: "<recipient_address>",
     Amount: "1000000", // 1 XRP in drops
-    Fee: "12",
-    Sequence: 1,
   },
 });
 
@@ -98,7 +93,9 @@ console.log("Transaction hash:", result.hash);
 
 ## 5. Session Restore
 
-On page reload, the manager automatically attempts to restore the previous session:
+With core, call `autoReconnect()` once on startup. Only wallets with an eligible
+restore/recovery flow can restore. On Xahau, GemWallet supports verified restore;
+other adapters require explicit reconnect:
 
 ```ts
 // Call this once on app startup
@@ -127,15 +124,9 @@ if (restored) {
     import { WalletModal, WalletButton } from "@xrpl-wallet-kit/ui";
 
     const manager = new WalletManager({
-  autoReconnect: true,
+      autoReconnect: true,
       adapters: [createGemWalletAdapter()],
-      network: {
-        id: "testnet",
-        networkType: "TESTNET",
-        rpcUrl: "wss://s.altnet.rippletest.net:51233",
-        nativeAsset: "XRP",
-        nativeAssetDecimals: 6,
-      },
+      network: "testnet",
     });
 
     const modal = new WalletModal({ manager, title: "Connect Wallet" });
@@ -151,8 +142,16 @@ if (restored) {
 </html>
 ```
 
+The module example above assumes a bundler resolving npm imports. For an HTML
+file without a build step, use the [browser bundle](/docs/frameworks/legacy-cdn).
+Do not hardcode `Sequence` or `Fee`: let the adapter prepare them, or autofill
+with a connected XRPL client when your chosen wallet requires prepared fields.
+Check validated results before treating a submission as complete.
+
 ## Next Steps
 
 - [Theming](/docs/configuration/theming) — customize modal colors and fonts
 - [Adapters](/docs/adapters/overview) — configure individual wallets
+- [GhostSig](/docs/adapters/ghostsig), [Xyra](/docs/adapters/xyra) and [Joey Wallet](/docs/adapters/joey-wallet) - opt-in XRPL wallets
+- [Xahau](/docs/configuration/xahau) - configure Xaman, GemWallet, Xyra and Ledger
 - [API Reference](/docs/api/wallet-manager) — full WalletManager API

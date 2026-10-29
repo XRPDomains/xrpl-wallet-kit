@@ -44,6 +44,7 @@ Add `SESSION_SECRET` to `.env.local`:
 ```bash
 # .env.local
 SESSION_SECRET=at-least-32-characters-random-secret-here
+APP_ORIGIN=https://yourapp.example
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
 NEXT_PUBLIC_XAMAN_API_KEY=your_xaman_api_key
 XRPL_NODE_URL=wss://xrplcluster.com
@@ -86,7 +87,7 @@ export async function GET() {
 ```ts
 // app/api/auth/verify/route.ts
 import { getIronSession } from "iron-session";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { parseAuthMessage, validateAuthMessage } from "@xrpl-wallet-kit/auth";
 import { createXrplSignatureVerifier } from "@xrpl-wallet-kit/auth/verifiers";
@@ -117,9 +118,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid message format." }, { status: 400 });
     }
 
-    const hostname = (await headers()).get("host")?.split(":")[0] ?? "";
+    const origin = process.env.APP_ORIGIN!; // Trusted canonical origin, no trailing slash
     const { valid, errors } = await validateAuthMessage(message, {
-      expectedDomain: hostname,
+      expectedDomain: new URL(origin).host,
+      expectedUri: origin,
+      expectedChainId: "xrpl:0", // Match the configured XRPL network
       expectedAddress: address,
       maxAgeSeconds: 300,
       isNonceUsed: nonce => nonce !== session.pendingNonce,
@@ -338,7 +341,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 - Set `secure: true` in `cookieOptions` in production (requires HTTPS).
 - Invalidate `pendingNonce` after use — the example does this at step 4.
 - Validate `expectedDomain` in `validateAuthMessage` — prevents cross-origin replay.
+- Configure trusted `APP_ORIGIN` and verify the URI/chain, not the request's Host header.
 - `verifier` is created once at module load, not per request.
+
+This guide uses the existing XRPL `signMessage()` flow. For Joey Wallet's native
+login proof, use the separate [native sign-in verifier](/docs/auth/native-sign-in).
+Do not send native proofs or Xahau authentication to this XRPL message endpoint.
 
 ## See also
 

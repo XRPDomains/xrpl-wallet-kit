@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.2
+
+- Display verified XahauName Primary names on Xahau Testnet using SDK 0.4.0, with explicit trusted deployment configuration for Mainnet.
+- Load XahauName through a separate minified browser runtime; cache lookups and support explicit identity refresh.
+- Restore GemWallet Xahau sessions with verified account/network state, registered signing context and cancellation of stale restoration attempts.
+- Synchronize adapter, identity, Xahau and framework documentation.
+
 ## 0.3.1
 
 - Add opt-in Auto wallet layout: use List until it overflows, then reuse the built-in Card layout.

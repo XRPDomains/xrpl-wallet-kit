@@ -1,7 +1,7 @@
 ---
 layout: page
 title: XRPL Wallet Kit
-description: A framework-agnostic wallet adapter toolkit for XRPL browser dApps.
+description: A framework-agnostic wallet adapter toolkit for XRPL and Xahau browser dApps.
 sidebar: false
 aside: false
 outline: false

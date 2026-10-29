@@ -8,9 +8,10 @@ An adapter must implement `WalletAdapter` from `@xrpl-wallet-kit/core`:
 
 ```ts
 import type { WalletAdapter } from "@xrpl-wallet-kit/core";
+import { WALLET_ADAPTER_API_VERSION } from "@xrpl-wallet-kit/core";
 
 const myAdapter: WalletAdapter = {
-  adapterApiVersion: "1.1",
+  adapterApiVersion: WALLET_ADAPTER_API_VERSION,
   metadata: {
     id: "my-wallet",
     name: "My Wallet",
@@ -45,7 +46,7 @@ const myAdapter: WalletAdapter = {
 | `metadata.id` | `string` | ✅ | Unique lowercase kebab-case ID: `"my-wallet"` |
 | `metadata.name` | `string` | ✅ | Human-readable name shown in the modal |
 | `metadata.icon` | `string` | — | URL or data URI for the wallet logo |
-| `metadata.type` | `"extension" \| "mobile" \| "walletconnect" \| "snap" \| "hardware" \| "embedded"` | ✅ | Wallet integration type |
+| `metadata.type` | `"extension" \| "mobile" \| "walletconnect" \| "snap" \| "hardware" \| "embedded" \| "web"` | ✅ | Wallet integration type; `web` for hosted popup wallets |
 | `adapterApiVersion` | `string` | — | Set to `WALLET_ADAPTER_API_VERSION` from core |
 | `capabilities` | `WalletCapabilities` | ✅ | Methods and granular support the adapter actually implements |
 
@@ -62,7 +63,7 @@ import { WalletKitError, WalletKitErrorCode } from "@xrpl-wallet-kit/core";
 async connect(options: ConnectOptions): Promise<ConnectResult> {
   if (!window.MyWallet) {
     throw new WalletKitError(
-      WalletKitErrorCode.WALLET_NOT_FOUND,
+      WalletKitErrorCode.WALLET_NOT_INSTALLED,
       "My Wallet extension is not installed."
     );
   }
@@ -139,6 +140,7 @@ async signMessage(
   const result = await window.MyWallet.signMessage({ message: request.message });
 
   return {
+    proof: result.signature,
     signature: result.signature,         // hex compact signature
     publicKey: result.publicKey,          // hex public key (optional)
     signatureKind: "signature",           // "signature" | "signedTx"
@@ -152,9 +154,9 @@ Use `"signedTx"` if the wallet returns a full signed transaction blob.
 The auth verifier branches automatically based on `signatureKind`.
 :::
 
-### `restoreSession(session): Promise<ConnectResult | null>`
+### `restoreSession(session, options?): Promise<ConnectResult | null>`
 
-Attempts to restore a previous session without user interaction. Called on page load.
+Attempts to restore a previous session without user interaction. Called on page load. The optional `ConnectOptions` supplies the manager's trusted network, protocol context and cancellation signal. Protocol-backed adapters must restore signing context only after verifying the current account and network; never rebuild it from storage.
 
 ```ts
 async restoreSession(stored: WalletSession): Promise<ConnectResult | null> {
@@ -205,8 +207,8 @@ export function createMyWalletAdapter(options: MyWalletAdapterOptions = {}): Wal
     },
     capabilities: { connect: true, disconnect: true, signTransaction: true },
 
-    async connect(options) {
-      // use options.clientId etc.
+    async connect(connectOptions) {
+      // Read factory options.clientId and per-request connectOptions separately.
     },
 
     async disconnect() { /* ... */ },
@@ -226,7 +228,8 @@ Use `WalletKitError` with the correct code so the manager and UI can handle erro
 
 | Code | When to use |
 |---|---|
-| `WALLET_NOT_FOUND` | Extension/app not installed or not detected |
+| `WALLET_NOT_FOUND` | Adapter ID is not registered |
+| `WALLET_NOT_INSTALLED` / `WALLET_NOT_AVAILABLE` | Required wallet/provider is missing |
 | `CONNECTION_REJECTED` | User cancelled the connect prompt |
 | `SIGN_REJECTED` | User cancelled or rejected signing |
 | `REQUEST_TIMEOUT` | Wallet didn't respond within a reasonable time |
@@ -256,9 +259,39 @@ const manager = new WalletManager({
     createMyWalletAdapter({ clientId: "..." }),
     // ...other adapters
   ],
-  network: { /* ... */ },
+  network: "mainnet",
 });
 ```
+
+## XRPL and Xahau Chain Support
+
+Legacy adapters without a `supportedChains` declaration remain XRPL-only.
+Declare only chains and transaction types the provider can actually sign:
+
+```ts
+details: {
+  supportedChains: { families: ["xrpl", "xahau"] },
+  transactionModes: ["sign-only", "sign-and-submit"],
+}
+```
+
+This is a declaration, not a complete implementation. Non-XRPL requests require
+a registered protocol before connection. Use its prepared fields and signed
+blob verification; never run Xahau transactions through an XRPL-only codec or
+drop `NetworkID`/`HookParameters`. Criteria in a chain filter are combined;
+empty arrays deny support, rather than meaning every network.
+
+Return network context in connection results and network-change events. A
+chain-aware adapter emitting `networkChanged` without a network is disconnected
+by the manager. GemWallet can restore Xahau with verified provider state and a
+manager-supplied protocol; other Xahau adapters require explicit reconnect.
+See [Xahau setup](/docs/configuration/xahau#core-selective-integration) and the
+skill's `references/chain-support.md` before implementing this path.
+
+Native login is a separate optional `signIn()` method/capability. Do not alias it
+to `signMessage()`; follow the [native sign-in contract](/docs/auth/native-sign-in).
+Publish the adapter guide using the common skill reference
+`references/adapter-docs.md`.
 
 ## Hard rules
 
@@ -271,8 +304,10 @@ Never include these in an adapter:
 
 ## Building with AI
 
-::: tip Adapter developer skill — a key differentiator
-XRPL Wallet Kit ships a dedicated **adapter developer skill** for Claude Code and Codex. No other XRPL wallet library has an equivalent. The skill encodes the full adapter contract, capability rules, error codes, session restore safety rules, and cleanup requirements — so AI agents produce correct adapters from wallet documentation alone, without missing edge cases.
+::: tip Adapter developer skill
+The project skill covers the adapter contract, XRPL/Xahau chain rules,
+capabilities, native sign-in, session safety and consumer documentation format.
+Use it with current provider documentation and review the generated implementation.
 
 **[→ Full guide: Building Adapters with AI](/docs/advanced/ai-development)**
 :::

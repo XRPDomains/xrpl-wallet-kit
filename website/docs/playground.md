@@ -8,7 +8,9 @@ description: Configure and preview the XRPL Wallet Kit modal live — layout, th
 Adjust the controls to see how the modal looks with your configuration. The code snippet below updates automatically.
 
 ::: info
-The playground uses demo mode — no real wallet connection. Wallets are shown as empty slots to demonstrate layout and theming.
+The playground previews wallet names and logos without connecting or signing.
+Controls offer Auto, List, Card and Icon. Auto starts with List and switches to
+Card when the modal list would overflow; the SDK default remains List.
 :::
 
 > Want more control? **[🎨 Open Theme Builder →](/docs/theme-builder)** — full-page tool with presets, desktop/mobile preview, and live modal preview.
@@ -32,7 +34,7 @@ const manager = new WalletManager({
 // Paste your config from the playground above:
 const modal = new WalletModal({
   manager,
-  layout: "grid",
+  layout: "auto",
   theme: {
     accent: "#7c3aed",
     radius: "20px",
@@ -42,22 +44,26 @@ const modal = new WalletModal({
 
 ## Theme tokens
 
-All theme properties are optional. Unset properties fall back to the defaults shown below:
+All theme properties are optional. Use `themeMode` on constructors or `ui.mode`
+on the client; mode is not a theme token. Common defaults are shown below;
+the [Theming guide](/docs/configuration/theming#theme-tokens) is the full reference.
 
 | Property | Light default | Dark default | Description |
 |---|---|---|---|
-| `mode` | `"auto"` | — | `"light"` / `"dark"` / `"auto"` |
-| `accent` | `#2563eb` | `#3b82f6` | Primary actions, active states |
-| `background` | `#ffffff` | `#0f172a` | Modal background |
-| `foreground` | `#0f172a` | `#f1f5f9` | Primary text |
+| `accent` | `#0078ae` | `#4aa3ff` | Primary actions, active states |
+| `background` | `#fbfcff` | `#111827` | Modal background |
+| `foreground` | `#111827` | `#f8fafc` | Primary text |
 | `muted` | `#64748b` | `#94a3b8` | Secondary text |
-| `surface` | `#f8fafc` | `#1e293b` | Wallet card background |
-| `surfaceHover` | `#f1f5f9` | `#334155` | Wallet card hover |
-| `border` | `#e2e8f0` | `rgba(255,255,255,.08)` | Borders |
-| `overlay` | `rgba(0,0,0,0.5)` | `rgba(0,0,0,0.7)` | Backdrop |
-| `radius` | `"16px"` | — | Modal corner radius |
-| `walletRadius` | `"12px"` | — | Wallet card radius |
-| `shadow` | `0 20px 60px rgba(0,0,0,.12)` | — | Modal drop shadow |
-| `fontFamily` | `system-ui, sans-serif` | — | Font stack |
+| `surface` | `#f3f7fb` | `#1f2937` | Wallet card background |
+| `surfaceHover` | `#edf3f8` | `#263244` | Wallet card hover |
+| `border` | `rgba(17,24,39,.08)` | `rgba(248,250,252,.10)` | Borders |
+| `overlay` | `rgba(15,23,42,.46)` | `rgba(2,6,23,.72)` | Backdrop |
+| `radius` | `"14px"` | `"14px"` | Modal corner radius |
+| `walletRadius` | `"10px"` | `"10px"` | Wallet card radius |
 
 See [Theming](/docs/configuration/theming) for the full guide.
+
+For chain and wallet selection, use [Theme Builder](/docs/theme-builder).
+Share [Theme Builder for Xahau](/docs/theme-builder?chain=xahau) to open it with
+Xahau selected. Wallet preview selection is not a declaration of provider
+capabilities; see [Adapters Overview](/docs/adapters/overview).

@@ -5,15 +5,20 @@ description: XRPL Wallet Kit ships an adapter developer skill — a structured p
 
 # Building Adapters with AI
 
-XRPL Wallet Kit includes an **adapter developer skill** — a knowledge file that gives Claude Code, Codex, or any compatible AI agent everything it needs to produce a correct, contract-compliant adapter from wallet documentation alone. No hand-holding required.
+XRPL Wallet Kit includes an **adapter developer skill**: an agent-readable guide
+for mapping wallet provider APIs to the Kit contract on XRPL and Xahau. Pair it
+with the provider documentation and current source; generated adapters still
+need review and wallet acceptance checks.
 
-::: tip The only XRPL wallet library with a dedicated AI skill
-xrpl-connect and other XRPL wallet libraries have no equivalent. The XRPL Wallet Kit skill encodes the adapter contract, capability rules, error codes, session restore safety rules, cleanup requirements, and a pre-PR checklist. An AI that has read the skill cannot accidentally skip any of them.
+::: tip Start from the project skill
+The skill covers capabilities, chain filters, native sign-in, protocol-aware
+signing, session restore and cleanup. It guides implementation; it does not
+establish that a wallet supports an operation or replace verification.
 :::
 
 ## What the skill contains
 
-The skill is a single `SKILL.md` file at:
+The skill entry point is:
 
 ```
 skills/xrpl-wallet-kit-adapter-developer/SKILL.md
@@ -22,7 +27,8 @@ skills/xrpl-wallet-kit-adapter-developer/SKILL.md
 It is written to be agent-readable — structured prose that any coding AI can follow without requiring specific tool support. It covers:
 
 - The full `WalletAdapter` interface — every required and optional method with semantics
-- **Capability rules** — when `signMessage`, `signTransaction`, `signAndSubmit`, `payments`, `nftOffers` may be set to `true`
+- **Capability rules** — when `signMessage`, native `signIn`, `signTransaction`, `signAndSubmit`, `payments`, `nftOffers` may be declared
+- **Chain support** — `supportedChains`, non-XRPL protocol preparation, signed-intent verification and fee ceilings
 - **Error mapping** — which `WalletKitErrorCode` applies to each failure case
 - **Session restore rules** — when `restoreSession()` is safe to implement vs when to return `null`
 - **Cleanup requirements** — WalletConnect proposals, focus/visibility listeners, deeplink timers, storage markers
@@ -37,6 +43,8 @@ Plus companion reference files:
 | `references/adapter-checklist.md` | Pre-PR review checklist (20+ items) |
 | `references/walletconnect-wallet.md` | How to add a WalletConnect wallet definition |
 | `references/hardware-adapters.md` | Ledger / WebHID / WebUSB notes |
+| `references/chain-support.md` | XRPL/Xahau chain declarations and protocol-aware signing |
+| `references/adapter-docs.md` | Common public guide structure, capability tables and transaction snippets |
 | `references/scaffold.md` | Steps for creating a new official monorepo package |
 | `references/test-template.md` | Node test runner scaffold for adapter tests |
 | `templates/adapter-package/` | Copy-paste starter package |
@@ -55,11 +63,13 @@ Run this slash command at the start of your session. The skill is pre-installed 
 
 ### Codex (OpenAI)
 
-Pass the skill as a context file:
+Ask the agent to read the project skill and the relevant references:
 
-```bash
-codex --context skills/xrpl-wallet-kit-adapter-developer/SKILL.md \
-  "Build a wallet adapter for MyWallet using the docs at..."
+```text
+Read skills/xrpl-wallet-kit-adapter-developer/SKILL.md in this repository.
+Implement an adapter for MyWallet using its official provider documentation.
+Follow references/chain-support.md for XRPL/Xahau support and
+references/adapter-docs.md for the public guide.
 ```
 
 ### Other AI agents
@@ -154,33 +164,27 @@ When the skill is active, the AI automatically refuses to:
 | Inject modals, alerts, or React | Adapters are pure TypeScript with no UI |
 | Set `signMessage: true` before implementing it | Capabilities must match actual method implementations |
 | Return `null` silently on user cancel | Must throw `WalletKitErrorCode.SIGN_REJECTED` |
-| Skip WalletConnect proposal cleanup | Must call `clearStaleProposals()` + `disconnectStale()` |
+| Leave stale WalletConnect proposals/pairings | Clean up using the provider's supported lifecycle APIs |
 | Call `connect()` inside `restoreSession()` | `restoreSession()` is passive-only |
 | Submit a transaction inside `signTransaction()` | Must sign only, never submit |
 
 ---
 
-## Why this matters: XRPL Wallet Kit vs alternatives
+## Contract and Chain Safety {#why-this-matters-xrpl-wallet-kit-vs-alternatives}
 
-| | XRPL Wallet Kit | xrpl-connect |
-|---|:---:|:---:|
-| **Adapter developer skill** | ✅ Ships in repo | ❌ None |
-| **Typed `WalletAdapter` contract** | ✅ Full interface + validator | ⚠️ Loose convention |
-| **`WalletKitErrorCode` enum** | ✅ Structured error codes | ❌ Free-form strings |
-| **AI workflow guide** | ✅ `SKILL.md` + references | ❌ None |
-| **Pre-PR checklist** | ✅ 20+ item checklist | ❌ None |
-| **Test scaffold** | ✅ Node test template | ❌ None |
-| **Copy-paste starter package** | ✅ `templates/adapter-package/` | ❌ Manual |
-| **Runtime contract validator** | ✅ `assertWalletAdapter()` | ❌ None |
-| **Framework-agnostic** | ✅ No React required | ⚠️ React-centric |
-
-Building an adapter for a new wallet typically takes **under 2 hours** with the skill active, from reading the wallet docs to passing `npm run typecheck && npm test`.
+Use the same contract for extension, popup, mobile and hardware adapters.
+Validate it with `assertWalletAdapter()` and keep public capabilities aligned
+with the implementation. For Xahau, a working XRPL connection does not establish
+chain support: declare the filter, register the protocol and preserve fields
+such as `NetworkID` and `HookParameters` through signing.
 
 ---
 
 ## Extending the skill
 
-If you are building adapters outside this monorepo, you can still use the skill by pointing your AI at the `SKILL.md` file. The skill is self-contained and does not require any other files to follow the adapter contract.
+If building outside this monorepo, provide the skill directory with its reference
+files and inspect the installed core's current types. The scaffold is a starting
+point, not a validated provider implementation.
 
 For contributions to the official adapter set, read the scaffold guide:
 

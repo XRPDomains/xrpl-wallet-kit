@@ -112,28 +112,24 @@ export function ConnectButton() {
 
 ### 5. Session restore
 
-Call `autoReconnect()` once on the client after mount:
+`WalletKitProvider` requests `manager.autoReconnect()` after client mount. Keep
+`autoReconnect: true` in the manager config to allow restoration; do not add a
+second effect that repeats the call. Hardware/popup and Xahau connections may
+require an explicit reconnect rather than passive restore.
 
-```tsx
-// components/WalletProvider.tsx
-"use client";
+## Xahau and Additional Wallets
 
-import { useEffect } from "react";
-import { WalletKitProvider } from "@xrpl-wallet-kit/next";
-import { manager } from "@/lib/wallet-manager";
+Inside the same client-provider path, the full client's `createWalletClient()`
+accepts `network: "xahau-mainnet"` or `"xahau-testnet"` and a positive
+`preflight.maxFeeDrops`. Include `wallets: ["xaman", "gemwallet", "xyra", "ledger"]`
+to offer all four Xahau adapters; pass the public Xaman ID as `xamanClientId`.
+The codec loads on demand. Core/selective setups require explicit protocol
+registration; see [Xahau Configuration](/docs/configuration/xahau).
 
-export function WalletProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    manager.autoReconnect();
-  }, []);
-
-  return (
-    <WalletKitProvider manager={manager}>
-      {children}
-    </WalletKitProvider>
-  );
-}
-```
+For XRPL, GhostSig, Xyra and Joey Wallet are opt-in. Register their named adapter
+factories or explicitly select `"ghostsig"`, `"xyra"`, `"joey-wallet"` with the
+full client. For Joey native authentication, use
+[`signIn()`](/docs/auth/native-sign-in), not `signMessage()`.
 
 ## Environment Variables
 

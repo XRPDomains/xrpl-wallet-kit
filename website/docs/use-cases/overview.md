@@ -15,7 +15,9 @@ Use this as a shareable overview when planning an integration, onboarding a new 
 | Cross-chain Bridge | Sign XRPL-side bridge transactions while an external SDK handles the destination chain | `signAndSubmit`, memos, destination tags | [Cross-chain Bridge](/docs/use-cases/bridge) |
 | Sign In with XRPL | Authenticate users with wallet proofs instead of passwords | `@xrpl-wallet-kit/auth`, `signMessage` | [Authentication](/docs/auth/introduction) |
 | Account UX | Show connected account, balance, address QR, identity, and recent transactions | `WalletButton`, account panel config | [Connect Button](/docs/configuration/connect-button) |
-| Wallet Selection | Offer Xaman, GemWallet, WalletConnect, Ledger, XRPL Snap, and extension wallets | adapters, WalletConnect modes, metadata | [Adapter Overview](/docs/adapters/overview) |
+| Wallet Selection | Offer extensions, hardware, mobile and hosted wallets including GhostSig, Xyra and Joey Wallet | adapters, chain filters, Auto layout | [Adapter Overview](/docs/adapters/overview) |
+| Xahau dApps | Send XAH, call Hooks with Invoke, trade URITokens | Xaman, GemWallet, Xyra, opt-in Ledger; lazy protocol | [Xahau](/docs/configuration/xahau) |
+| Native Wallet Login | Request Joey Wallet's native login proof | `signIn`, server nonce and native verifier | [Wallet-Native Sign In](/docs/auth/native-sign-in) |
 
 ## Product Patterns
 

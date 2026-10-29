@@ -21,7 +21,9 @@ does not prevent parallel replay.
 
 ### Create the verifier
 
-Create the verifier **once** when the server starts. It holds a WebSocket connection to an XRPL node for `signedTx` verification.
+Create the verifier once when the server starts. Signed transaction proofs are
+verified locally; `nodeUrl` is an optional fallback for compact proofs without
+a public key, not a persistent WebSocket connection.
 
 ```ts
 // auth/verifier.ts (or auth/verifier.js)
@@ -29,8 +31,7 @@ import { createXrplSignatureVerifier } from "@xrpl-wallet-kit/auth/verifiers";
 
 export const verifier = createXrplSignatureVerifier({
   nodeUrl: process.env.XRPL_NODE_URL ?? "wss://xrplcluster.com",
-  // connectTimeoutMs: 8000,  // optional, default 8000
-  // requestTimeoutMs: 10000, // optional, default 10000
+  nodeTimeout: 5000,
 });
 ```
 
@@ -68,8 +69,8 @@ router.post("/verify", async (req: Request, res: Response) => {
   const {
     message,
     signatureKind,    // "signature" | "signedTx"
-    signature,        // compact sig (GemWallet, Crossmark, DropFi)
-    txBlob,           // signed tx blob (Xaman, WalletConnect, XRPL Snap)
+    signature,        // compact signature when the selected wallet supports it
+    txBlob,           // signed transaction proof; use signatureKind to choose
     address,
     publicKey,        // optional — forwarded when adapter provides it
   } = req.body;
@@ -95,7 +96,9 @@ router.post("/verify", async (req: Request, res: Response) => {
 
   // 3 — Validate domain, age, nonce
   const { valid, errors } = await validateAuthMessage(message, {
-    expectedDomain: req.hostname,                      // e.g. "myapp.com"
+    expectedDomain: new URL(process.env.APP_ORIGIN!).host,
+    expectedUri: process.env.APP_ORIGIN!, // Trusted canonical origin, no trailing slash
+    expectedChainId: "xrpl:0", // Match your configured XRPL network
     expectedAddress: address,
     maxAgeSeconds: 300,
     isNonceUsed: nonce => nonce !== req.session.pendingNonce,
@@ -262,7 +265,13 @@ await auth.signIn();
 
 ## Production checklist
 
+This message-auth example is for wallets with `signMessage()`. GhostSig and Xyra
+do not expose it; Joey Wallet uses the separate
+[native sign-in API/verifier](/docs/auth/native-sign-in). Do not remap native
+proofs to this endpoint or treat a Xahau connection as XRPL login proof.
+
 - **`SESSION_SECRET`** — at least 32 random characters, stored in an environment variable, never committed.
+- **`APP_ORIGIN`** - trusted canonical origin matching the signed URI/domain, including the port during local development.
 - **Redis session store** — swap the default MemoryStore for [`connect-redis`](https://github.com/tj/connect-redis) in production. MemoryStore leaks memory and does not survive restarts.
 - **HTTPS only** — set `cookie.secure: true` and serve behind a TLS terminator.
 - **Rate-limit `/api/auth/nonce`** — prevents nonce exhaustion attacks. Add [`express-rate-limit`](https://github.com/express-rate-limit/express-rate-limit) to the nonce endpoint.

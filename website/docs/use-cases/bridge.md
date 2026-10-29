@@ -2,12 +2,15 @@
 
 Bridges connect XRPL to external networks (EVM chains, Cosmos, Solana, etc.). The wallet kit signs XRPL-side transactions — bridge protocol logic, destination-chain interactions, and claim flows are handled by the bridge's own SDK.
 
+This guide targets XRPL, not the Kit's Xahau runtime. Xahau support does not
+automatically add support for `XChainCommit` or `EscrowCreate`.
+
 ## Common Patterns
 
 Most XRPL bridges use one of three mechanisms:
 
 - **Lock-and-mint via Payment** — send XRP or IOU to a bridge custodial address; the bridge mints wrapped tokens on the destination chain
-- **XRPL EVM Sidechain (XLS-38d)** — uses the native `XChainCommit` transaction to move assets to the XRPL EVM-compatible sidechain
+- **XLS-38 bridges** — use native cross-chain transactions where the selected bridge actually implements that protocol; do not assume every EVM bridge uses XLS-38
 - **Escrow / HTLC** — `EscrowCreate` with a cryptographic condition, released by the bridge when the destination-chain leg is confirmed
 
 ## Lock-and-Mint: Payment to Bridge
@@ -36,7 +39,11 @@ await manager.signAndSubmit({
 
 > Memo format varies by bridge protocol. Always consult the bridge's integration docs before constructing Memo fields.
 
-## XRPL EVM Sidechain (XLS-38d)
+## XLS-38 Bridge Transactions {#xrpl-evm-sidechain-xls-38d}
+
+The following is an XLS-38 transaction shape, not a universal EVM bridge
+integration. Obtain the bridge definition and XRPL-format destination account
+from that bridge's SDK; do not place an EVM `0x` address in an AccountID field.
 
 ```ts
 // Step 1: Create a claim ID on the destination chain first (bridge SDK call)
@@ -54,7 +61,7 @@ await manager.signAndSubmit({
     },
     XChainClaimID:        "<claim_id>",        // obtained from bridge SDK
     Amount:               "5000000",           // 5 XRP in drops
-    OtherChainDestination: "<evm_address>",
+    OtherChainDestination: "<destination_classic_address>",
   },
 });
 ```
@@ -63,6 +70,8 @@ await manager.signAndSubmit({
 
 ```ts
 // Step 1: Create time-locked escrow on XRPL
+import { unixTimeToRippleTime } from "xrpl";
+const now = Date.now(); // unixTimeToRippleTime accepts milliseconds
 await manager.signAndSubmit({
   txJson: {
     TransactionType: "EscrowCreate",
@@ -70,7 +79,8 @@ await manager.signAndSubmit({
     Destination: "<bridge_address>",
     Amount: "10000000",                                    // 10 XRP in drops
     Condition: "<crypto_condition_hex>",                   // PREIMAGE-SHA-256
-    FinishAfter: Math.floor(Date.now() / 1000) + 3600,    // 1-hour window
+    FinishAfter: unixTimeToRippleTime(now + 3_600_000), // Release no earlier than 1 hour
+    CancelAfter: unixTimeToRippleTime(now + 7_200_000), // Refund possible after 2 hours
   },
 });
 
@@ -88,11 +98,15 @@ await manager.signAndSubmit({
 | DropFi | ✅ | ✅ | ✅ | |
 | WalletConnect | ✅ | ⚠️ | ✅ | `XChainCommit` support depends on the connected wallet app |
 | XRPL Snap | ✅ | ✅ | ✅ | |
-| Ledger | ✅ | ⚠️ | ✅ | `XChainCommit` requires XRPL app **v2.4.0+** |
+| Ledger | ✅ | Wallet dependent | Wallet dependent | Check XRP app version and fields |
+| [GhostSig](/docs/adapters/ghostsig) | ✅ | Wallet dependent | Wallet dependent | Generic XRPL signing |
+| [Xyra](/docs/adapters/xyra) | ✅ | Wallet dependent | Wallet dependent | Generic XRPL signing |
+| [Joey Wallet](/docs/adapters/joey-wallet) | ✅ | Wallet dependent | Wallet dependent | Generic XRPL signing |
 
 ## Tips
 
-**The wallet kit signs XRPL transactions only.** Destination-chain claim transactions (claim wrapped tokens, finalise bridge) require the bridge's own SDK or UI — outside the scope of this kit.
+**These examples sign the XRPL side only.** Kit also supports Xahau, but does
+not implement EVM signing or bridge-specific claims. Keep those in the bridge SDK.
 
 **Always verify `DestinationTag` requirements before sending.** Sending to a bridge custodial address without the correct tag may result in permanently lost funds. The bridge documentation will specify the required tag value.
 

@@ -45,6 +45,33 @@ function App() {
 
 `WalletButton` renders a fully self-contained connect / account panel button. No extra configuration needed.
 
+## Xahau and Additional Wallets
+
+Use the full client to configure Xahau without importing the protocol manually:
+
+```tsx
+import { createWalletClient } from "@xrpl-wallet-kit/client";
+
+const manager = createWalletClient({
+  network: "xahau-mainnet",
+  wallets: ["xaman", "gemwallet", "xyra", "ledger"],
+  xamanClientId: "YOUR_XAMAN_CLIENT_ID",
+  preflight: { maxFeeDrops: "50000" },
+});
+// Pass this manager to WalletKitProvider as above.
+```
+
+The provider filters its modal by network support. Set `ui.walletList.layout`
+to `"auto"` on the provider for an adaptive list/card picker.
+For a smaller explicit core/selective setup, follow
+[Xahau Configuration](/docs/configuration/xahau#core-selective-integration).
+On Xahau, GemWallet supports verified restore; other adapters reconnect explicitly after reload.
+
+On XRPL, opt into [GhostSig](/docs/adapters/ghostsig), [Xyra](/docs/adapters/xyra)
+and [Joey Wallet](/docs/adapters/joey-wallet) with
+`wallets: ["ghostsig", "xyra", "joey-wallet"]`. They are not in the default
+XRPL list. Joey's extension ID is distinct from WalletConnect's `joey`.
+
 ## `WalletKitProvider`
 
 Wrap your application (or the subtree that needs wallet access) with `WalletKitProvider`:
@@ -125,16 +152,21 @@ interface WalletKitContextValue {
 }
 ```
 
-For a custom selector, treat `"unknown"` as a pending check rather than as unavailable:
+For a custom selector, treat `"unknown"` as a pending check. Detection is a hint,
+not a reason to disable web/mobile/hardware wallets. Filter by chain separately:
 
 ```tsx
-function WalletList() {
-  const { wallets, availability, connect } = useWalletKit();
+import { adapterSupportsNetwork } from "@xrpl-wallet-kit/core";
 
-  return wallets.map((wallet) => (
+function WalletList() {
+  const { manager, wallets, availability, connect } = useWalletKit();
+
+  return wallets.filter(wallet => adapterSupportsNetwork(
+    manager.getAdapter(wallet.id)!, manager.getNetwork(),
+  )).map((wallet) => (
     <button
       key={wallet.id}
-      disabled={availability[wallet.id] !== true}
+      aria-busy={availability[wallet.id] === "unknown"}
       onClick={() => connect(wallet.id)}
     >
       {wallet.name}
@@ -171,7 +203,9 @@ function AddressDisplay() {
 
 ### `useWalletStatus()`
 
-Returns `"disconnected" | "connecting" | "connected"` without subscribing to account details — useful for lightweight status indicators:
+Returns `"disconnected" | "connecting" | "connected"` for status indicators.
+It reads the shared context; it does not establish an independent subscription
+or guarantee fewer renders:
 
 ```tsx
 function StatusDot() {
@@ -223,14 +257,19 @@ type ReactWalletButtonProps = {
   label?: string;
   size?: "sm" | "md" | "lg";
   variant?: "default" | "pill" | "minimal" | "outline";
-  icon?: false
-    | { type: "default" }
+  icon?: { type: "default" }
     | { type: "image"; src: string; alt?: string }
     | { type: "html"; html: string; ariaLabel?: string };
   showAdapterIcon?: boolean;
   showChevron?: boolean;
+  showBalance?: boolean;
+  balanceResolver?: WalletBalanceResolver;
 };
 ```
+
+This is a subset: the component accepts managed `WalletButtonOptions` plus span
+attributes. With `showBalance`, the native balance is hidden in a constrained
+button before wrapping but remains in the account panel.
 
 `WalletButton` must be used inside a `WalletKitProvider`.
 
@@ -262,6 +301,12 @@ function CustomConnectButton() {
 `WalletKitProvider` keeps its children and a deterministic context value in server-rendered HTML. The modal is created client-side only, so `modal` is initially `null`; `openModal()` and `closeModal()` are safe no-ops until it mounts.
 
 The React package publishes a `"use client"` boundary and works directly in Next.js App Router Client Components. The dedicated `@xrpl-wallet-kit/next` package remains available as a thin discoverability alias. See the [Next.js guide](/docs/frameworks/next) for provider placement.
+
+The provider requests `manager.autoReconnect()` after mount. Set the manager's
+`autoReconnect: true` to allow supported restoration; do not add another startup
+effect for the same call. Use the manager for transactions and native login:
+`manager.signTransaction()`, `signAndSubmit()`, `signMessage()` and `signIn()`.
+Check capabilities and see [native sign-in](/docs/auth/native-sign-in) for Joey.
 
 ## TypeScript
 

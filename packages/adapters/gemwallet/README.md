@@ -53,9 +53,9 @@ When using `@xrpl-wallet-kit/client` defaults, GemWallet is already included.
 
 ## Auto Reconnect
 
-GemWallet restore is intentionally conservative. The stored dApp session is not treated as proof that the extension is still connected. On reload, the adapter must read the active GemWallet address and compare it with the stored XRPL address.
+GemWallet restore is intentionally conservative. The stored dApp session is not treated as proof that the extension is still connected. On reload, the adapter must read the active GemWallet address and compare it with the stored account address.
 
-`restoreSession()` does not call connect, open extension UI, ask the user to sign in, or submit any wallet request beyond passive address inspection. Normal stale or unavailable states return `null` so the manager can emit stale/expired session events and let the user reconnect manually.
+`restoreSession(session, options?)` reads the current address and, for chain-aware adapters, the current network. Xahau restore also requires the manager's registered protocol context; cached keys and RPC URLs are not trusted. Missing or rejected network information requires explicit reconnect, even where explicit connect permits a configured-preset fallback. Restore never calls connect, signing or submission. Normal stale or unavailable states return `null`.
 
 ## Testing
 

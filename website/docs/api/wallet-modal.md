@@ -164,6 +164,8 @@ modal.updateOptions({
 });
 ```
 
+<div id="walletuiconfig"></div>
+
 `updateOptions` accepts a `WalletUiConfig` object:
 
 ```ts
@@ -190,7 +192,7 @@ interface WalletUiConfig {
   /** Wallet list settings */
   walletList?: {
     layout?: "auto" | "list" | "grid" | "card" | "icon";
-    wallets?: string[];
+    wallets?: "all" | string[];
     groups?: WalletUiGroup[];
     /** Show small wallet group subtitles under wallet names (default: false) */
     showGroup?: boolean;
@@ -209,8 +211,6 @@ interface WalletUiConfig {
     accountStatus?: "full" | "address" | "icon";
     icon?: WalletButtonIconConfig;
     showBalance?: boolean;
-    showRecentTransactions?: boolean;
-    maxVisibleTransactions?: number;
     showAdapterIcon?: boolean;
     showChevron?: boolean;
   };

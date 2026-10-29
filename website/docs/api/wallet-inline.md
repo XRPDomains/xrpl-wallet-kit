@@ -59,7 +59,7 @@ const inline = new WalletInline({
   manager,
   themeMode: "dark",
   theme: { accent: "#0ea5e9" },
-  layout: "grid",
+  layout: "card",
   size: "wide",
   textSize: "md",
   wallets: ["xaman", "gemwallet", "ledger", "walletconnect"],
@@ -79,4 +79,7 @@ const inline = new WalletInline({
 | Mount target | Optional | Required |
 | Wallet and QR rendering | Shared | Shared |
 
-`WalletInline` is intentionally not created by `createWalletKit()` in phase 1. This keeps the default integration small and avoids introducing a second automatic UI lifecycle.
+`WalletInline` is mounted explicitly; `createWalletKit()` creates the overlay
+modal instead. The inline picker shares chain filtering and the network footer.
+Its unconstrained height keeps Auto in List mode; choose `card` explicitly for
+a compact three-column wallet picker.

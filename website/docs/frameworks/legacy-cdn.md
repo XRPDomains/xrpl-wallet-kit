@@ -5,7 +5,7 @@ Use XRPL Wallet Kit on pages that cannot use a bundler - a classic CMS site, a l
 ## Load the IIFE Bundle
 
 ```html
-<!-- From CDN (pinned to the current stable release) -->
+<!-- From CDN (tracks latest; not version-pinned) -->
 <script src="https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js"></script>
 ```
 
@@ -43,13 +43,12 @@ The IIFE bundle is large because it includes all adapters and polyfills. For pro
   <script src="https://cdn.jsdelivr.net/npm/@xrpl-wallet-kit/browser@latest/dist/xrpl-wallet-kit.iife.min.js"></script>
   <script>
     var kit = XRPLWalletKit.createWalletKit({
-  autoReconnect: true,
+      autoReconnect: true,
       wallets: 'all',
       walletConnectProjectId: 'YOUR_WC_PROJECT_ID',
       connectButton: '#connect-btn',
     });
 
-    kit.manager.autoReconnect();
   </script>
 </body>
 </html>
@@ -72,13 +71,8 @@ The IIFE bundle is large because it includes all adapters and polyfills. For pro
         projectId: 'YOUR_WC_PROJECT_ID'
       }),
     ],
-    network: {
-      id: 'mainnet',
-      networkType: 'MAINNET',
-      rpcUrl: 'wss://xrplcluster.com',
-      nativeAsset: 'XRP',
-      nativeAssetDecimals: 6,
-    }
+    network: 'mainnet',
+    autoReconnect: true
   });
 
   var modal = new WalletKit.WalletModal({ manager: manager });
@@ -114,13 +108,8 @@ Call the same global API from your existing page script and keep the wallet UI m
 
   var manager = new WalletKit.WalletManager({
     adapters: [ WalletKit.createGemWalletAdapter() ],
-    network: {
-      id: 'mainnet',
-      networkType: 'MAINNET',
-      rpcUrl: 'wss://xrplcluster.com',
-      nativeAsset: 'XRP',
-      nativeAssetDecimals: 6,
-    }
+    network: 'mainnet',
+    autoReconnect: true
   });
 
   var modal = new WalletKit.WalletModal({ manager: manager });
@@ -158,8 +147,6 @@ document.getElementById('pay-btn').addEventListener('click', async function () {
         Account: manager.getAccount().address,
         Destination: 'rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe',
         Amount: '1000000',
-        Fee: '12',
-        Sequence: 1,
       }
     });
     alert('Transaction submitted: ' + result.hash);
@@ -211,15 +198,19 @@ XRPLWalletKit.createGemWalletAdapter()
 XRPLWalletKit.createWalletConnectAdapter(options)
 XRPLWalletKit.createCrossmarkAdapter()
 XRPLWalletKit.createLedgerAdapter()
-XRPLWalletKit.createDropfiAdapter()
+XRPLWalletKit.createDropFiAdapter()
 XRPLWalletKit.createXrplSnapAdapter()
-XRPLWalletKit.createGhostsigAdapter(options) // v0.1.20+, opt-in
-XRPLWalletKit.createJoeyWalletAdapter(options) // v0.3.0+, opt-in
+XRPLWalletKit.createGhostsigAdapter(options) // opt-in
+XRPLWalletKit.createXyraAdapter(options) // opt-in on XRPL, default on Xahau
+XRPLWalletKit.createJoeyWalletAdapter(options) // opt-in
 ```
 
 GhostSig is not included by `wallets: 'all'`. Enable it explicitly with
 `wallets: ['ghostsig']` or pass `createGhostsigAdapter()` in `adapters`.
 See the [GhostSig guide](/docs/adapters/ghostsig) for popup and signing requirements.
+
+Xyra is also opt-in on XRPL: use `wallets: ['xyra']`. It is included by default
+when the full client is configured for Xahau. See [Xyra](/docs/adapters/xyra).
 
 Enable Joey Wallet's browser extension with `wallets: ['joey-wallet']`.
 The returned kit exposes `kit.signIn({ nonce, statement, resources })` for
@@ -236,8 +227,8 @@ If your HTML page uses `<script type="module">` you can also import ESM directly
   import { createWalletKit } from "https://esm.sh/@xrpl-wallet-kit/client@latest";
 
   const { manager } = createWalletKit({
-  autoReconnect: true,
-    adapters: [XRPLWalletKit.createGemWalletAdapter()],
+    autoReconnect: true,
+    wallets: ["gemwallet"],
     network: "mainnet",
   });
 </script>
@@ -249,7 +240,7 @@ ESM imports from esm.sh do not require a bundler, but they do need a browser tha
 
 ## See Also
 
-- [Xahau](/docs/configuration/xahau#browser-cdn) - automatic runtime loading, hosting and CSP requirements in v0.2.0+
+- [Xahau](/docs/configuration/xahau#browser-cdn) - automatic runtime loading, matching assets, hosting and CSP requirements
 
 - [Quick Start](/docs/quick-start) — modern bundler setup
 - [Vanilla TypeScript guide](/docs/frameworks/vanilla) — Vite / webpack setup

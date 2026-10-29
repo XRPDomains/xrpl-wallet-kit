@@ -8,7 +8,7 @@
 import { WalletManager } from "@xrpl-wallet-kit/core";
 import { WalletModal, WalletButton } from "@xrpl-wallet-kit/ui";
 
-const manager = new WalletManager({ adapters: [/* ... */], network: { /* ... */ } });
+const manager = new WalletManager({ adapters: [/* ... */], network: "mainnet" });
 const modal   = new WalletModal({ manager });
 
 const button = new WalletButton({
@@ -59,7 +59,7 @@ interface WalletButtonOptions {
   accountPanelMode?: "dropdown" | "modal";    // default: "modal"
 
   // Balance display
-  showBalance?: boolean;            // show XRP balance in panel (default: false)
+  showBalance?: boolean;            // native balance in button/panel (default: false)
   balanceResolver?: WalletBalanceResolver;    // custom balance fetcher
 
   // Recent transactions
@@ -173,7 +173,7 @@ const button = new WalletButton({
 ## Account panel mode
 
 ```ts
-// Dropdown — panel appears directly below the button (default on desktop)
+// Dropdown — panel appears directly below the button (explicit opt-in)
 const button = new WalletButton({
   manager,
   modal,
@@ -192,7 +192,15 @@ const button = new WalletButton({
 
 ## Balance display
 
-Balance display is off by default. Enable it to show the XRP balance in the account panel.
+Balance display is off by default. Enable it to show the selected network's
+native asset (XRP or XAH) in the button and account panel. The default resolver
+displays the available balance after reserves and keeps total/reserve details
+in the panel. Formatting uses fewer decimals for larger balances.
+
+When the host constrains the button width, Kit hides the inline balance before
+it wraps; the account panel still shows it. Avoid CSS that forces Kit's balance
+onto a separate line or overrides its visibility. Requests for the same active
+balance are shared; a transient refresh failure retains the previous value.
 
 ```ts
 const button = new WalletButton({
@@ -201,12 +209,19 @@ const button = new WalletButton({
   target,
   showBalance: true,
   // Optional: supply a custom balance resolver
-  balanceResolver: async ({ address, network }) => {
-    const xrp = await myBalanceApi.getBalance(address);
-    return { xrpBalance: xrp, symbol: "XRP" };
+  balanceResolver: async ({ address, network, signal }) => {
+    const value = await myBalanceApi.getBalance(address, network?.id, signal);
+    const symbol = network?.nativeAsset ?? "XRP";
+    return { value, formatted: `${value} ${symbol}`, symbol };
   },
 });
 ```
+
+Browser balance reads use `network.httpRpcUrl`. Choose an endpoint that permits
+your origin or provide your own resolver through a trusted backend. The Xahau
+protocol's `xahau.request` override does not replace the balance resolver.
+Call `kit.refreshBalance()` or `button.refreshBalance()` after external activity;
+avoid repeatedly refreshing from a render loop.
 
 ## Recent transactions
 

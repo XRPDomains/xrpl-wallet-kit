@@ -10,7 +10,7 @@ type GemWalletNetworkResponse = { type?: string; result?: { network?: string | {
 export interface GemWalletProvider {
   isInstalled?: () => Promise<GemWalletBooleanResponse>;
   isConnected?: () => Promise<GemWalletBooleanResponse>;
-  getAddress?: () => Promise<{ result?: { address?: string } }>;
+  getAddress?: () => Promise<{ type?: string; result?: { address?: string } }>;
   getPublicKey?: () => Promise<{ result?: { address?: string; publicKey?: string } } | { address?: string; publicKey?: string } | null | undefined>;
   getNetwork?: () => Promise<GemWalletNetworkResponse>;
   signTransaction?: (payload: unknown) => Promise<{ result?: { signature?: string | null } }>;
@@ -88,22 +88,52 @@ export class GemWalletAdapter extends BaseWalletAdapter {
       raw: { address, publicKey: publicKey?.raw, network }
     };
   }
-  async restoreSession(session: WalletSession) {
-    if (session.account.network && getNetworkFamily(session.account.network) !== "xrpl") return null;
-    if (!await this.waitForAvailability(this.hasInjectedProvider() ? 0 : 2500)) return null;
-    const provider = this.getProvider();
-    const address = await this.getCurrentAddress(provider);
-    if (!address || address.accountAddress !== session.account.address) return null;
-    this.account = { ...session.account, address: address.accountAddress };
-    if (this.options.supportedChains) {
-      try { await this.assertProviderState(provider); }
-      catch { this.account = undefined; return null; }
-    }
-    return {
-      account: { ...session.account, address: address.accountAddress },
-      session: { ...session, account: { ...session.account, address: address.accountAddress } },
-      raw: address.raw
+  async restoreSession(session: WalletSession, options: ConnectOptions = {}) {
+    const generation = ++this.generation;
+    this.account = undefined;
+    this.protocolContext = undefined;
+    const assertCurrent = () => {
+      if (generation !== this.generation || options.signal?.aborted) throw createWalletError.notConnected();
     };
+    try {
+      assertCurrent();
+      const network = options.network ?? session.account.network;
+      if (network && !adapterSupportsNetwork(this, network)) return null;
+      const externalProtocol = network && getNetworkFamily(network) !== "xrpl";
+      const context = options.protocolContext;
+      if (externalProtocol && (!context || context.protocol.family !== getNetworkFamily(network)
+        || context.network.id !== network.id || context.network.networkId !== network.networkId
+        || getNetworkFamily(context.network) !== getNetworkFamily(network)
+        || context.network.networkType !== network.networkType || context.network.rpcUrl !== network.rpcUrl)) return null;
+      if (!await this.withAbort(() => this.waitForAvailability(this.hasInjectedProvider() ? 0 : 2500), options.signal)) return null;
+      assertCurrent();
+      const provider = this.getProvider();
+      const address = await this.withAbort(() => this.getCurrentAddress(provider), options.signal);
+      assertCurrent();
+      if (!address || address.accountAddress !== session.account.address) return null;
+      let reported: GemWalletNetworkResponse | undefined;
+      if (this.options.supportedChains) {
+        if (!network) return null;
+        // Restore needs positive network evidence; unlike explicit connect it cannot use a configured-preset fallback.
+        reported = await this.readNetwork(provider, options.signal, assertCurrent);
+        const hint = getProviderHint(network, "gemwallet");
+        if (reported.result?.chain !== hint.chain || this.networkName(reported.result?.network) !== hint.network) return null;
+      }
+      assertCurrent();
+      const account = { ...session.account, address: address.accountAddress, network,
+        ...(externalProtocol ? { publicKey: undefined, networkType: this.networkName(reported?.result?.network) } : {}) };
+      this.account = account;
+      this.protocolContext = externalProtocol ? { protocol: context!.protocol, network: network! } : undefined;
+      return {
+        account,
+        session: { ...session, account, ...(externalProtocol ? {
+          metadata: { ...session.metadata, networkSource: "provider", providerNetworkAvailable: true }
+        } : {}) },
+        raw: { address: address.raw, network: reported }
+      };
+    } catch {
+      return null;
+    }
   }
 
   async signMessage(request: SignMessageRequest) {
@@ -314,6 +344,7 @@ export class GemWalletAdapter extends BaseWalletAdapter {
     if (!provider.getAddress) return undefined;
     try {
       const raw = await provider.getAddress();
+      if (raw.type === "reject") return undefined;
       const accountAddress = raw.result?.address;
       return accountAddress ? { accountAddress, raw } : undefined;
     } catch {

@@ -98,17 +98,15 @@ const toast = new WalletToast({
 
 ## Custom Explorer URL
 
-By default, toast links use the built-in XRPL explorer for the active network. Override with your own explorer:
+By default, toast links use the active network's explorer, including Xahau presets.
+When overriding, preserve that chain context:
 
 ```ts
+import { getExplorerTxUrl } from "@xrpl-wallet-kit/core";
+
 const toast = new WalletToast({
   manager,
-  explorerUrl: (hash, network) => {
-    if (network?.id === "mainnet") {
-      return `https://livenet.xrpl.org/transactions/${hash}`;
-    }
-    return `https://testnet.xrpl.org/transactions/${hash}`;
-  },
+  explorerUrl: (hash, network) => getExplorerTxUrl(network, hash),
 });
 ```
 

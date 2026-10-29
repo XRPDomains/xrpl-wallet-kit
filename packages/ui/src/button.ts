@@ -2,6 +2,8 @@ import QRCodeStyling from "qr-code-styling";
 import { getExplorerAccountUrl, getExplorerTxUrl, getNativeAsset, isMainnetNetwork, sanitizeWalletUrl } from "@xrpl-wallet-kit/core";
 import type { WalletSession, WalletTransaction } from "@xrpl-wallet-kit/core";
 import { createXrpBalanceResolver } from "./balance";
+import { createXahauNameResolver } from "./xahauname";
+import type { XahauNameResolverOptions } from "./xahauname";
 import { ensureWalletStyle, lockPageScroll, unlockPageScroll } from "./dom";
 import { QR_DARK, QR_LIGHT, QR_SIZE } from "./icons";
 import { resolveWalletUiMessages } from "./locales";
@@ -70,7 +72,7 @@ export class WalletButtonController {
       themeMode: "light",
       theme: {},
       nonce: options.nonce,
-      identityResolver: options.identityResolver ?? createXrpDomainsResolver(),
+      identityResolver: options.identityResolver ?? createDefaultWalletIdentityResolver(),
       balanceResolver: options.balanceResolver ?? createXrpBalanceResolver(),
       explorerUrl: options.explorerUrl,
       formatAddress: options.formatAddress,
@@ -174,6 +176,7 @@ export class WalletButtonController {
       : this.options.messages;
     this.options = { ...this.options, ...options, messages: nextMessages };
     if ("showWeb3Name" in options || "identityResolver" in options) {
+      if ("identityResolver" in options) this.identityCache.clear();
       void this.resolveIdentity(this.options.manager.getSession());
     }
     if ("showBalance" in options || "balanceResolver" in options) {
@@ -503,6 +506,7 @@ export class WalletButtonController {
   private async resolveIdentity(session: WalletSession | null, options: { force?: boolean } = {}): Promise<void> {
     const address = this.getSessionAddress(session);
     if (!session || !address || !this.shouldShowWeb3Name() || !this.options.identityResolver) {
+      this.identityRequest += 1;
       this.identityName = null;
       this.identityAvatar = null;
       this.identityResolvingKey = undefined;
@@ -583,7 +587,9 @@ export class WalletButtonController {
   }
 
   private identityCacheKey(session: WalletSession): string {
-    return `${session.account.network?.id ?? session.account.networkType ?? "unknown"}:${this.getSessionAddress(session)}`;
+    const network = session.account.network;
+    return JSON.stringify([network?.family ?? "xrpl", network?.id ?? session.account.networkType,
+      network?.networkId, network?.rpcUrl, this.getSessionAddress(session)]);
   }
 
   private cancelBalance(): void {
@@ -1251,6 +1257,19 @@ export class WalletButtonController {
       "'": "&#39;"
     })[char] ?? char);
   }
+}
+
+export interface DefaultWalletIdentityResolverOptions {
+  xrpDomains?: XrpDomainsResolverOptions;
+  xahauName?: XahauNameResolverOptions | false;
+}
+
+export function createDefaultWalletIdentityResolver(options: DefaultWalletIdentityResolverOptions = {}): WalletIdentityResolver {
+  const xrp = createXrpDomainsResolver(options.xrpDomains);
+  const xahau = options.xahauName === false ? undefined : createXahauNameResolver(options.xahauName);
+  return (address, session, context) => session.account.network?.family === "xahau"
+    ? xahau?.(address, session, context) ?? Promise.resolve(null)
+    : xrp(address, session, context);
 }
 
 export function createXrpDomainsResolver(options: XrpDomainsResolverOptions = {}): WalletIdentityResolver {

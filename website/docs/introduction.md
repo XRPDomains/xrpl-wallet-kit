@@ -42,7 +42,7 @@ The **core** package contains the manager, types, errors, and storage logic. It 
 
 ## Supported Wallets
 
-The table below covers XRPL. The [Xahau integration](/docs/configuration/xahau) in v0.2.0
+The table below covers XRPL. The [Xahau integration](/docs/configuration/xahau)
 uses a chain-filtered subset with its own transaction scope and wallet configuration.
 
 | Wallet | Package | Type | Connect | Sign only | Sign and submit |
@@ -70,9 +70,10 @@ and submission, including Payment and NFT offers, but not `signMessage()`.
 Enable it explicitly with `wallets: ["ghostsig"]` or `createGhostsigAdapter()`;
 the default client list and `wallets: "all"` do not include it.
 
-[Xyra](/docs/adapters/xyra) supports XRPL mainnet/testnet connection and
-transaction signing with or without submission. Add `createXyraAdapter()`
-explicitly to your manager's `adapters`. It does not support `signMessage()`
+[Xyra](/docs/adapters/xyra) supports XRPL and Xahau mainnet/testnet connection and
+transaction signing with or without submission. Select `wallets: ["xyra"]` on
+XRPL or add `createXyraAdapter()` explicitly; the full client includes it by
+default on Xahau. It does not support `signMessage()`
 or passive session restore. The Sign only column refers to `manager.signTransaction()`;
 see the [capability matrix](/docs/adapters/overview#capability-matrix) for message signing,
 native sign-in and session guarantees.
@@ -107,13 +108,19 @@ XRPL Wallet Kit has no React dependency. The headless core works with any JavaSc
 
 ## Experimental Batch Integration
 
-Version **0.1.21** adds opt-in, single-account **All-or-Nothing Batch**
+The kit provides opt-in, single-account **All-or-Nothing Batch**
 preparation, inner-transaction preflight and per-operation confirmation tracking.
 Applications can group 2-8 operations while retaining the existing signing API.
 Enable compatible wallets explicitly. See [Batch Transactions](/docs/configuration/batch)
 for scope, examples and integration requirements.
 
 ## Next Steps
+
+For Xahau, configure `network: "xahau-mainnet"` and a positive fee ceiling with
+the full client. Xaman, GemWallet and Xyra are configured automatically; select
+Ledger explicitly for the fourth wallet. The separate codec runtime loads on
+demand. Payment, Invoke/HookParameters and URITokens use the existing signing
+methods; Batch and multisign remain outside that runtime's scope.
 
 - [Installation](/docs/installation) — install the packages
 - [Quick Start](/docs/quick-start) — connect your first wallet in 5 minutes

@@ -351,7 +351,7 @@ export interface WalletAdapter {
   connect: (options: ConnectOptions) => Promise<ConnectResult>;
   cancelPendingConnection?: () => void | Promise<void>;
   disconnect?: () => Promise<void>;
-  restoreSession?: (session: WalletSession) => Promise<ConnectResult | null>;
+  restoreSession?: (session: WalletSession, options?: ConnectOptions) => Promise<ConnectResult | null>;
   canRecoverSession?: (options: ConnectOptions) => boolean | Promise<boolean>;
   recoverSession?: (options: ConnectOptions) => Promise<ConnectResult | null>;
   switchNetwork?: (network: WalletNetwork) => Promise<SwitchNetworkResult | void>;

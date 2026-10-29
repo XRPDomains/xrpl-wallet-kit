@@ -2,7 +2,7 @@
 
 XRPL Wallet Kit supports mainnet, testnet, devnet, and custom XRPL networks,
 subject to adapter network restrictions. Network presets determine explorer
-links and non-mainnet badges. For Xahau mainnet/testnet integration since v0.2.0,
+links, native-asset labels and the modal footer. For Xahau mainnet/testnet integration,
 see [Xahau](/docs/configuration/xahau).
 
 ## Built-in Networks
@@ -35,7 +35,8 @@ const manager = new WalletManager({
   networks: [{
     id: "my-network",
     name: "My XRPL Network",
-    networkType: "MAINNET",        // used for network badge color
+    family: "xrpl",
+    networkType: "MAINNET",        // network classification and footer context
     rpcUrl: "wss://my-xrpl-node.example.com",
     httpRpcUrl: "https://my-xrpl-node.example.com",
     nativeAsset: "XRP",
@@ -51,27 +52,28 @@ const manager = new WalletManager({
 
 ## Network Badge
 
-The modal displays a colored network badge when the connected network is not mainnet:
-
-- **Mainnet** — no badge (clean UI)
-- **Testnet** — yellow badge: `TESTNET`
-- **Devnet** — orange badge: `DEVNET`
-- **Custom** — shows the `id` value
-
 The modal footer identifies the selected chain and network, for example
 `XRPL Wallet Kit · XRPL Mainnet` or `XRPL Wallet Kit · Xahau Mainnet`, without
-adding a separate mainnet badge. Testnet and devnet retain a visible network badge.
+adding a separate badge above the wallet list. Testnet, Devnet and custom
+networks are also identified in the footer; there is no duplicate network badge.
+
+For Xahau with the all-in-one client, use `network: "xahau-mainnet"` or
+`"xahau-testnet"`. The client registers presets and the lazy protocol automatically.
+Core and selective integrations must register the protocol explicitly; changing
+`nativeAsset` to `"XAH"` on an XRPL preset does not enable Xahau signing. See
+[Xahau Configuration](/docs/configuration/xahau).
 
 ## Switching Networks
 
-Since `0.1.17`, the manager exposes a unified network-switching API. It only invokes adapters that explicitly advertise `switchNetwork: true` and rejects targets outside the adapter's `supportedNetworks` metadata.
+The manager only invokes adapters that explicitly advertise `switchNetwork: true`
+and rejects targets outside their `supportedChains` and `supportedNetworks` metadata.
 
 ```ts
 const details = manager.getCapabilityDetails();
 
 if (
   manager.can("switchNetwork") &&
-  details?.supportedNetworks?.includes("testnet")
+  (!details?.supportedNetworks || details.supportedNetworks.includes("testnet"))
 ) {
   await manager.switchNetwork("testnet");
 }

@@ -13,7 +13,7 @@ const kit = createWalletKit({
 });
 ```
 
-Auto starts with List and uses the built-in three-column Card layout when the list overflows the modal. It responds to viewport and wallet-list changes without adding a separate card design. Use `"list"`, `"card"`, `"grid"`, or `"icon"` for a fixed layout; the default remains `"list"`. Auto keeps List for inline previews, where height is unconstrained.
+Auto starts with List and uses the built-in three-column Card layout when the list overflows the modal. It responds to viewport and wallet-list changes. Use `"list"`, `"card"`, or `"icon"` for a fixed layout; `"grid"` remains accepted for compatibility but is not offered in the website controls. The SDK default remains `"list"`. Auto keeps List for inline previews, where height is unconstrained.
 
 ### Theme Options
 
@@ -96,14 +96,14 @@ Use a fresh nonce for each server-rendered response and keep the value consisten
 |---|---|---|---|
 | `accent` | `#0078ae` | `#4aa3ff` | Links, focus rings, selected states, and primary accents |
 | `accentText` | `#ffffff` | `#ffffff` | Text/icons shown on accent-colored backgrounds |
-| `background` | `#ffffff` | `#111827` | Modal, panel, and toast background |
+| `background` | `#fbfcff` | `#111827` | Modal, panel, and toast background |
 | `foreground` | `#111827` | `#f8fafc` | Primary text |
 | `muted` | `#64748b` | `#94a3b8` | Secondary and helper text |
 | `error` | `#b45309` | `#fbbf24` | Error state color |
 | `success` | `#059669` | `#34d399` | Success state color, such as copied/checkmark feedback |
-| `surface` | `#f8fafc` | `#1f2937` | Wallet card and action surface |
-| `surfaceHover` | `#f1f5f9` | `#263244` | Hover surface |
-| `border` | `#e5e7eb` | `#334155` | Borders |
+| `surface` | `#f3f7fb` | `#1f2937` | Wallet card and action surface |
+| `surfaceHover` | `#edf3f8` | `#263244` | Hover surface |
+| `border` | `rgba(17,24,39,.08)` | `rgba(248,250,252,.10)` | Borders |
 | `overlay` | `rgba(15,23,42,.46)` | `rgba(2,6,23,.72)` | Backdrop overlay |
 | `overlayBlur` | `0` | `0` | Backdrop blur in pixels |
 | `fallbackIconBackground` | `rgba(15,23,42,.06)` | `rgba(255,255,255,.10)` | Fallback wallet icon background |
@@ -111,7 +111,7 @@ Use a fresh nonce for each server-rendered response and keep the value consisten
 | `radius` | `14px` | `14px` | Modal and panel corner radius |
 | `walletRadius` | `10px` | `10px` | Wallet rows, cards, buttons, and small surfaces |
 | `spinnerTrail` | `rgba(0,0,0,.08)` | `rgba(255,255,255,.08)` | Spinner track color |
-| `headerBackground` | `#ffffff` | `#111827` | Modal and account panel header background |
+| `headerBackground` | `#fbfcff` | `#111827` | Modal and account panel header background |
 | `shadow` | `0 8px 40px rgba(15,23,42,.12), 0 0 0 1px rgba(15,23,42,.04)` | `none` | Modal shadow |
 | `fontFamily` | `Inter, ui-sans-serif, system-ui, ...` | `Inter, ui-sans-serif, system-ui, ...` | Font stack |
 

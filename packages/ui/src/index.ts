@@ -8,6 +8,8 @@ export * from "./modal";
 export * from "./button";
 export * from "./toast";
 export * from "./balance";
+export { createXahauNameResolver } from "./xahauname";
+export type { XahauNameDeployment, XahauNameResolverOptions } from "./xahauname";
 export * from "./icons";
 
 export { WalletModal as XrplWalletModal } from "./modal";

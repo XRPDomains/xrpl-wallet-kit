@@ -231,11 +231,12 @@ test("WalletButton account avatar uses skeleton while identity resolves", () => 
     identityResolver: async () => null
   }) as unknown as {
     identityResolvingKey: string;
+    identityCacheKey(session: WalletSession): string;
     renderPanelContent(session: WalletSession): string;
     renderStyles(): string;
   };
 
-  button.identityResolvingKey = "mainnet:rTestAddress1234567890";
+  button.identityResolvingKey = button.identityCacheKey(session);
   const html = button.renderPanelContent(session);
 
   assert.match(html, /xwk-account-avatar-skeleton/);

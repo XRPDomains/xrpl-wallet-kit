@@ -47,6 +47,7 @@ export class WalletManager extends WalletEventEmitter {
   private destroyed = false;
   private sessionMutation: Promise<void> = Promise.resolve();
   private autoReconnectPromise?: Promise<WalletSession | null>;
+  private restorationAbortController?: AbortController;
   private transactions = new Map<string, WalletTransaction>();
   private pendingConfirmations = new Map<string, AbortController>();
   private transactionStore?: WalletTransactionStore;
@@ -242,13 +243,21 @@ export class WalletManager extends WalletEventEmitter {
       this.emit("session_expired", { adapterId: session.adapterId });
       return null;
     }
+    const controller = new AbortController();
+    this.restorationAbortController = controller;
     try {
-      this.assertAdapterNetwork(adapter, this.getNetwork());
-      if (session.account.network) this.assertAccountNetwork(adapter, session.account, this.getNetwork(), "stored session");
+      const network = this.getNetwork();
+      this.assertAdapterNetwork(adapter, network);
+      if (session.account.network) this.assertAccountNetwork(adapter, session.account, network, "stored session");
       if (adapter.restoreSession) {
-        const restoredResult = await this.withTimeout(adapter.restoreSession(session), DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS);
+        const protocol = this.getProtocol(network);
+        const restoredResult = await this.withTimeout(adapter.restoreSession(session, {
+          network, walletId: adapter.metadata.id, signal: controller.signal,
+          protocolContext: protocol ? { protocol, network } : undefined
+        }), DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS);
         if (version !== this.lifecycleVersion) return null;
         if (restoredResult.timedOut) {
+          controller.abort();
           await this.clearStoredSessionAsStale(session, "restore_timeout", version);
           if (version !== this.lifecycleVersion) return null;
           return null;
@@ -284,6 +293,9 @@ export class WalletManager extends WalletEventEmitter {
       if (version !== this.lifecycleVersion) return null;
       this.emit("session_expired", { adapterId: session.adapterId });
       return null;
+    } finally {
+      controller.abort();
+      if (this.restorationAbortController === controller) this.restorationAbortController = undefined;
     }
   }
 
@@ -937,6 +949,8 @@ export class WalletManager extends WalletEventEmitter {
 
   private invalidateRestoration(): void {
     this.lifecycleVersion += 1;
+    this.restorationAbortController?.abort();
+    this.restorationAbortController = undefined;
     this.autoReconnectPromise = undefined;
   }
 

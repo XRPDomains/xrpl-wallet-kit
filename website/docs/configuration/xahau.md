@@ -4,10 +4,8 @@ Use the same wallet connection and transaction API for Xahau mainnet and testnet
 The all-in-one client registers the network presets, wallet configuration and
 Xahau signing runtime; no separate protocol import is needed.
 
-::: info Available from v0.2.0
-Use matching Wallet Kit package versions **0.2.0 or later** for Xahau integration
-and automatic CDN runtime loading. Earlier releases do not include these features.
-:::
+Use matching versions of Wallet Kit packages. For a browser-only integration,
+see [Load the IIFE Bundle](#load-the-iife-bundle).
 
 ## Networks
 
@@ -16,8 +14,9 @@ and automatic CDN runtime loading. Earlier releases do not include these feature
 | `xahau-mainnet` | 21337 | XAH | [Mainnet explorer](https://xahau.xrpl.org/) |
 | `xahau-testnet` | 21338 | XAH | [Testnet explorer](https://xahau-testnet.xrpl.org/) |
 
-XAH uses six decimal places: `"1000000"` drops is 1 XAH. Mainnet has no modal
-network badge, like XRPL mainnet. Testnet retains the `Xahau Testnet` badge.
+XAH uses six decimal places: `"1000000"` drops is 1 XAH. The modal footer shows
+the selected chain and network, including Testnet; no duplicate badge appears
+above the wallet list.
 
 ## Quick Start
 
@@ -193,7 +192,7 @@ const result = await kit.signAndSubmit({
 console.log(result.hash);
 ```
 
-Installing or changing Hooks through `SetHook` is not supported in this release.
+Installing or changing Hooks through `SetHook` is not supported by the runtime.
 
 ### NFTs / URITokens
 
@@ -293,8 +292,14 @@ allows your website's origin, or route reads through your backend.
 
 ## Connection and Message Signing
 
-Reconnect explicitly after a reload; passive Xahau session restore is not
-supported. For a wallet without network switching, disconnect and connect again
+The default connect button/account panel can display the verified XahauName
+Primary on Testnet. Mainnet requires an explicit trusted name-service deployment;
+see [Identity & Avatar](/docs/configuration/identity#xahauname-primary).
+Name lookup does not require a wallet signature or enable backend authentication.
+
+GemWallet can restore after reload when its current account/network match and
+the Xahau protocol is registered. Other wallets require explicit reconnect.
+For a wallet without network switching, disconnect and connect again
 with a kit configured for the intended network. Do not relabel an active session.
 
 Raw message signing is exposed by Xaman and GemWallet, not Xyra or Ledger.
@@ -381,3 +386,9 @@ the all-in-one client accepts `xahau: { request }`, returning the unwrapped RPC
 result from a trusted transport. Allow only configured endpoints; never forward
 arbitrary wallet-provided URLs. See [Networks](/docs/configuration/networks)
 for the general network configuration API.
+
+The `xahau.request` transport handles protocol signing/submission RPCs, not the
+button's balance reads. Configure a CORS-enabled `httpRpcUrl` or a
+[`balanceResolver`](/docs/configuration/connect-button#balance-display) for those reads.
+See [Bundle & Performance](/docs/advanced/bundle-performance#signing-and-rpc)
+for post-sign freshness checks and confirmation ownership.

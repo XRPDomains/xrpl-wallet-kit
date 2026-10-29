@@ -33,7 +33,7 @@ const result = await manager.signAndSubmit({
 });
 
 console.log("Minted. TX hash:", result.hash);
-// Parse NFTokenID from result.meta or use xrpl.js parseNFTokenID()
+// Look up the validated transaction by result.hash to obtain mint metadata.
 ```
 
 ## List for Sale
@@ -86,16 +86,28 @@ await manager.signAndSubmit({
 | WalletConnect | ✅ | ✅ | ✅ |
 | XRPL Snap | ✅ | ✅ | ✅ |
 | Ledger | ✅ | ✅ | ✅ |
+| [GhostSig](/docs/adapters/ghostsig) | ✅ | ✅ | ✅ |
+| [Xyra](/docs/adapters/xyra) | Wallet dependent | Wallet dependent | Wallet dependent |
+| [Joey Wallet](/docs/adapters/joey-wallet) | Wallet dependent | Wallet dependent | Wallet dependent |
 
-> Ledger requires XRPL app **v2.2.0+** for NFT transactions.
+Support depends on the wallet/device app version and transaction fields.
+Use the XRP app on Ledger for these XRPL transactions; see its
+[adapter guide](/docs/adapters/ledger). Generic signing is not proof of support
+for every NFT operation.
 
 ## Tips
 
 **Royalties are enforced on-ledger.** `TransferFee` is collected automatically on every secondary sale — no smart contract needed.
 
-**The `NFTokenID` is in transaction metadata.** After minting, parse `meta.nftoken_id` from the submitted result, or use `xrpl.js` helper `parseNFTokenID(meta)`.
+**Use validated metadata.** Fetch the transaction using the returned hash and
+extract the minted token ID from the validated metadata/affected NFT pages.
+`parseNFTokenID()` decodes an existing token ID; it does not extract one from
+metadata. Kit's normalized result does not expose a top-level `meta` field.
 
-**Marketplace accounts can accept offers on behalf of buyers.** The `NFTokenAcceptOffer` caller does not need to be the NFT owner — useful for gasless UX where the marketplace account submits the acceptance transaction.
+**The accepting account is part of the trade.** A direct sell-offer acceptance
+transfers the NFT to the accepting buyer; it is not a gasless relay on behalf
+of an unrelated buyer. Brokered acceptance requires matching buy/sell offers
+and follows the [NFTokenAcceptOffer rules](https://xrpl.org/docs/references/protocol/transactions/types/nftokenacceptoffer).
 
 **Brokered mode** lets a marketplace match a buy and sell offer atomically by specifying both `NFTokenBuyOffer` and `NFTokenSellOffer` in a single `NFTokenAcceptOffer` call.
 

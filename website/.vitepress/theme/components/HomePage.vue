@@ -2,10 +2,10 @@
   <main class="xwk-home">
     <header class="xwk-home__hero">
       <div>
-        <span class="xwk-home__eyebrow">Wallet infrastructure for XRPL</span>
+        <span class="xwk-home__eyebrow">Wallet infrastructure for XRPL and Xahau</span>
         <h1>XRPL Wallet Kit</h1>
         <p class="xwk-home__lede">
-          One typed connection layer for XRPL wallets, with a headless core when you need control and
+          One typed connection layer for XRPL and Xahau wallets, with a headless core when you need control and
           production UI when you do not.
         </p>
         <nav class="xwk-home__actions" aria-label="Start using XRPL Wallet Kit">
