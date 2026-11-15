@@ -46,7 +46,7 @@
 .xahau-actions .xahau-primary { border: 1px solid var(--xahau-rule); border-radius: var(--xahau-radius); padding: 10px 16px; color: var(--xahau-ink); background: var(--xahau-surface); }
 .xahau-actions a:hover, .xahau-resources a:hover { text-decoration: underline; text-underline-offset: 4px; }
 .xahau-workbench { display: grid; grid-template-columns: minmax(340px, 440px) minmax(0, 1fr); align-items: start; gap: 48px; padding-bottom: 36px; }
-.xahau-demo { width: 100%; min-width: 0; }
+.xahau-demo { width: 100%; min-width: 0; container: xahau-demo / inline-size; }
 .xahau-demo-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px 12px; font-size: 12px; color: var(--xahau-muted); }
 .xahau-demo-toolbar h2 { color: var(--xahau-ink); font-size: 18px; font-weight: 600; margin: 0; }
 .xahau-demo select { appearance: auto; cursor: pointer; font: inherit; font-size: 13px; font-weight: 500; min-height: 38px; padding: 8px 12px; border: 1px solid var(--xahau-rule); border-radius: var(--xahau-radius); background: var(--xahau-surface); color: var(--xahau-ink); box-shadow: var(--xahau-control-shadow); }
@@ -62,14 +62,21 @@
 .xahau-mode-switch .vpi-sun, .xahau-mode-switch .vpi-moon { width: 21px; height: 21px; }
 .xahau-wallet-mount .xwk-account-button { box-shadow: var(--xahau-control-shadow); }
 .xahau-wallet-mount .xwk-button-icon { width: 32px; height: 32px; min-width: 32px; max-width: 32px; flex-basis: 32px; box-shadow: var(--xahau-icon-shadow); }
-.xahau-demo :is(select, input):focus { outline: none; border-color: var(--xahau-rule); box-shadow: var(--xahau-control-shadow); }
-.xahau-page[data-keyboard="false"] :is(button, select, input):focus-visible { outline: none; }
-.xahau-page[data-keyboard="true"] .xahau-demo :is(button, select, input):focus-visible { outline: 1px solid var(--xahau-soft); outline-offset: 3px; }
-.xahau-page button:focus:not(:focus-visible) { outline: none; }
+.xahau-demo select:focus:not(:focus-visible) { outline: none; border-color: var(--xahau-rule); box-shadow: var(--xahau-control-shadow); }
+.xahau-demo .xahau-mode-switch button:focus-visible { outline-offset: -3px; }
 .xahau-loading { color: var(--xahau-muted); font-size: 14px; }
 .xahau-demo-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 16px; border-top: 1px solid var(--xahau-rule); background: var(--xahau-control-bg); }
 .xahau-demo-options label { display: grid; gap: 8px; min-width: 0; font-size: 12px; font-weight: 500; color: var(--xahau-soft); }
 .xahau-demo-options select { width: 100%; min-width: 0; font-size: 13px; }
+@container xahau-demo (max-width: 300px) {
+  .xahau-demo-options { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .xahau-demo-toolbar { flex-wrap: wrap; }
+}
+@media (any-pointer: coarse) {
+  .xahau-demo select, .xahau-mode-switch button { min-height: 44px; }
+  .xahau-mode-switch button { min-width: 44px; }
+  .xahau-wallet-mount { padding-top: 76px; }
+}
 .xahau-session { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 12px; margin-top: 16px; }
 .xahau-session span { min-width: 0; flex: 1; }
 .xahau-session code { display: block; overflow-wrap: anywhere; color: var(--xahau-soft); }

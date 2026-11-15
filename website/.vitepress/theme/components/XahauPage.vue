@@ -1,5 +1,5 @@
 <template>
-  <div class="xahau-page" :data-keyboard="keyboardFocus" @pointerdown.capture="keyboardFocus = false" @keydown.tab.capture="keyboardFocus = true">
+  <div class="xahau-page">
     <header class="xahau-intro">
       <p class="xahau-brand">XRPL Wallet Kit</p>
       <h1>Xahau Network</h1>
@@ -119,7 +119,6 @@ import { loadWalletKit } from '../loadWalletKit'
 import '../xahau.css'
 
 const { isDark } = useData()
-const keyboardFocus = ref(false)
 const network = ref('xahau-mainnet')
 const layout = ref<'list' | 'grid' | 'card' | 'icon'>('list')
 const mode = ref<'auto' | 'light' | 'dark'>('auto')

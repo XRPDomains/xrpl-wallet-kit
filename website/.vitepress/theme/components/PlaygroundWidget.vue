@@ -1,4 +1,5 @@
 <template>
+  <div class="pg-container">
   <div class="pg-root">
     <!-- Controls panel -->
     <aside class="pg-controls">
@@ -64,6 +65,7 @@
         <pre class="pg-code"><code>{{ codeSnippet }}</code></pre>
       </div>
     </div>
+  </div>
   </div>
 </template>
 
@@ -296,10 +298,11 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.pg-container { container: playground / inline-size; }
 /* ── Root layout ─────────────────────────────────────────────── */
 .pg-root {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: 24px;
   margin: 32px 0;
   font-family: var(--vp-font-family-base);
@@ -309,6 +312,21 @@ onUnmounted(() => {
   .pg-root {
     grid-template-columns: 1fr;
   }
+}
+@container playground (max-width: 640px) {
+  .pg-root { grid-template-columns: minmax(0, 1fr); }
+}
+.pg-controls :is(button, input):focus-visible,
+.pg-copy-btn:focus-visible {
+  outline: 2px solid var(--vp-c-text-1);
+  outline-offset: 2px;
+}
+@media (any-pointer: coarse) {
+  .pg-chip, .pg-swatch, .pg-color-input, .pg-copy-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .pg-swatches { flex-wrap: wrap; }
 }
 
 /* ── Controls ─────────────────────────────────────────────── */

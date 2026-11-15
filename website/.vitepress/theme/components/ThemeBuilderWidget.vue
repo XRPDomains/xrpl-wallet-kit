@@ -1451,7 +1451,7 @@ onUnmounted(() => {
 /* ── Main 2-column ───────────────────────────────────────────── */
 .tb-main {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
@@ -1549,6 +1549,7 @@ onUnmounted(() => {
 
 /* ── Controls sidebar ────────────────────────────────────────── */
 .tb-controls {
+  container: theme-controls / inline-size;
   background: var(--vp-c-bg-soft);
   border: 1px solid var(--vp-c-border);
   border-radius: 12px;
@@ -1686,7 +1687,6 @@ onUnmounted(() => {
   padding: 3px 6px;
   outline: none;
 }
-.tb-color-text:focus { border-color: var(--vp-c-brand-1); }
 .tb-color-text::placeholder { color: var(--vp-c-text-3); }
 
 .tb-reset-btn {
@@ -1938,7 +1938,17 @@ onUnmounted(() => {
   background-position: right 9px center;
   transition: border-color 0.15s;
 }
-.tb-select:focus { border-color: var(--vp-c-brand-1); }
+.tb-controls :is(button, select, input, summary):focus-visible {
+  outline: 2px solid var(--vp-c-text-1);
+  outline-offset: -2px;
+}
+.tb-controls select:focus:not(:focus-visible) { outline: none; }
+@container theme-controls (max-width: 380px) {
+  .tb-control-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (any-pointer: coarse) {
+  .tb-control-tab, .tb-controls select, .tb-controls .tb-text-btn { min-height: 44px; }
+}
 .tb-select:hover { border-color: var(--vp-c-brand-1); }
 
 /* ── Phone bezel (mobile preview) ───────────────────────────── */
