@@ -421,7 +421,7 @@ async function bootstrap(run = bootstrapRun) {
     metadata: PREVIEW_CONFIG.metadata,
     network: getSelectedNetwork(),
     batch: { adapterIds: BATCH_TEST_ADAPTERS },
-    autoReconnect: chainSelect.value === "xrpl",
+    autoReconnect: true,
     accountStatus: { enabled: chainSelect.value === "xrpl" },
     persistTransactions: true,
     storage: createBrowserWalletStorage(`xwk.preview.${getSelectedNetwork()}.`),
@@ -454,8 +454,6 @@ async function bootstrap(run = bootstrapRun) {
     autoDismissMs: 5000
   });
   walletToast.mount();
-  reactPreview = mountReactPreview(manager, getWalletUiOptions(), getWalletButtonOptions());
-
   manager.on("connecting", (event) => log("connecting", event));
   manager.on("connected", (event) => {
     log("connected", event);
@@ -492,6 +490,7 @@ async function bootstrap(run = bootstrapRun) {
   renderTransactionState();
   renderSigningState();
   renderAuthState();
+  reactPreview = mountReactPreview(manager, getWalletUiOptions(), getWalletButtonOptions());
   log("ethereum_provider_debug", describeEthereumProviders());
   log("ready", { walletConnectMode: mode, wallets: manager.getWallets().map((wallet) => wallet.id) });
 }

@@ -3,7 +3,7 @@ import test from "node:test";
 import { Wallet } from "xrpl";
 import type { JoeyInjectedProvider } from "@joeywallet/wallet-sdk";
 import { createJoeyWalletAdapter } from "../packages/adapters/joey-wallet/src/index";
-import { assertWalletAdapter, XRPL_MAINNET, XRPL_TESTNET, WalletKitErrorCode } from "../packages/core/src/index";
+import { assertWalletAdapter, XRPL_MAINNET, XRPL_TESTNET, WalletKitErrorCode, WalletManager, MemoryWalletStorage, WALLET_STORAGE_VERSION } from "../packages/core/src/index";
 import { createWalletClient } from "../packages/client/src/index";
 
 const wallet = Wallet.generate();
@@ -18,11 +18,13 @@ function fixture() {
   let failure: unknown;
   let mutate = (value: Record<string, unknown>) => value;
   let wait: (() => Promise<void>) | undefined;
+  let readWait: ((method: string) => Promise<void>) | undefined;
   const provider: JoeyInjectedProvider = {
     isJoey: true,
     async request<T>({ method, params }: { method: string; params?: unknown }): Promise<T> {
       calls.push({ method, params });
       if (failure) throw failure;
+      if (method === "getAccounts" || method === "getNetwork") await readWait?.(method);
       if (method === "connect") return { accounts: addresses.map(address => ({ address })), chain } as T;
       if (method === "getAccounts") return addresses as T;
       if (method === "getNetwork") return { chain, networkId: Number(chain.split(":")[1]) } as T;
@@ -45,7 +47,7 @@ function fixture() {
     emit: (event: string, value: unknown) => { for (const listener of [...(listeners.get(event) ?? [])]) listener(value as never); },
     chain: (value: string) => { chain = value; }, addresses: (value: string[]) => { addresses = value; },
     fail: (value: unknown) => { failure = value; }, mutate: (value: typeof mutate) => { mutate = value; },
-    wait: (value: typeof wait) => { wait = value; } };
+    wait: (value: typeof wait) => { wait = value; }, readWait: (value: typeof readWait) => { readWait = value; } };
 }
 
 test("Joey is SSR-safe, passive, XRPL-only and separate from WalletConnect", () => {
@@ -66,7 +68,10 @@ test("connect verifies the provider chain; restore reads passive state only", as
   const result = await adapter.connect({ network: XRPL_MAINNET });
   const session = { adapterId: adapter.metadata.id, account: result.account, connectedAt: Date.now() };
   f.calls.length = 0;
-  assert.equal((await adapter.restoreSession(session))?.account.address, wallet.address);
+  const restored = await adapter.restoreSession(session);
+  assert.equal(restored?.account.address, wallet.address);
+  assert.equal(restored?.session.account, restored?.account);
+  assert.equal(restored?.session.connectedAt, session.connectedAt);
   assert.deepEqual(f.calls.map(call => call.method), ["getAccounts", "getNetwork"]);
   f.addresses([other.address]); assert.equal(await adapter.restoreSession(session), null);
   f.addresses([wallet.address]); f.chain("xrpl:1"); assert.equal(await adapter.restoreSession(session), null);
@@ -74,6 +79,56 @@ test("connect verifies the provider chain; restore reads passive state only", as
   assert.equal((await adapter.connect({ network: XRPL_TESTNET })).account.network?.id, "testnet");
   await adapter.disconnect();
   assert.equal([...f.listeners.values()].flatMap(set => [...set]).length, 0);
+});
+
+test("manager accepts Joey restored sessions and can sign without a new connect", async () => {
+  const f = fixture();
+  const adapter = createJoeyWalletAdapter({ provider: f.provider });
+  const storage = new MemoryWalletStorage();
+  const stored = { adapterId: adapter.metadata.id, connectedAt: Date.now(), account: {
+    address: wallet.address, publicKey: "untrusted-cache", network: { ...XRPL_MAINNET }
+  } };
+  storage.setItem("session", JSON.stringify({ version: WALLET_STORAGE_VERSION, session: stored, updatedAt: Date.now() }));
+  const manager = new WalletManager({ adapters: [adapter], network: "mainnet", autoReconnect: true, storage,
+    accountStatus: { enabled: false }, transactionConfirmation: { enabled: false }, logger: { level: "silent" } });
+  let restoredEvents = 0, connectedEvents = 0;
+  manager.on("session_restored", () => { restoredEvents++; });
+  manager.on("connected", () => { connectedEvents++; });
+  try {
+    const restored = await manager.autoReconnect();
+    assert.equal(restored?.account.address, wallet.address);
+    assert.equal(restored?.account.network?.rpcUrl, XRPL_MAINNET.rpcUrl);
+    assert.equal(restored?.account.publicKey, undefined);
+    assert.equal(restored?.connectedAt, stored.connectedAt);
+    assert.equal(manager.getSession(), restored);
+    assert.ok(storage.getItem("session"));
+    assert.equal(restoredEvents, 1);
+    assert.equal(connectedEvents, 1);
+    assert.ok((await manager.signTransaction({ txJson: tx })).txBlob);
+    assert.equal(f.calls.some(call => call.method === "connect" || call.method === "signAndSubmitTransaction"), false);
+  } finally { manager.destroy(); await adapter.disconnect(); }
+});
+
+test("aborted Joey restore cannot bind late provider results or request network", async () => {
+  const f = fixture();
+  const adapter = createJoeyWalletAdapter({ provider: f.provider });
+  const controller = new AbortController();
+  let entered!: () => void, release!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  f.readWait(async method => { if (method === "getAccounts") { entered(); await gate; } });
+  const session = { adapterId: adapter.metadata.id, connectedAt: Date.now(), account: { address: wallet.address, network: XRPL_MAINNET } };
+  const restoring = adapter.restoreSession(session, { network: XRPL_MAINNET, signal: controller.signal });
+  try {
+    await started;
+    controller.abort();
+    assert.equal(await restoring, null);
+    release();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(f.calls.some(call => call.method === "getNetwork"), false);
+    assert.equal([...f.listeners.values()].some(set => set.size > 0), false);
+    await assert.rejects(adapter.signTransaction({ txJson: tx }), { code: WalletKitErrorCode.NOT_CONNECTED });
+  } finally { release(); await adapter.disconnect(); }
 });
 
 test("sign-only never submits; native submit returns preliminary status", async () => {

@@ -61,9 +61,12 @@ support from a shared address format or transaction name.
   OfferCreate/Cancel, AccountSet, Invoke with HookParameters, and URIToken
   mint/buy/sell-offer/cancel/burn. Check the source allowlist before extending it.
 - Do not claim SetHook, Batch, multisign, delegated-key signing, XLS-20 parity,
-  chain-bound authentication. GemWallet can restore Xahau only with matching
-  current provider account/network and manager-supplied protocol context; missing
-  proof, missing runtime or cancellation must fail closed. Other Xahau adapters
+  chain-bound authentication. GemWallet Xahau restore requires a matching current
+  provider account and manager-supplied protocol context. Enforce reported network
+  identity; the exact unreported-network response may use the same configured-preset
+  fallback as connect, marked `providerNetworkAvailable: false`. Never call that
+  network proof; verify every signed blob's chain/intent before return or broadcast.
+  Missing account/runtime, malformed metadata or cancellation must fail closed. Other Xahau adapters
   still require explicit reconnect. Raw message signing is
   not a chain-bound login proof. XRPL NFT capability flags do not imply URIToken support.
 - Full client automatically registers Xahau presets and lazy protocol. Core and

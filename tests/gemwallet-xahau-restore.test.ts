@@ -73,13 +73,83 @@ for (const network of [XAHAU_TESTNET, XAHAU_MAINNET]) {
   });
 }
 
-test("GemWallet Xahau restore refuses stale account, missing network proof and missing protocol", async () => {
+test("GemWallet restore accepts cold provider replies after the legacy three-second deadline", async () => {
+  const { manager, provider, calls } = await fixture();
+  const getAddress = provider.getAddress!;
+  provider.getAddress = async () => {
+    await new Promise(resolve => setTimeout(resolve, 3200));
+    return getAddress();
+  };
+  const stale: unknown[] = [];
+  manager.on("session_stale", event => stale.push(event));
+  try {
+    assert.ok(await manager.autoReconnect());
+    assert.deepEqual(stale, []);
+    const result = await manager.signTransaction({ txJson: {
+      TransactionType: "Payment", Destination: Wallet.generate().address, Amount: "1"
+    } });
+    assert.ok(result.txBlob);
+    assert.equal(calls.signatures, 1);
+    assert.equal(calls.network, 1);
+  } finally { manager.destroy(); }
+});
+
+test("GemWallet restore times out without accepting a late address or reading network", async () => {
+  const { manager, adapter, provider, calls } = await fixture();
+  Object.defineProperty(adapter, "restoreSessionTimeoutMs", { value: 20 });
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const getAddress = provider.getAddress!;
+  provider.getAddress = async () => { await pending; return getAddress(); };
+  const reasons: unknown[] = [];
+  manager.on("session_stale", event => reasons.push(event.reason));
+  try {
+    assert.equal(await manager.autoReconnect(), null);
+    release();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.deepEqual(reasons, ["restore_timeout"]);
+    assert.equal(calls.network, 0);
+    await assert.rejects(adapter.signTransaction({ txJson: { TransactionType: "Payment", Amount: "1" } }), { code: "NOT_CONNECTED" });
+  } finally { release(); manager.destroy(); }
+});
+
+test("GemWallet Xahau restores unreported network metadata with protocol verification, never a network claim", async () => {
+  for (const network of [XAHAU_MAINNET, XAHAU_TESTNET]) {
+    const { manager, provider, calls, protocol } = await fixture(network);
+    provider.getNetwork = async () => { calls.network++; return { type: "reject" }; };
+    try {
+      const restored = await manager.autoReconnect();
+      assert.ok(restored);
+      assert.equal(restored.account.network?.rpcUrl, network.rpcUrl);
+      assert.equal(restored.account.publicKey, undefined);
+      assert.equal(restored.metadata?.networkSource, "configured-preset");
+      assert.equal(restored.metadata?.providerNetworkAvailable, false);
+      const request = { txJson: { TransactionType: "Payment", Destination: Wallet.generate().address, Amount: "1" } };
+      const signed = await manager.signTransaction(request);
+      assert.equal(protocol.decode(signed.txBlob!).NetworkID, network.networkId);
+      assert.equal(calls.submits, 0);
+      assert.equal((await manager.signAndSubmit(request)).status, "submitted");
+      const signTransaction = provider.signTransaction!;
+      provider.signTransaction = (payload: any) => signTransaction({ ...payload, transaction: {
+        ...payload.transaction, NetworkID: network.networkId === 21337 ? 21338 : 21337
+      } });
+      await assert.rejects(manager.signAndSubmit(request));
+      assert.equal(calls.submits, 1, "Wrong-network signatures must never be broadcast");
+      assert.equal(calls.address, 1);
+      assert.equal(calls.network, 1);
+    } finally { manager.destroy(); }
+  }
+});
+
+test("GemWallet Xahau restore refuses stale account, conflicting/malformed metadata and missing protocol", async () => {
   const cases: Partial<GemWalletProvider>[] = [
     { getAddress: async () => ({ result: { address: Wallet.generate().address } }) },
     { getAddress: async () => ({ type: "reject" }) },
     { getNetwork: async () => ({ result: { chain: "XRPL", network: "Testnet" } }) },
     { getNetwork: async () => ({ result: { chain: "XAHAU", network: "Mainnet" } }) },
-    { getNetwork: async () => ({ type: "reject" }) },
+    { getNetwork: async () => ({ type: "response" }) },
+    { getNetwork: async () => ({ type: "reject", result: { chain: "XAHAU", network: "Testnet" } }) },
+    { getNetwork: async () => { throw new Error("Provider transport failed"); } },
     { getNetwork: undefined }
   ];
   for (const override of cases) {

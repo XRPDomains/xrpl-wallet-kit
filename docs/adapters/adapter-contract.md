@@ -31,6 +31,7 @@ interface WalletAdapter {
   disconnect?: () => Promise<void>;
 
   restoreSession?: (session: WalletSession, options?: ConnectOptions) => Promise<ConnectResult | null>;
+  restoreSessionTimeoutMs?: number;
   canRecoverSession?: (options: ConnectOptions) => boolean | Promise<boolean>;
   recoverSession?: (options: ConnectOptions) => Promise<ConnectResult | null>;
   cancelPendingConnection?: () => void | Promise<void>;
@@ -148,12 +149,16 @@ Per-adapter examples:
 
 `WalletManager.autoReconnect()` owns session storage, stale-session cleanup, and event emission. Core does not know how a wallet extension, mobile SDK, WalletConnect client, snap, or hardware device proves that a previously stored session is still usable.
 
-Adapters own that proof through `restoreSession(session, options?)`. Existing one-argument implementations remain compatible. The manager supplies its registered network and protocol context through `options`, not through serialized storage. Protocol-backed adapters must restore this context as well as the account, verify the current provider account/network, and return `null` if either proof or runtime is unavailable. Honor `options.signal` and reject late results after cancellation; never recreate executable protocol context from local storage.
+Adapters own that proof through `restoreSession(session, options?)`. Existing one-argument implementations remain compatible. The manager supplies its registered network and protocol context through `options`, not through serialized storage. Protocol-backed adapters must restore this context as well as verify the current provider account and enforce reported network identity. Return `null` if the current account proof or required runtime is unavailable. Honor `options.signal` and reject late results after cancellation; never recreate executable protocol context from local storage.
+
+GemWallet Xahau has the same narrowly scoped fallback on restore as on explicit connect: an exact `{ type: "reject", result: undefined }` network response may use the manager's trusted preset/protocol after a matching current address is read. Mark `networkSource: "configured-preset"` and `providerNetworkAvailable: false`, never verified wallet-network identity. Every signed blob must pass protocol chain/intent checks before return or broadcast. Conflicting reported networks, malformed replies and transport failures still reject restoration; this exception does not apply to XRPL or adapters without the required protocol.
+
+The default restore deadline is 3 seconds. `restoreSessionTimeoutMs` may declare a longer provider hydration budget, capped at 60 seconds; invalid values use the default. GemWallet declares 15 seconds because its native getter APIs initialize an extension window. This is not a signing or authentication request. Those provider-owned windows cannot be suppressed or closed through the GemWallet API; do not describe GemWallet restoration as guaranteed popup-free. If permission or unlocking is needed, the wallet controls that UI and the bounded restore may still fail.
 
 `restoreSession()` must:
 
 - be passive-only;
-- never open a popup, QR panel, deeplink, sign-in request, connect request, hardware prompt, or transaction approval;
+- never explicitly start a popup, QR panel, deeplink, sign-in request, connect request, hardware prompt, or transaction approval; document any provider-owned UI that native read APIs may open;
 - read current wallet/provider state that already exists after page reload;
 - return a normalized `ConnectResult` only when the current wallet account still matches the stored `session.account.address`;
 - return `null` for normal stale, locked, unavailable, mismatched, or not-yet-hydrated sessions;

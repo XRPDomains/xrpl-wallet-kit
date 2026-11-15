@@ -59,7 +59,7 @@ This table describes manager-level operations on XRPL. Xahau signing uses the ch
 |---|---|
 | Connect | Yes |
 | Disconnect | Local Kit cleanup; no provider-level disconnect |
-| Session restore | XRPL and Xahau, with matching current account/network |
+| Session restore | XRPL and Xahau; current account and network rules below |
 | `signTransaction()` | Yes, if the provider exposes `signTransaction` |
 | `signAndSubmit()` | Yes |
 | `signMessage()` | Yes; `signature` proof |
@@ -114,9 +114,11 @@ GemWallet returns a compact message signature. Use a server-issued challenge and
 
 ## Sessions and Disconnect
 
-`manager.autoReconnect()` checks that GemWallet still reports the stored account and requested network. On Xahau, the manager also restores the registered protocol context so subsequent signing and submission use the Xahau codec and verification flow. The full client provides this runtime automatically; core/selective integrations must register it.
+`manager.autoReconnect()` checks that GemWallet still reports the stored account and rejects a reported network mismatch. On Xahau, the manager also restores the registered protocol context so subsequent signing and submission use the Xahau codec and verification flow. The full client provides this runtime automatically; core/selective integrations must register it.
 
-If GemWallet cannot report its current account or network, reconnect explicitly. A stored session or configured network alone is not sufficient proof for restoration.
+GemWallet may return `{ type: "reject", result: undefined }` for Xahau network metadata even when address access succeeds. As with explicit connect, restore can use the manager's trusted preset and protocol in this specific case. Session metadata reports `networkSource: "configured-preset"` and `providerNetworkAvailable: false`; this is not proof of the wallet's active network. The protocol verifies every signed transaction against the requested chain and intent before returning it or submitting it. Other malformed/failed network reads, reported mismatches or a missing account/runtime require reconnect. Cached account data alone never restores a session.
+
+Restore allows up to 15 seconds for extension startup. GemWallet's native address/network reads may open its own window, even though Kit does not request a new connection or signature. If the wallet requires unlocking or permission, finish it within that window or reconnect manually. Restore does not retry automatically and ignores replies after cancellation or timeout.
 
 `manager.disconnect()` clears Kit's session. It does not revoke the extension's site permissions.
 

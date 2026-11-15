@@ -352,6 +352,8 @@ export interface WalletAdapter {
   cancelPendingConnection?: () => void | Promise<void>;
   disconnect?: () => Promise<void>;
   restoreSession?: (session: WalletSession, options?: ConnectOptions) => Promise<ConnectResult | null>;
+  /** Provider hydration budget; core caps this at 60 seconds. Defaults to 3 seconds. */
+  restoreSessionTimeoutMs?: number;
   canRecoverSession?: (options: ConnectOptions) => boolean | Promise<boolean>;
   recoverSession?: (options: ConnectOptions) => Promise<ConnectResult | null>;
   switchNetwork?: (network: WalletNetwork) => Promise<SwitchNetworkResult | void>;

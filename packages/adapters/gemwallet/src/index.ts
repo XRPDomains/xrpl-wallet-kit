@@ -26,6 +26,8 @@ export interface GemWalletProvider {
 }
 
 export class GemWalletAdapter extends BaseWalletAdapter {
+  // Native getters may need a cold extension popup to hydrate before returning.
+  readonly restoreSessionTimeoutMs = 15_000;
   metadata: WalletMetadata = { id: "gemwallet", name: "GemWallet", type: "extension", group: "Extensions", icon: GEMWALLET_ICON };
   capabilities: WalletCapabilities = { connect: true, signMessage: true, signAndSubmit: true, nftOffers: true, payments: true };
   private account?: WalletAccount;
@@ -114,10 +116,10 @@ export class GemWalletAdapter extends BaseWalletAdapter {
       let reported: GemWalletNetworkResponse | undefined;
       if (this.options.supportedChains) {
         if (!network) return null;
-        // Restore needs positive network evidence; unlike explicit connect it cannot use a configured-preset fallback.
-        reported = await this.readNetwork(provider, options.signal, assertCurrent);
+        // Match explicit connect: unreported metadata is allowed only with a trusted protocol that verifies every signed blob.
+        reported = await this.readNetwork(provider, options.signal, assertCurrent, Boolean(externalProtocol));
         const hint = getProviderHint(network, "gemwallet");
-        if (reported.result?.chain !== hint.chain || this.networkName(reported.result?.network) !== hint.network) return null;
+        if (reported.result && (reported.result.chain !== hint.chain || this.networkName(reported.result.network) !== hint.network)) return null;
       }
       assertCurrent();
       const account = { ...session.account, address: address.accountAddress, network,
@@ -127,7 +129,7 @@ export class GemWalletAdapter extends BaseWalletAdapter {
       return {
         account,
         session: { ...session, account, ...(externalProtocol ? {
-          metadata: { ...session.metadata, networkSource: "provider", providerNetworkAvailable: true }
+          metadata: { ...session.metadata, networkSource: reported?.result ? "provider" : "configured-preset", providerNetworkAvailable: Boolean(reported?.result) }
         } : {}) },
         raw: { address: address.raw, network: reported }
       };

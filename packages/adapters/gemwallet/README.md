@@ -39,7 +39,7 @@ When using `@xrpl-wallet-kit/client` defaults, GemWallet is already included.
 - Xahau message signing uses the provider's native `signMessage()` API. The returned compact signature is not a chain-bound authentication result; domain/network/nonce binding and verification belong to the application/backend. Account/provider state is checked before and after signing.
 - Availability is detected with `provider.isInstalled()`.
 - `connect()` reads the active extension address and network.
-- `restoreSession()` is passive-only. It reads the current extension address with `getAddress()` and restores only when that address matches the stored session address.
+- `restoreSession()` reads the current extension address with `getAddress()` and restores only when that address matches the stored session address. GemWallet may open its native extension window for this read.
 - If GemWallet cannot provide a current address during restore, the adapter returns `null` instead of reviving the stored session blindly.
 - `signAndSubmit()` routes by `methodHint`:
   - `payment` -> `sendPayment`
@@ -53,9 +53,11 @@ When using `@xrpl-wallet-kit/client` defaults, GemWallet is already included.
 
 ## Auto Reconnect
 
+GemWallet declares a 15-second restore budget for cold extension startup. It never retries the getters automatically. The SDK's address/network getters can open a provider-owned window; the Kit cannot guarantee popup-free reads or close that window through the SDK. A missing address, malformed response, deadline or cancellation leaves the account disconnected, and late replies cannot activate signing state.
+
 GemWallet restore is intentionally conservative. The stored dApp session is not treated as proof that the extension is still connected. On reload, the adapter must read the active GemWallet address and compare it with the stored account address.
 
-`restoreSession(session, options?)` reads the current address and, for chain-aware adapters, the current network. Xahau restore also requires the manager's registered protocol context; cached keys and RPC URLs are not trusted. Missing or rejected network information requires explicit reconnect, even where explicit connect permits a configured-preset fallback. Restore never calls connect, signing or submission. Normal stale or unavailable states return `null`.
+`restoreSession(session, options?)` reads the current address and, for chain-aware adapters, the current network. Xahau restore also requires the manager's registered protocol context; cached keys and RPC URLs are not trusted. Like explicit connect, the precise `{ type: "reject", result: undefined }` network response may use this trusted preset/runtime, marked `networkSource: "configured-preset"` and `providerNetworkAvailable: false`. It does not assert the wallet's network; every signed blob must pass protocol chain/intent verification before return or broadcast. Conflicting or malformed metadata and transport errors still fail closed. Restore never calls connect, signing or submission. Normal stale or unavailable states return `null`.
 
 ## Testing
 

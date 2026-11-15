@@ -64,20 +64,30 @@ export class JoeyWalletAdapter extends BaseWalletAdapter {
       } catch (cause) { throw this.mapError(cause, false); }
     });
   }
-  async restoreSession(session: WalletSession) {
+  async restoreSession(session: WalletSession, options: ConnectOptions = {}) {
     const generation = ++this.generation;
-    await this.runCleanup();
     this.account = undefined;
-    try {
-      const network = networkFor(session.account.network);
-      const client = this.provider();
-      const accounts = await client.getAccounts();
-      const current = await client.getNetwork();
+    this.client = undefined;
+    const assertCurrent = () => {
+      assertWalletRequestActive(options.signal);
       this.assertGeneration(generation);
+    };
+    try {
+      await this.runCleanup();
+      assertCurrent();
+      const network = networkFor(options.network ?? session.account.network);
       if (session.adapterId !== this.metadata.id || !isValidClassicAddress(session.account.address) ||
-        !accounts.includes(session.account.address) || current.chain !== chainFor(network)) return null;
+        networkFor(session.account.network).id !== network.id) return null;
+      const client = this.provider();
+      const accounts = await this.withAbort(() => client.getAccounts(), options.signal);
+      assertCurrent();
+      if (!accounts.includes(session.account.address)) return null;
+      const current = await this.withAbort(() => client.getNetwork(), options.signal);
+      assertCurrent();
+      if (current.chain !== chainFor(network)) return null;
       this.bind(client, { address: session.account.address, network, networkType: network.networkType });
-      return { account: this.account! };
+      const account = this.account!;
+      return { account, session: { ...session, account } };
     } catch { return null; }
   }
   cancelPendingConnection() { ++this.generation; }

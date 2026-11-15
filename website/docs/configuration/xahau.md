@@ -297,8 +297,11 @@ Primary on Testnet. Mainnet requires an explicit trusted name-service deployment
 see [Identity & Avatar](/docs/configuration/identity#xahauname-primary).
 Name lookup does not require a wallet signature or enable backend authentication.
 
-GemWallet can restore after reload when its current account/network match and
-the Xahau protocol is registered. Other wallets require explicit reconnect.
+GemWallet can restore after reload when its current account matches and the
+Xahau protocol is registered. Reported networks must match; the documented
+[GemWallet preset fallback](/docs/adapters/gemwallet#sessions-and-disconnect)
+also applies when its API explicitly returns no network metadata.
+Other wallets require explicit reconnect.
 For a wallet without network switching, disconnect and connect again
 with a kit configured for the intended network. Do not relabel an active session.
 

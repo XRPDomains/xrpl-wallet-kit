@@ -251,10 +251,14 @@ export class WalletManager extends WalletEventEmitter {
       if (session.account.network) this.assertAccountNetwork(adapter, session.account, network, "stored session");
       if (adapter.restoreSession) {
         const protocol = this.getProtocol(network);
+        const requestedTimeout = adapter.restoreSessionTimeoutMs;
+        const restoreTimeout = typeof requestedTimeout === "number" && Number.isSafeInteger(requestedTimeout) && requestedTimeout > 0
+          ? Math.min(requestedTimeout, 60_000)
+          : DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS;
         const restoredResult = await this.withTimeout(adapter.restoreSession(session, {
           network, walletId: adapter.metadata.id, signal: controller.signal,
           protocolContext: protocol ? { protocol, network } : undefined
-        }), DEFAULT_AUTO_RECONNECT_RESTORE_TIMEOUT_MS);
+        }), restoreTimeout);
         if (version !== this.lifecycleVersion) return null;
         if (restoredResult.timedOut) {
           controller.abort();
