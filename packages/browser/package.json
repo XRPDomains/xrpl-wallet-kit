@@ -35,7 +35,7 @@
     "buffer": "^6.0.3"
   },
   "devDependencies": {
-    "vite": "^6.4.3",
+    "vite": "^6.4.6",
     "typescript": "^5.5.4"
   },
   "publishConfig": {
