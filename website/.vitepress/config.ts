@@ -128,6 +128,7 @@ export default defineConfig({
           { text: "Joey Wallet", link: "/docs/adapters/joey-wallet" },
           { text: "GhostSig", link: "/docs/adapters/ghostsig" },
           { text: "Xyra", link: "/docs/adapters/xyra" },
+          { text: "Clasp", link: "/docs/adapters/clasp" },
         ],
       },
       {

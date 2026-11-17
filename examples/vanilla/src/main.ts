@@ -362,6 +362,7 @@ async function bootstrap(run = bootstrapRun) {
     { createDropFiAdapter },
     { createGemWalletAdapter },
     { createGhostsigAdapter },
+    { createClaspAdapter },
     { createXyraAdapter },
     { createLedgerAdapter },
     { createJoeyWalletAdapter },
@@ -373,6 +374,7 @@ async function bootstrap(run = bootstrapRun) {
     import("../../../packages/adapters/dropfi/src"),
     import("../../../packages/adapters/gemwallet/src"),
     import("../../../packages/adapters/ghostsig/src"),
+    import("../../../packages/adapters/clasp/src"),
     import("../../../packages/adapters/xyra/src"),
     import("../../../packages/adapters/ledger/src"),
     import("../../../packages/adapters/joey-wallet/src"),
@@ -401,6 +403,7 @@ async function bootstrap(run = bootstrapRun) {
   adapters.push(createCrossmarkAdapter());
   adapters.push(createDropFiAdapter());
   adapters.push(createGhostsigAdapter());
+  adapters.push(createClaspAdapter());
   adapters.push(createXyraAdapter({ supportedChains: chainSupport }));
   adapters.push(createJoeyWalletAdapter({ onDisconnected: () => manager?.emitDisconnected("joey-wallet") }));
   adapters.push(createXrplSnapAdapter({
