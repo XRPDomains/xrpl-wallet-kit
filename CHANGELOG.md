@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.3
+
+- Add the standalone Clasp passkey wallet adapter for XRPL Mainnet and Testnet, with verified sign-only transactions and wallet-managed submission.
+- Handle Clasp cancellation, timeouts and late replies without blocking reconnects or automatically replaying submissions.
+- Preserve transaction hashes and distinguish rejected, failed and uncertain Clasp submissions.
+- Add Clasp connection, Payment and NFT integration guides and synchronize supported-wallet documentation.
+
 ## 0.3.2
 
 - Display verified XahauName Primary names on Xahau Testnet using SDK 0.4.0, with explicit trusted deployment configuration for Mainnet.

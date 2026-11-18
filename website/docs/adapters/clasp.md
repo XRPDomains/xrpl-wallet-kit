@@ -44,7 +44,7 @@ Connect and sign from a user action so the browser can open the wallet popup. Pa
 
 ## Networks
 
-XRPL Mainnet and Testnet (`mainnet` and `testnet`). XRPL Devnet, XRPL EVM and Xahau are not supported.
+Supports the standard XRPL Mainnet and Testnet presets (`mainnet` and `testnet`). Custom network definitions, Devnet, XRPL EVM and Xahau are not supported. Reconnect to change networks.
 
 ## Capabilities
 
@@ -52,7 +52,7 @@ XRPL Mainnet and Testnet (`mainnet` and `testnet`). XRPL Devnet, XRPL EVM and Xa
 |---|---|
 | Connect | Yes |
 | Disconnect | Yes; clears local session |
-| Session restore | Not exposed |
+| Session restore | No; reconnect from a user action |
 | `signTransaction()` | Yes; returns a verified signed blob |
 | `signAndSubmit()` | Yes; Clasp signs and broadcasts |
 | `signMessage()` | Not exposed |
@@ -63,51 +63,71 @@ XRPL Mainnet and Testnet (`mainnet` and `testnet`). XRPL Devnet, XRPL EVM and Xa
 
 ## Options
 
-| Option | Default | Description |
-|---|---|---|
-| `maxFeeDrops` | `"1000000"` | Default sign-only fee ceiling in drops |
-| `client` | Official Clasp SDK client | Optional application-supplied SDK client |
+These options apply to `createClaspAdapter()`, not top-level client options. Pass the configured adapter through the client's `adapters` option.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `maxFeeDrops` | `string` | `"1000000"` for sign-only | Fee ceiling in drops. An explicit adapter/request ceiling also requires `txJson.Fee` for native submission |
+| `client` | `ClaspAdapterOptions["client"]` | Kit's Clasp v1 client | Optional SDK-compatible replacement; implement `cancelPendingRequest(reason)` to clean up pending requests |
 
 ## Transactions
 
 <!--@include: ../../.vitepress/snippets/adapter-transactions.md#introduction-->
 
+| Kit operation | Clasp method | Result |
+|---|---|---|
+| `signTransaction()` / `submit: false` | `sign` | Verified `txBlob` and hash; not broadcast |
+| `signAndSubmit()` | `sign_and_submit` | Hash and submitted status |
+
+`txJson` is authoritative. Optional `walletPayload` and `methodHint` do not override it.
+
+The examples below use `quotedFeeDrops`: a fresh fee quote in drops for the selected network and transaction, obtained by your dApp before the approval click. `Fee` is the exact fee; `maxFeeDrops` is its ceiling. If no ceiling is configured, Clasp can fill the omitted fee during native submission.
+
 ### Payment
 
 ::: code-group
-<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-submit-->
-<!--@include: ../../.vitepress/snippets/adapter-transactions.md#payment-sign-only-->
+<!--@include: ../../.vitepress/snippets/clasp-transactions.md#payment-submit-->
+<!--@include: ../../.vitepress/snippets/clasp-transactions.md#payment-sign-only-->
 :::
 
 For Clasp-managed submission with a fee ceiling, add an explicit `Fee` to `txJson` at or below the ceiling.
 
 ### NFT Transactions
 
-<!--@include: ../../.vitepress/snippets/adapter-transactions.md#nft-->
+<!--@include: ../../.vitepress/snippets/clasp-transactions.md#nft-->
 
 Use the same explicit `Fee` rule for these submission examples. For sign-only requests, pass the transaction to `manager.signTransaction()`.
 
 ## Authentication
 
-The passkey authorizes actions inside Clasp. A connected wallet is not proof of login to your dApp backend; the adapter does not expose `signMessage()` or `signIn()`.
+Neither `signMessage()` nor native `signIn()` is exposed. Clasp's `sign` method signs a real transaction, not a login message. Connection approval is not a backend login proof; use an authentication-capable adapter and the appropriate [backend verifier](/docs/auth/introduction). Clasp's separate SDK `connect({ challenge })` proof flow is not exposed by Kit.
 
 ## Sessions and Disconnect
 
-Reconnect explicitly after reload. Disconnect clears Kit state, but the SDK may reuse the Clasp window for another request.
+After reload, reconnect from a user action. `manager.disconnect()` clears Kit's account state and cancels local waiting, not wallet credentials. A cancelled or timed-out connection/sign-only request can be retried explicitly.
+
+Once submission has been requested, local cancellation cannot revoke it. The approval window may remain open; check the ledger before retrying. Kit never automatically replays a submission.
 
 ## Integration Notes
 
 - Start on Testnet, and check the validated ledger result before treating any submission as final.
-- Do not retry automatically after a submission with an unknown outcome.
+- Use HTTPS or localhost and allow wallet popups. Start connection and approval from user actions.
+- The adapter supports generic single-transaction signing, not multisigning or Batch.
+- Submission errors preserve `details.hash` when the wallet supplies one. A confirmed ledger failure has `final: true` and `outcomeUnknown: false`; missing confirmation remains uncertain.
 
 ## Troubleshooting
 
 | Symptom | Action |
 |---|---|
 | Popup is blocked | Start the request from a user action and allow popups |
-| Popup opens but the dApp gets no reply | Check the Cross-Origin-Opener-Policy requirements in the Clasp developer docs |
+| Clasp is missing from the wallet list | Install the standalone adapter and pass it through `adapters`, not `wallets` |
+| Fee ceiling rejects submission | Set a transaction-appropriate `txJson.Fee` at or below the configured ceiling |
+| Popup opens but the dApp gets no reply | Use the default COOP policy or `Cross-Origin-Opener-Policy: same-origin-allow-popups`, not `same-origin` |
+| Submission outcome is unknown | Check `details.hash` on the ledger before starting another request |
 
 ## Related Guides
 
 - [Adapters Overview](/docs/adapters/overview)
+- [WalletManager](/docs/api/wallet-manager)
+- [NFT Marketplace](/docs/use-cases/nft-marketplace)
 - [Clasp developer docs](https://claspwallet.com/developers/)

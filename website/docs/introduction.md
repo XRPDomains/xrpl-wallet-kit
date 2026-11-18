@@ -57,6 +57,9 @@ uses a chain-filtered subset with its own transaction scope and wallet configura
 | XRPL Snap | `adapter-xrpl-snap` | MetaMask Snap | ✅ | Not exposed | ✅ |
 | [GhostSig](/docs/adapters/ghostsig) | `adapter-ghostsig` | Hosted web / popup (opt-in) | ✅ | ✅ | ✅ |
 | [Xyra](/docs/adapters/xyra) | `adapter-xyra` | Hosted web / popup (opt-in) | ✅ | ✅ | ✅ |
+| [Clasp](/docs/adapters/clasp) | `adapter-clasp` | Passkey web / popup (standalone) | ✅ | ✅ | ✅ |
+
+[Clasp](/docs/adapters/clasp) supports native XRPL Mainnet and Testnet through an explicitly registered adapter. Install its separate package; it is not included in the default client/browser wallet list. Transaction signing does not provide backend sign-in.
 
 [Joey Wallet](/docs/adapters/joey-wallet) connects directly to Joey's
 browser extension on XRPL Mainnet, Testnet and Devnet. Enable

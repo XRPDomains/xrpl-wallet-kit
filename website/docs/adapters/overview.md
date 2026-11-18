@@ -31,11 +31,14 @@ Use `joey-wallet` for the native Joey extension. The WalletConnect detail entry 
 | DropFi | Included | Not supported |
 | GhostSig | Explicit opt-in | Not supported |
 | Xyra | Explicit opt-in | Included |
+| Clasp | Standalone adapter via `adapters` | Not supported |
 | Ledger | Included | Explicit opt-in; device app dependent |
 | XRPL Snap | Included | Not supported |
 | WalletConnect | With `walletConnectProjectId` | Not supported |
 
 `wallets: "all"` follows the defaults above; it does not add opt-in Joey Wallet, GhostSig or XRPL Xyra. Select their IDs explicitly. Wallets unsupported on the selected chain are filtered from the modal.
+
+Clasp requires a separate package and explicit `adapters: [createClaspAdapter()]` registration. It is not a built-in `wallets` ID or included in the browser IIFE.
 
 For Xahau presets, protocol setup and the required positive fee ceiling, see [Xahau Configuration](/docs/configuration/xahau). Ledger uses XRP on XRPL and XAH on Xahau; connection alone is not proof of support for every transaction type.
 
@@ -52,6 +55,7 @@ This matrix describes manager-level XRPL operations, not identical provider APIs
 | DropFi | Not exposed | Yes | `signature` | No | Matching passive account |
 | GhostSig | Yes | Yes | Not exposed | No | Cached account/key, not fresh authentication |
 | Xyra | Yes | Yes | Not exposed | No | Reconnect required |
+| Clasp | Yes | Yes | Not exposed | No | Reconnect required |
 | Ledger | Yes | Yes | Not exposed | No | Fresh device connection required |
 | XRPL Snap | Not exposed | Yes | `signedTx` | No | Cached account, not fresh verification |
 | WalletConnect | Wallet dependent | Wallet dependent | `signedTx`, wallet dependent | No | Active generic session; not detail entries |

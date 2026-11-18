@@ -18,6 +18,8 @@ for (const name of readdirSync(directory).filter(name => name.endsWith(".md") &&
     for (const field of ["Package", "Adapter ID", "Wallet type", "Client registration"]) assert.ok(source.includes(`| ${field} |`), `${name}: ${field}`);
     const capabilities = source.split("## Capabilities")[1].split("## Options")[0];
     assert.deepEqual([...capabilities.matchAll(/^\| ([^|]+) \|/gm)].map(match => match[1].trim()).filter(row => row !== "Operation"), operations);
+    const options = source.split("## Options")[1].split("## Transactions")[0];
+    assert.ok(options.includes("| Option | Type | Default | Description |"), `${name}: options table must include types`);
     assert.ok(source.includes("```ts [Client]") && source.includes("```ts [Core]"));
     assert.ok(source.includes("### Payment") && source.includes("### NFT Transactions"));
     assert.ok(source.includes("#payment-submit-->") && source.includes("#nft-->"));

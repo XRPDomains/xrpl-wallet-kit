@@ -56,6 +56,7 @@ All available adapters:
 | `@xrpl-wallet-kit/adapter-xrpl-snap` | XRPL Snap (MetaMask) |
 | `@xrpl-wallet-kit/adapter-ghostsig` | GhostSig (hosted popup, opt-in) |
 | `@xrpl-wallet-kit/adapter-xyra` | [Xyra](/docs/adapters/xyra) (hosted popup, opt-in) |
+| `@xrpl-wallet-kit/adapter-clasp` | [Clasp](/docs/adapters/clasp) (passkey popup, standalone) |
 
 Install the [GhostSig adapter](/docs/adapters/ghostsig) with its XRPL peer dependency:
 
@@ -82,6 +83,14 @@ See the [Joey Wallet guide](/docs/adapters/joey-wallet) for configuration.
 With the all-in-one client, enable it using `wallets: ["joey-wallet"]`;
 `wallets: "all"` does not include it. The WalletConnect wallet ID remains `joey`.
 
+Install Clasp separately and register `createClaspAdapter()` through the core manager or the client's `adapters` option:
+
+```sh
+npm install @xrpl-wallet-kit/core @xrpl-wallet-kit/adapter-clasp xrpl@^4
+```
+
+See the [Clasp guide](/docs/adapters/clasp#connect). Clasp is not in `wallets: "all"` or the browser IIFE.
+
 ## All-in-One Client Package
 
 If you want everything in one install:
@@ -98,7 +107,7 @@ pnpm add @xrpl-wallet-kit/client
 ```
 :::
 
-The client package re-exports core, UI, and all adapters for convenience. For a smaller production bundle, use `@xrpl-wallet-kit/client/selective` with named adapter packages; importing the default client can retain adapter SDKs that cannot be fully tree-shaken.
+The client package re-exports core, UI, and its built-in adapters for convenience. Standalone adapters such as Clasp need a separate import. For a smaller production bundle, use `@xrpl-wallet-kit/client/selective` with named adapter packages; importing the default client can retain adapter SDKs that cannot be fully tree-shaken.
 
 The full client also configures Xahau automatically when `network` is
 `"xahau-mainnet"` or `"xahau-testnet"`; its signing runtime loads on demand.
