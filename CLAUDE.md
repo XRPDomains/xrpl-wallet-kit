@@ -233,3 +233,7 @@ Even with all the rules above, model drift in long sessions is real. The hard
 guard is a pre-commit hook that re-runs the per-file integrity check on every
 staged file. See `scripts/check-file-integrity.sh` for the implementation and
 `.husky/pre-commit` for the wiring.
+
+## GitHub Release Notes
+
+Keep GitHub Release notes focused on user-facing changes. Omit local preview, test harness, validation example, and verification-only bullets. Record those details in development or acceptance documentation.
