@@ -16,7 +16,7 @@
 - Business API calls stay outside the adapter.
 - Adapter does not import React, Next, DOM modals, jQuery, or business app helpers.
 - Browser access is runtime-only; SSR imports do not access a wallet.
-- Popup messaging validates origin, source, request identity and reply shape.
+- Hosted popup adapters pass the [popup acceptance checks](popup-adapters.md#acceptance), including validation on the deployed origin and headers.
 
 ## Session
 

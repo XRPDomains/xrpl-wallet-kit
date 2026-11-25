@@ -129,7 +129,7 @@ Use `createWalletError` from `@xrpl-wallet-kit/core` where possible.
 
 - Prefer extending `BaseWalletAdapter` when building inside this repo.
 - Keep browser globals behind runtime guards so package imports remain SSR-safe.
-- For popup messaging, validate origin, source, request correlation and reply shape; open approval UI from a user gesture.
+- For hosted popup wallets, follow [Popup Adapters](references/popup-adapters.md) for user activation, opener headers, request isolation, and submission finality.
 - Use provider SDKs directly; do not inject CDN scripts from the adapter unless the provider requires a documented loader.
 - Use structured provider APIs instead of string parsing when possible.
 - Normalize account metadata into `WalletAccount`.
