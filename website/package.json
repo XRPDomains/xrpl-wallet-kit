@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/website",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "scripts": {
     "dev": "vitepress dev",
@@ -19,5 +19,8 @@
     "vitepress": {
       "vite": "^6.4.6"
     }
+  },
+  "dependencies": {
+    "@xrpl-wallet-kit/adapter-clasp": "0.3.3"
   }
 }

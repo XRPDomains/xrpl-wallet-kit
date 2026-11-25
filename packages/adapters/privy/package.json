@@ -1,6 +1,6 @@
 {
   "name": "@xrpl-wallet-kit/adapter-privy",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Opt-in Privy embedded XRPL wallet adapter.",
   "license": "MIT",
   "type": "module",
@@ -11,7 +11,7 @@
   "files": ["dist", "README.md"],
   "scripts": { "build": "tsc -p tsconfig.json" },
   "dependencies": {
-    "@xrpl-wallet-kit/core": "0.3.3",
+    "@xrpl-wallet-kit/core": "0.3.4",
     "@xrpl-commons/xrpl-connect-privy": "1.1.0-rc.0",
     "xrpl-connect": "1.1.0-rc.0"
   },

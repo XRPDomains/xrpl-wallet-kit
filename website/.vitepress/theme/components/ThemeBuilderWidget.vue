@@ -340,6 +340,9 @@
         <!-- Preview column -->
         <div class="tb-preview-col">
           <p v-if="loadError" role="alert">{{ loadError }}</p>
+          <p v-else-if="includesClasp && claspLoadFailed" role="alert">
+            Clasp could not load in the preview. Reload the page to retry.
+          </p>
           <div class="tb-preview-bar">
             <div class="tb-state-toggle" aria-label="Preview wallet state">
               <button
@@ -445,6 +448,8 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { loadWalletKit } from '../loadWalletKit'
+import { loadClaspAdapterFactory } from '../loadClaspAdapter'
+import { createThemeBuilderPrivyAdapter } from '../createThemeBuilderPrivyAdapter'
 
 // ── Config state ──────────────────────────────────────────────
 const config = reactive({
@@ -588,7 +593,7 @@ const btnSizes = [
   { value: 'md', label: 'MD' },
   { value: 'lg', label: 'LG' },
 ]
-type WalletOptionId = 'xaman' | 'gemwallet' | 'crossmark' | 'dropfi' | 'xrplsnap' | 'walletconnect' | 'ghostsig' | 'xyra' | 'ledger' | 'joey-wallet'
+type WalletOptionId = 'xaman' | 'gemwallet' | 'crossmark' | 'dropfi' | 'xrplsnap' | 'walletconnect' | 'ghostsig' | 'xyra' | 'ledger' | 'joey-wallet' | 'clasp' | 'privy'
 const selectedChain = ref<'xrpl' | 'xahau'>('xrpl')
 const selectedNetworkType = ref<'mainnet' | 'testnet'>('mainnet')
 const selectedNetwork = computed(() => selectedChain.value === 'xahau'
@@ -603,6 +608,8 @@ const allWalletOptions: Array<{ id: WalletOptionId; label: string }> = [
   { id: 'walletconnect', label: 'WalletConnect' },
   { id: 'ghostsig', label: 'GhostSig' },
   { id: 'xyra', label: 'Xyra' },
+  { id: 'clasp', label: 'Clasp' },
+  { id: 'privy', label: 'Privy' },
   { id: 'ledger', label: 'Ledger' },
 ]
 const xahauWalletIds: WalletOptionId[] = ['xaman', 'gemwallet', 'xyra', 'ledger']
@@ -616,6 +623,13 @@ const selectedWalletIds = computed({
   get: () => chainWallets[selectedChain.value],
   set: (ids: WalletOptionId[]) => { chainWallets[selectedChain.value] = ids },
 })
+const includesClasp = computed(() => selectedWalletIds.value.includes('clasp'))
+const includesPrivy = computed(() => selectedWalletIds.value.includes('privy'))
+const privyPreviewAppId = 'cmwub5vek01cq0hl6iyhpyin4'
+const privyPreviewNetworkKey = 'xwk.theme-builder.privy-network'
+
+const builtInWalletIds = computed(() => selectedWalletIds.value.filter(id => id !== 'clasp' && id !== 'privy'))
+const claspLoadFailed = ref(false)
 
 function toggleWallet(id: WalletOptionId) {
   const selected = selectedWalletIds.value
@@ -931,7 +945,7 @@ const codeSnippet = computed(() => {
   const sizeLine      = config.size   !== 'default' ? `\n  size: "${config.size}",`        : ''
   const themePart     = themeLines.length ? `\n  theme: {\n${themeLines.join('\n')}\n  },` : ''
 
-  const walletLines = selectedWalletIds.value.map((id) => `    "${id}",`).join('\n')
+  const walletLines = builtInWalletIds.value.map((id) => `    "${id}",`).join('\n')
   const credentialLines: string[] = []
   if (selectedWalletIds.value.includes('xaman')) {
     credentialLines.push('  xamanClientId: "YOUR_XAMAN_CLIENT_ID",')
@@ -941,7 +955,24 @@ const codeSnippet = computed(() => {
   }
   const credentials = credentialLines.length ? `\n${credentialLines.join('\n')}` : ''
   const feeConfig = selectedChain.value === 'xahau' ? '\n  preflight: { maxFeeDrops: "50000" },' : ''
-  const managerSnippet = `const manager = createWalletClient({\n  network: "${selectedNetwork.value}",\n  wallets: [\n${walletLines}\n  ],${credentials}${feeConfig}\n})`
+  const adapterImports: string[] = []
+  const adapterRegistrations: string[] = []
+  if (includesClasp.value) {
+    adapterImports.push('import { createClaspAdapter } from "@xrpl-wallet-kit/adapter-clasp"')
+    adapterRegistrations.push('manager.register(createClaspAdapter())')
+  }
+  if (includesPrivy.value) {
+    adapterImports.push('import { createPrivyAdapter } from "@xrpl-wallet-kit/adapter-privy"')
+    adapterRegistrations.push([
+      'manager.register(createPrivyAdapter({',
+      '  appId: "YOUR_PUBLIC_PRIVY_APP_ID",',
+      '  redirectUri: new URL("/wallet/privy", window.location.origin).href,',
+      '}))',
+    ].join('\n'))
+  }
+  const imports = adapterImports.length ? adapterImports.join('\n') + '\n\n' : ''
+  const registrations = adapterRegistrations.length ? '\n' + adapterRegistrations.join('\n') : ''
+  const managerSnippet = `${imports}const manager = createWalletClient({\n  network: "${selectedNetwork.value}",\n  wallets: [\n${walletLines}\n  ],${credentials}${feeConfig}\n})${registrations}`
   const modalSnippet = `const modal = new WalletModal({\n  manager,${themeModeLine}${themeNameLine}${layoutLine}${sizeLine}${themePart}\n})`
 
   const btnLines: string[] = []
@@ -971,9 +1002,12 @@ async function loadKit(): Promise<void> {
   kitLoaded.value = true
 }
 
+let createPreviewClaspAdapter: Awaited<ReturnType<typeof loadClaspAdapterFactory>> | undefined
+
 function buildMockManager() {
   if (!kitBundle) return null
-  const key = `${selectedNetwork.value}:${selectedWalletIds.value.join(',')}`
+  const claspFactory = includesClasp.value ? createPreviewClaspAdapter : undefined
+  const key = `${selectedNetwork.value}:${selectedWalletIds.value.join(',')}:${Boolean(claspFactory)}`
   if (previewManager && key === previewManagerKey) return previewManager
   if (previewManager) {
     void previewManager.disconnect().catch((error: unknown) => {
@@ -984,16 +1018,32 @@ function buildMockManager() {
   }
   previewManager = kitBundle.createWalletClient({
     network: selectedNetwork.value,
-    wallets: [...selectedWalletIds.value],
+    wallets: builtInWalletIds.value,
     xamanClientId: '1c7dfba7-aadd-4b03-bafb-ca5c8f84bb4f',
     walletConnectProjectId: '7e0944cf9202885569eb41182016baed',
     preflight: { maxFeeDrops: '50000' },
     storage: 'memory',
+    autoReconnect: includesPrivy.value,
   })
+  if (claspFactory) {
+    previewManager.register(claspFactory())
+  }
+  if (includesPrivy.value) {
+    const manager = previewManager
+    manager.register(createThemeBuilderPrivyAdapter(kitBundle, {
+      appId: privyPreviewAppId,
+      redirectUri: new URL(import.meta.env.BASE_URL + 'docs/theme-builder', location.origin).href,
+      onDisconnected: () => manager.emitDisconnected('privy'),
+    }))
+  }
   previewManagerKey = key
   return previewManager
 }
 
+function handlePrivyPreviewClick(event: MouseEvent) {
+  if (!(event.target instanceof Element) || !event.target.closest('button[data-wallet-id="privy"]')) return
+  try { sessionStorage.setItem(privyPreviewNetworkKey, selectedNetworkType.value) } catch {}
+}
 function getSdkThemeName(): string | undefined {
   return config.themeName === 'default' || config.themeName === 'light'
     ? undefined
@@ -1011,6 +1061,8 @@ function renderPreview() {
   if (modalInstance)  { try { modalInstance.destroy()  } catch {}; modalInstance  = null }
 
   const mount = mountRef.value
+  mount.removeEventListener('click', handlePrivyPreviewClick, true)
+  mount.addEventListener('click', handlePrivyPreviewClick, true)
   mount.classList.toggle('tb-layout-auto', config.layout === 'auto')
   mount.innerHTML = ''
   mount.style.position = 'relative'
@@ -1297,6 +1349,22 @@ function setupInlineObserver(container: HTMLElement, isMobile: boolean): Mutatio
 }
 
 watch(config, () => { if (kitLoaded.value) queuePreview() }, { deep: true })
+watch(() => kitLoaded.value && includesClasp.value, async (shouldLoad, _, onCleanup) => {
+  if (!shouldLoad || createPreviewClaspAdapter) return
+  let active = true
+  onCleanup(() => { active = false })
+  claspLoadFailed.value = false
+  try {
+    const factory = await loadClaspAdapterFactory(kitBundle)
+    if (!active) return
+    createPreviewClaspAdapter = factory
+    queuePreview()
+  } catch (error) {
+    if (!active) return
+    claspLoadFailed.value = true
+    console.warn('Theme Builder: Clasp preview adapter not available', error)
+  }
+})
 watch(selectedWalletIds, () => { if (kitLoaded.value) queuePreview() }, { deep: true })
 watch(selectedNetwork, () => { if (kitLoaded.value) queuePreview() })
 watch(previewState, () => { if (kitLoaded.value) queuePreview() })
@@ -1308,7 +1376,12 @@ watch(previewDevice, async () => {
 })
 
 onMounted(async () => {
-  const chain = new URLSearchParams(window.location.search).get('chain')
+  try {
+    const network = sessionStorage.getItem(privyPreviewNetworkKey)
+    if (network === 'mainnet' || network === 'testnet') selectedNetworkType.value = network
+  } catch {}
+  const params = new URLSearchParams(window.location.search)
+  const chain = params.get('chain')
   if (chain === 'xrpl' || chain === 'xahau') selectedChain.value = chain
   try {
     compactPageQuery = window.matchMedia('(max-width: 900px)')
@@ -1316,6 +1389,10 @@ onMounted(async () => {
     compactPageQuery.addEventListener('change', syncCompactPage)
     await loadKit()
     renderPreview()
+    if (params.has('privy_oauth_code') || params.has('privy_oauth_error')) {
+      const privy = previewManager?.getAdapter?.('privy')
+      if (await privy?.canRecoverSession?.()) await previewManager?.autoReconnect?.()
+    }
   } catch (e) {
     loadError.value = 'Wallet preview could not load. Please reload the page.'
     console.warn('Theme Builder: XRPL Wallet Kit not available', e)
@@ -1323,6 +1400,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  mountRef.value?.removeEventListener('click', handlePrivyPreviewClick, true)
   compactPageQuery?.removeEventListener('change', syncCompactPage)
   compactPageQuery = null
   cancelPreviewFrames()

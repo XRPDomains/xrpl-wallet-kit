@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4
+
+- Add the opt-in Privy adapter for native XRPL Mainnet and Testnet wallets, with email OTP, optional OAuth and transaction review.
+- Include Privy and Clasp in Theme Builder with their standalone registration snippets.
+
 ## 0.3.3
 
 - Add the standalone Clasp passkey wallet adapter for XRPL Mainnet and Testnet, with verified sign-only transactions and wallet-managed submission.
