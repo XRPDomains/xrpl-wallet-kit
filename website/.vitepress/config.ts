@@ -129,6 +129,7 @@ export default defineConfig({
           { text: "GhostSig", link: "/docs/adapters/ghostsig" },
           { text: "Xyra", link: "/docs/adapters/xyra" },
           { text: "Clasp", link: "/docs/adapters/clasp" },
+          { text: "Privy", link: "/docs/adapters/privy" },
         ],
       },
       {

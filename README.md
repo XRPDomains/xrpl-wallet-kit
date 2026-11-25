@@ -47,6 +47,7 @@ Adapters:
 - `@xrpl-wallet-kit/adapter-ghostsig` (opt-in hosted wallet)
 - `@xrpl-wallet-kit/adapter-xyra` (hosted wallet; opt-in on XRPL)
 - `@xrpl-wallet-kit/adapter-clasp` (standalone passkey wallet; XRPL Mainnet/Testnet)
+- `@xrpl-wallet-kit/adapter-privy` (opt-in embedded wallet; XRPL Mainnet/Testnet)
 
 Since v0.2.0, the all-in-one client supports `xahau-mainnet` and `xahau-testnet`
 with automatic protocol registration. Core/selective integrations can use

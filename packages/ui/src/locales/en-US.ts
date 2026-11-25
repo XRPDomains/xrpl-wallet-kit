@@ -1,6 +1,14 @@
 import type { WalletUiMessages } from "./types";
 
 export const enUSMessages: WalletUiMessages = {
+  walletInteraction: {
+    emailHint: "Use an email code to open your wallet here, without an app or seed phrase.",
+    invalidEmail: "Enter a valid email address.", invalidCode: "Enter the full verification code.",
+    codeHint: "Check your email for the code.",
+    chooseMethod: "Choose a sign-in method", emailTitle: "Sign in with email", email: "Email address", sendCode: "Send code",
+    codeTitle: "Enter confirmation code", code: "Verification code", verifyCode: "Verify code", resendCode: "Resend code",
+    reviewTitle: "Review transaction", approve: "Approve"
+  },
   connectWallet: "Connect Wallet",
   connect: "Connect",
   connected: "Connected",

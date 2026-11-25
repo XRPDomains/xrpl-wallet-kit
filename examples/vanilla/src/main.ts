@@ -14,6 +14,8 @@ if (!("Buffer" in globalThis)) {
 }
 
 const PREVIEW_CONFIG = {
+  privyAppId: import.meta.env.VITE_PRIVY_APP_ID?.trim() ?? "",
+  privyClientId: import.meta.env.VITE_PRIVY_CLIENT_ID?.trim() || undefined,
   xamanClientId: import.meta.env.VITE_XAMAN_CLIENT_ID ?? "",
   walletConnectProjectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ?? "",
   walletConnectSignMessageDestination: import.meta.env.VITE_WALLETCONNECT_SIGN_MESSAGE_DESTINATION ?? "raAyazbgEkwzLByXipQuPLWFfnsPS1v1q9",
@@ -43,7 +45,11 @@ const uriButton = document.querySelector<HTMLButtonElement>("#uri-submit-button"
 const uriResult = document.querySelector<HTMLPreElement>("#uri-result")!;
 const initialUrl = new URL(window.location.href);
 if (initialUrl.searchParams.get("chain") === "xahau") chainSelect.value = "xahau";
-const initialNetwork = initialUrl.searchParams.get("network");
+const privyCallbackPath = "/wallet/privy";
+const privyNetworkKey = "xwk.preview.privyNetwork";
+const returningFromPrivy = initialUrl.pathname === privyCallbackPath;
+const privyReturnNetwork = returningFromPrivy ? sessionStorage.getItem(privyNetworkKey) : null;
+const initialNetwork = privyReturnNetwork ?? initialUrl.searchParams.get("network");
 if (initialNetwork && ["mainnet", "testnet", "devnet"].includes(initialNetwork)) networkSelect.value = initialNetwork;
 if (chainSelect.value === "xahau" && networkSelect.value === "devnet") networkSelect.value = "testnet";
 function saveNetworkSelection() {
@@ -409,6 +415,18 @@ async function bootstrap(run = bootstrapRun) {
   adapters.push(createXrplSnapAdapter({
     signMessageDestination: PREVIEW_CONFIG.walletConnectSignMessageDestination
   }));
+
+  const canResumePrivy = !returningFromPrivy || privyReturnNetwork === "mainnet" || privyReturnNetwork === "testnet";
+  if (PREVIEW_CONFIG.privyAppId && canResumePrivy && chainSelect.value === "xrpl" && networkSelect.value !== "devnet") {
+    sessionStorage.setItem(privyNetworkKey, getSelectedNetwork());
+    const { createPrivyAdapter } = await import("../../../packages/adapters/privy/src");
+    adapters.push(createPrivyAdapter({
+      appId: PREVIEW_CONFIG.privyAppId,
+      clientId: PREVIEW_CONFIG.privyClientId,
+      redirectUri: new URL(privyCallbackPath, location.origin).href,
+      onDisconnected: () => manager?.emitDisconnected("privy")
+    }));
+  }
 
   const protocolModule = chainSelect.value === "xahau" ? await import("../../../packages/xahau/src") : undefined;
   if (run !== bootstrapRun) return;

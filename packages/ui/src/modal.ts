@@ -1,7 +1,7 @@
 import QRCodeStyling from "qr-code-styling";
 import QRCode from "qrcode";
 import { WalletKitError, WalletKitErrorCode, adapterSupportsNetwork, getErrorMessage, isWalletKitError, sanitizeWalletUrl } from "@xrpl-wallet-kit/core";
-import type { WalletAdapter, WalletMetadata, WalletSession } from "@xrpl-wallet-kit/core";
+import type { WalletAdapter, WalletInteraction, WalletMetadata, WalletSession } from "@xrpl-wallet-kit/core";
 import { resolveWalletUiOptions } from "./config";
 import { resolveWalletUiMessages } from "./locales";
 import { resolveWalletTheme } from "./themes";
@@ -51,12 +51,16 @@ class WalletPickerView {
     private lastFocusedElement: HTMLElement | null = null;
     private qrCopyResetTimer?: number;
     private activeRequestAdapterId?: string;
+    private offInteraction?: () => void;
+    private interaction?: WalletInteraction;
     private activeGroupId?: string;
     private cachedStyleKey = "";
     private cachedStyle = "";
     private adaptiveLayout: "list" | "card" = "list";
     private adaptiveSignature = "";
     private adaptiveFrame?: number;
+    private walletRefreshFrame?: number;
+    private walletListMarkup = new WeakMap<HTMLElement, string>();
     private readonly onLayoutResize = () => this.scheduleAdaptiveLayout();
     private closeTimer?: number;
     private recentWalletId?: string;
@@ -78,9 +82,14 @@ class WalletPickerView {
         this.options = { manager: options.manager, mount: options.mount, ...resolveWalletUiOptions(options) };
         this.recentWalletId = this.readRecentWalletId();
         this.offEvents.push(options.manager.on("qr", ({ adapterId, uri, deeplink }) => this.showQr(adapterId, uri, deeplink)), options.manager.on("connecting", ({ adapterId, recovering }) => {
-            if (!recovering)
+            if (!recovering) {
                 this.setLoading(adapterId);
+                this.bindInteraction(adapterId, false);
+            }
         }), options.manager.on("connected", ({ adapterId, session }) => this.handleConnected(adapterId, session ?? options.manager.getSession())), options.manager.on("error", ({ adapterId, error }) => this.setError(error, adapterId)));
+        if (presentation === "modal") this.offEvents.push(options.manager.on("signing", ({ adapterId, kind }) => {
+            if (kind === "transaction") this.bindInteraction(adapterId, true);
+        }));
         this.offEvents.push(options.manager.on("walletsChanged", () => {
             if (this.root?.dataset.xwkView === "list") void this.refreshAvailability();
         }));
@@ -134,10 +143,13 @@ class WalletPickerView {
         return request.promise;
     }
     close(notify = true, restoreFocus = notify, animate = true) {
+        this.clearInteraction(notify);
         window.removeEventListener("resize", this.onLayoutResize);
         window.visualViewport?.removeEventListener("resize", this.onLayoutResize);
         if (this.adaptiveFrame !== undefined) window.cancelAnimationFrame(this.adaptiveFrame);
         this.adaptiveFrame = undefined;
+        if (this.walletRefreshFrame !== undefined) window.cancelAnimationFrame(this.walletRefreshFrame);
+        this.walletRefreshFrame = undefined;
         this.availabilityRequest++;
         if (this.availabilityTimer) clearInterval(this.availabilityTimer);
         this.availabilityTimer = undefined;
@@ -185,6 +197,7 @@ class WalletPickerView {
         this.closeTimer = window.setTimeout(finishClose, 190);
     }
     destroy() {
+        this.clearInteraction(true);
         this.availabilityRequest++;
         void this.options.manager.cancelPendingConnection();
         this.rejectOpenWait("Wallet picker was destroyed before a wallet connected.");
@@ -298,6 +311,12 @@ class WalletPickerView {
         this.focusInitialElement();
     }
     private handleBack() {
+        if (this.interaction?.details) {
+            this.close();
+            return;
+        }
+        const interactionWallet = this.interaction && this.activeRequestAdapterId;
+        this.clearInteraction(true);
         const groupId = this.activeGroupId;
         if (this.root?.dataset.xwkView === "qr" && groupId && this.getGroups().some((group) => group.id === groupId)) {
             void this.options.manager.cancelPendingConnection();
@@ -309,6 +328,14 @@ class WalletPickerView {
         if (this.root?.dataset.xwkView === "qr" || this.root?.dataset.xwkView === "connect")
             void this.options.manager.cancelPendingConnection();
         this.showList();
+        if (interactionWallet) {
+            window.setTimeout(() => {
+                if (this.root?.dataset.xwkView !== "list") return;
+                const row = Array.from(this.root.querySelectorAll<HTMLElement>("[data-wallet-id]"))
+                    .find(button => button.dataset.walletId === interactionWallet);
+                row?.focus();
+            }, 0);
+        }
     }
     private async retryQrConnection() {
         const adapterId = this.qrState?.adapterId;
@@ -495,7 +522,7 @@ class WalletPickerView {
         window.setTimeout(() => {
             if (!this.root?.isConnected)
                 return;
-            this.root.querySelector<HTMLElement>(".xwk-modal")?.focus({ preventScroll: true });
+            (this.root.querySelector<HTMLElement>(".xwk-interaction [data-xwk-choice]") ?? this.root.querySelector<HTMLElement>(".xwk-modal"))?.focus({ preventScroll: true });
         }, 0);
     }
     private restoreFocus() {
@@ -616,6 +643,7 @@ class WalletPickerView {
     private refreshWalletList(scheduleLayout = true) {
         if (this.root?.dataset.xwkView !== "list")
             return;
+        if (this.deferPressedWalletRefresh()) return;
         const grid = this.root.querySelector<HTMLElement>(".xwk-grid");
         if (!grid)
             return;
@@ -634,11 +662,10 @@ class WalletPickerView {
             modal.classList.add(`xwk-layout-${layout}`);
         }
         const activeGroup = this.activeGroupId ? this.getGroups().find((group) => group.id === this.activeGroupId) : undefined;
-        grid.innerHTML = activeGroup
+        const markup = activeGroup
             ? this.getGroupWallets(activeGroup).map((wallet) => this.renderWallet(wallet, layout)).join("")
             : this.renderWalletList(layout);
-        this.bindGroupButtons();
-        this.bindWalletButtons();
+        this.updateWalletGrid(grid, markup);
         grid.scrollTop = scrollTop;
         if (focused) {
             const replacement = Array.from(grid.querySelectorAll<HTMLElement>("[data-wallet-id], [data-wallet-group-id]"))
@@ -646,6 +673,24 @@ class WalletPickerView {
             (replacement ?? this.root.querySelector<HTMLElement>("[data-xwk-close]") ?? this.root).focus({ preventScroll: true });
         }
         if (scheduleLayout) this.scheduleAdaptiveLayout();
+    }
+    private updateWalletGrid(grid: HTMLElement, markup: string) {
+        if (this.walletListMarkup.get(grid) === markup) return;
+        grid.innerHTML = markup;
+        this.walletListMarkup.set(grid, markup);
+        this.bindGroupButtons();
+        this.bindWalletButtons();
+    }
+    private deferPressedWalletRefresh(): boolean {
+        if (!this.root?.querySelector("[data-wallet-id]:active, [data-wallet-group-id]:active")) return false;
+        // Replacing a pressed button before mouseup/touchend loses the native click.
+        if (this.walletRefreshFrame === undefined) {
+            this.walletRefreshFrame = window.requestAnimationFrame(() => {
+                this.walletRefreshFrame = undefined;
+                this.refreshWalletList();
+            });
+        }
+        return true;
     }
     private getLayout(): Exclude<WalletUiLayout, "auto"> {
         const layout = this.options.layout ?? "list";
@@ -657,6 +702,7 @@ class WalletPickerView {
         this.adaptiveFrame = window.requestAnimationFrame(() => {
             this.adaptiveFrame = undefined;
             if (this.root?.dataset.xwkView !== "list" || this.options.layout !== "auto") return;
+            if (this.deferPressedWalletRefresh()) return;
             const body = this.root.querySelector<HTMLElement>(".xwk-body");
             const grid = this.root.querySelector<HTMLElement>(".xwk-grid");
             const modal = this.root.querySelector<HTMLElement>(".xwk-modal");
@@ -692,11 +738,9 @@ class WalletPickerView {
         const title = this.root?.querySelector(".xwk-title");
         if (title)
             title.textContent = this.options.title ?? this.messages().connectWallet;
-        const grid = this.root?.querySelector(".xwk-grid");
+        const grid = this.root?.querySelector<HTMLElement>(".xwk-grid");
         if (grid)
-            grid.innerHTML = this.renderWalletList(this.getLayout());
-        this.bindGroupButtons();
-        this.bindWalletButtons();
+            this.updateWalletGrid(grid, this.renderWalletList(this.getLayout()));
         this.scheduleAdaptiveLayout();
     }
     private showWalletGroup(groupId: string) {
@@ -713,10 +757,9 @@ class WalletPickerView {
         const title = this.root.querySelector(".xwk-title");
         if (title)
             title.textContent = group.name;
-        const grid = this.root.querySelector(".xwk-grid");
+        const grid = this.root.querySelector<HTMLElement>(".xwk-grid");
         if (grid)
-            grid.innerHTML = this.getGroupWallets(group).map((wallet) => this.renderWallet(wallet, this.getLayout())).join("");
-        this.bindWalletButtons();
+            this.updateWalletGrid(grid, this.getGroupWallets(group).map((wallet) => this.renderWallet(wallet, this.getLayout())).join(""));
         this.scheduleAdaptiveLayout();
     }
     private showQr(adapterId: string, uri: string, deeplink?: string) {
@@ -992,6 +1035,194 @@ class WalletPickerView {
         const messages = this.messages();
         return this.qrCopied ? `${this.checkIcon()} ${this.escapeHtml(messages.copied)}` : `${this.linkIcon()} ${this.escapeHtml(messages.copyUri)}`;
     }
+    private clearInteraction(cancel = false) {
+        const interaction = this.interaction;
+        this.interaction = undefined;
+        this.offInteraction?.();
+        this.offInteraction = undefined;
+        if (cancel) interaction?.cancel();
+    }
+    private bindInteraction(adapterId: string, review: boolean) {
+        this.clearInteraction();
+        const adapter = this.options.manager.getAdapter(adapterId);
+        this.offInteraction = adapter?.onInteraction?.(interaction => {
+            const previous = this.interaction;
+            if (interaction && review && !this.root?.isConnected) {
+                const unsubscribe = this.offInteraction;
+                this.offInteraction = undefined;
+                this.open();
+                this.offInteraction = unsubscribe;
+            }
+            this.interaction = interaction ?? undefined;
+            if (interaction) {
+                this.renderInteraction(adapterId, interaction);
+            } else if (previous?.details) {
+                this.close(false, true);
+            } else if (previous && this.root?.isConnected) {
+                this.renderConnectShell(adapter?.metadata, adapterId);
+            }
+        });
+    }
+    private renderInteraction(adapterId: string, interaction: WalletInteraction) {
+        const adapter = this.options.manager.getAdapter(adapterId);
+        if (!this.root?.querySelector(".xwk-interaction-shell")) this.renderConnectShell(adapter?.metadata, adapterId);
+        const body = this.root?.querySelector<HTMLElement>(".xwk-body");
+        const title = this.root?.querySelector<HTMLElement>(".xwk-title");
+        if (!body || !title) return;
+        const messages = this.messages();
+        const copy = messages.walletInteraction;
+        const kind = interaction.kind;
+        body.scrollTop = 0;
+        const titleText = (kind === "method" ? copy?.chooseMethod : kind === "email" ? copy?.emailTitle :
+            kind === "code" ? copy?.codeTitle : kind === "review" ? copy?.reviewTitle : undefined) ?? interaction.title;
+        const walletIcon = kind !== "review" ? sanitizeWalletUrl(adapter?.metadata.icon, { allowDataImage: true }) : undefined;
+        if (walletIcon) {
+            title.innerHTML = `<span class="xwk-interaction-title"><img src="${this.escapeHtml(walletIcon)}" alt=""><span>${this.escapeHtml(titleText)}</span></span>`;
+        } else {
+            title.textContent = titleText;
+        }
+        const submitLabel = (kind === "email" ? copy?.sendCode : kind === "code" ? copy?.verifyCode :
+            kind === "review" ? copy?.approve : undefined) ?? interaction.submitLabel ?? messages.connect;
+        const escape = (text: string) => this.escapeHtml(text);
+        const statusIcons = `<span class="xwk-field-status" aria-hidden="true"><svg class="xwk-field-valid" viewBox="0 0 16 16" fill="none"><path d="m3 8 3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="xwk-field-invalid" viewBox="0 0 16 16" fill="none"><path d="m4 4 8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>`;
+        const fields = interaction.fields?.map(field => {
+            const label = escape((kind === "email" ? copy?.email : kind === "code" ? copy?.code : undefined) ?? field.label);
+            const codeLength = field.codeLength && Number.isInteger(field.codeLength) && field.codeLength >= 4 && field.codeLength <= 12
+                ? field.codeLength : undefined;
+            const input = `<input required name="${escape(field.name)}" type="${escape(field.type)}" autocomplete="${escape(field.autocomplete ?? "off")}" inputmode="${escape(field.inputMode ?? "text")}" ${codeLength ? `maxlength="${codeLength}" pattern="[0-9]{${codeLength}}"` : `placeholder="${escape(field.placeholder ?? "")}"`}>`;
+            const control = codeLength
+                ? `<span class="xwk-code-control">${input}<span class="xwk-code-cells" aria-hidden="true">${"<span></span>".repeat(codeLength)}</span></span>`
+                : input;
+            return `<label class="xwk-interaction-field"><span class="${kind === "email" || kind === "code" ? "xwk-sr-only" : ""}">${label}</span><span class="xwk-field-control">${control}${statusIcons}</span></label>`;
+        }).join("") ?? "";
+        const description = (kind === "email" ? copy?.emailHint : kind === "code" ? copy?.codeHint : undefined) ?? interaction.description;
+        const details = interaction.details?.map(detail =>
+            `<dt>${escape(detail.label)}</dt><dd>${escape(detail.value)}</dd>`
+        ).join("") ?? "";
+        const choices = interaction.choices?.map((choice, index) => {
+            const icon = this.renderWalletIcon({ id: choice.id, name: choice.label, type: "embedded", icon: choice.icon });
+            return this.renderWalletRow(icon, choice.label, `data-xwk-choice="${index}"`);
+        }).join("") ?? "";
+        const submitIcon = kind === "email" ? this.sendIcon() : kind === "code" || kind === "review" ? this.checkIcon() : "";
+        const submit = interaction.submit
+            ? `<button class="xwk-action xwk-action-primary" type="submit">${submitIcon}<span>${escape(submitLabel)}</span></button>` : "";
+        const secondary = interaction.secondaryAction
+            ? `<button class="xwk-action" type="button" data-xwk-secondary>${kind === "code" ? this.refreshIcon() : ""}<span>${escape((kind === "code" ? copy?.resendCode : undefined) ?? interaction.secondaryAction.label)}</span></button>` : "";
+        if (choices) {
+            this.ensureStyles(this.resolveTheme(), "list", this.options.size ?? "default", this.options.textSize ?? "sm");
+        }
+        body.innerHTML = `<form class="xwk-interaction" novalidate data-step="${escape(kind ?? "")}">${description ? `<p class="xwk-interaction-description">${escape(description)}</p>` : ""}${choices ? `<div class="xwk-grid">${choices}</div>` : ""}${fields}${details ? `<dl class="xwk-interaction-details">${details}</dl>` : ""}${submit || secondary ? `<div class="xwk-interaction-actions">${submit}${secondary}</div>` : ""}</form>`;
+        const form = body.querySelector("form")!;
+        const alert = document.createElement("p");
+        alert.className = "xwk-interaction-error";
+        alert.id = `${this.titleId}-interaction-error`;
+        alert.setAttribute("role", "alert");
+        alert.setAttribute("aria-atomic", "true");
+        body.classList.add("xwk-interaction-body");
+        body.append(alert);
+        const field = form.querySelector(".xwk-interaction-field");
+        const fieldAlert = document.createElement("p");
+        fieldAlert.className = "xwk-field-error";
+        fieldAlert.id = `${this.titleId}-field-error`;
+        fieldAlert.setAttribute("role", "alert");
+        fieldAlert.setAttribute("aria-atomic", "true");
+        field?.append(fieldAlert);
+        form.querySelectorAll<HTMLElement>(".xwk-code-control").forEach(control => {
+            const input = control.querySelector("input")!;
+            const cells = control.querySelectorAll<HTMLElement>(".xwk-code-cells > span");
+            const sync = () => {
+                const digits = input.value.replace(/[^0-9]/g, "").slice(0, cells.length);
+                if (input.value !== digits) input.value = digits;
+                const start = input.selectionStart ?? digits.length;
+                const end = input.selectionEnd ?? start;
+                cells.forEach((cell, index) => {
+                    cell.textContent = digits[index] ?? "";
+                    cell.toggleAttribute("data-caret", start === end && index === Math.min(start, cells.length - 1));
+                    cell.toggleAttribute("data-selection", index >= start && index < end);
+                });
+            };
+
+
+            input.addEventListener("input", sync);
+            input.addEventListener("focus", sync);
+            input.addEventListener("select", sync);
+            input.addEventListener("keyup", sync);
+            input.addEventListener("click", sync);
+            input.addEventListener("paste", event => {
+                const digits = event.clipboardData?.getData("text").replace(/[^0-9]/g, "");
+                if (!digits || digits.length < cells.length) return;
+                event.preventDefault();
+                input.value = digits.slice(0, cells.length);
+                input.dispatchEvent(new Event("input", { bubbles: true }));
+            });
+        });
+
+        const inputs = Array.from(form.querySelectorAll("input"));
+        const setStatus = (input: HTMLInputElement, state?: "valid" | "invalid") => {
+            const control = input.closest<HTMLElement>(".xwk-field-control")!;
+            if (state) control.dataset.status = state;
+            else delete control.dataset.status;
+            if (state === "invalid") {
+                input.setAttribute("aria-invalid", "true");
+                input.setAttribute("aria-describedby", fieldAlert.id);
+            } else {
+                input.removeAttribute("aria-invalid");
+                input.removeAttribute("aria-describedby");
+            }
+        };
+        const emailIsValid = (input: HTMLInputElement) =>
+            input.validity.valid && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value);
+        const clearError = () => {
+            alert.textContent = "";
+            fieldAlert.textContent = "";
+
+            inputs.forEach(input => setStatus(input, input.type === "email" && emailIsValid(input) ? "valid" : undefined));
+        };
+        const showError = (message: string, fields: readonly HTMLInputElement[]) => {
+
+            (fields.length ? fieldAlert : alert).textContent = message;
+            fields.forEach(input => setStatus(input, "invalid"));
+        };
+        form.addEventListener("input", clearError);
+        inputs.filter(input => input.type === "email").forEach(input => {
+            input.addEventListener("blur", () => {
+                if (input.value && !emailIsValid(input)) showError(copy?.invalidEmail ?? input.validationMessage, [input]);
+            });
+        });
+        const run = async (operation: () => void | Promise<void>, action?: HTMLElement | null) => {
+            const buttons = Array.from(form.querySelectorAll("button"));
+            clearError();
+            action?.setAttribute("aria-busy", "true");
+            buttons.forEach(button => { button.disabled = true; });
+            try { await operation(); }
+            catch (error) {
+                const message = getErrorMessage(error);
+                const isFieldError = (kind === "email" && /invalid email|valid email address/i.test(message)) ||
+                    (kind === "code" && /invalid.*code|incorrect.*code|code.*expired/i.test(message));
+                showError(message, isFieldError && action?.matches('[type="submit"]') ? inputs : []);
+            } finally {
+                action?.removeAttribute("aria-busy");
+                buttons.forEach(button => { button.disabled = false; });
+            }
+        };
+        form.querySelectorAll<HTMLButtonElement>("[data-xwk-choice]").forEach((button, index) => {
+            button.addEventListener("click", () => void run(() => interaction.choices?.[index].select(), button));
+        });
+        form.addEventListener("submit", event => {
+            event.preventDefault();
+            const invalid = inputs.find(input => input.type === "email" ? !emailIsValid(input) : !input.validity.valid);
+            if (invalid) {
+                showError((invalid.type === "email" ? copy?.invalidEmail : kind === "code" ? copy?.invalidCode : undefined) ?? invalid.validationMessage, [invalid]);
+                invalid.focus();
+                return;
+            }
+            const values: Record<string, string> = Object.create(null);
+            new FormData(form).forEach((value, key) => { values[key] = String(value); });
+            void run(() => interaction.submit?.(values), (event as SubmitEvent).submitter as HTMLElement | null);
+        });
+        form.querySelector("[data-xwk-secondary]")?.addEventListener("click", event => void run(() => interaction.secondaryAction?.run(), event.currentTarget as HTMLElement));
+        form.querySelector<HTMLElement>("[data-xwk-choice]")?.focus();
+    }
     private renderConnectShell(wallet: WalletMetadata | undefined, adapterId: string) {
         const messages = this.messages();
         const theme = this.resolveTheme();
@@ -1007,7 +1238,20 @@ class WalletPickerView {
             return;
         this.root.dataset.xwkView = "connect";
         this.ensureStyles(theme, layout, size, textSize);
-        this.root.innerHTML = `<section ${this.renderShellAttributes("xwk-modal xwk-connect-modal")}><div class="xwk-header"><button class="xwk-back" data-xwk-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button><div class="xwk-title" id="${this.titleId}">${this.escapeHtml(messages.connect)}</div>${this.renderHeaderEnd()}</div><div class="xwk-body"><div class="xwk-connect xwk-standalone-connect"><div class="xwk-spinner" aria-hidden="true"><div class="xwk-connect-icon">${this.renderWalletIcon(wallet)}</div></div><strong class="xwk-connect-name">${this.escapeHtml(walletName)}</strong><p class="xwk-connect-status" role="status" aria-live="polite">${this.escapeHtml(statusText)}</p></div></div>${this.renderFooter()}</section>`;
+        const interactive = this.options.manager.getAdapter(adapterId)?.onInteraction;
+        const loading = `<div class="xwk-connect xwk-standalone-connect"><div class="xwk-spinner" aria-hidden="true"><div class="xwk-connect-icon">${this.renderWalletIcon(wallet)}</div></div><strong class="xwk-connect-name">${this.escapeHtml(walletName)}</strong><p class="xwk-connect-status" role="status" aria-live="polite">${this.escapeHtml(statusText)}</p></div>`;
+        const existing = interactive ? this.root.querySelector<HTMLElement>(".xwk-interaction-shell") : null;
+        if (existing?.dataset.adapterId === adapterId) {
+            const body = existing.querySelector<HTMLElement>(".xwk-body")!;
+            body.classList.remove("xwk-interaction-body");
+            body.innerHTML = loading;
+            body.scrollTop = 0;
+            existing.querySelector<HTMLElement>(".xwk-title")!.textContent = messages.connect;
+            this.focusInitialElement();
+            return;
+        }
+        const shellClass = interactive ? "xwk-modal xwk-connect-modal xwk-interaction-shell" : "xwk-modal xwk-connect-modal";
+        this.root.innerHTML = `<section ${this.renderShellAttributes(shellClass)} data-adapter-id="${this.escapeHtml(adapterId)}"><div class="xwk-header"><button class="xwk-back" data-xwk-back aria-label="${this.escapeHtml(messages.back)}">${this.backIcon()}</button><div class="xwk-title" id="${this.titleId}">${this.escapeHtml(messages.connect)}</div>${this.renderHeaderEnd()}</div><div class="xwk-body">${loading}</div>${this.renderFooter()}</section>`;
         this.bindChrome();
     }
     private getConnectStatusText(wallet: WalletMetadata | undefined, adapterId: string) {
@@ -1056,7 +1300,59 @@ class WalletPickerView {
         const spinnerSecondary = theme.spinnerTrail;
         const qrLoadingColor = theme.muted;
         const overlayBlur = theme.overlayBlur > 0 ? `blur(${theme.overlayBlur}px)` : "none";
-        const styles = `.xwk-overlay{position:fixed;inset:0;background:${theme.overlay};-webkit-backdrop-filter:${overlayBlur};backdrop-filter:${overlayBlur};display:grid;overscroll-behavior:contain;place-items:center;z-index:var(--xwk-layer-modal,2147483000);font-family:${theme.fontFamily};font-size:${bodyFontSize};opacity:0;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));transition:opacity .2s ease-out}.xwk-overlay[data-xwk-state="open"]{opacity:1}.xwk-overlay[data-xwk-state="closing"]{opacity:0;transition-duration:.18s;transition-timing-function:cubic-bezier(.4,0,1,1)}.xwk-modal{box-sizing:border-box;display:block;width:min(${width},100%);max-height:calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));background:${theme.background};border:1px solid ${theme.border};border-radius:${theme.radius};box-shadow:${theme.shadow};color:${theme.foreground};opacity:0;overflow:hidden;transform:translateY(8px) scale(.97);transform-origin:center bottom;transition:opacity .24s cubic-bezier(.22,1,.36,1),transform .24s cubic-bezier(.22,1,.36,1)}.xwk-overlay[data-xwk-state="open"] .xwk-modal{opacity:1;transform:translateY(0) scale(1)}.xwk-overlay[data-xwk-state="closing"] .xwk-modal{opacity:0;transform:translateY(6px) scale(.985);transition-duration:.18s;transition-timing-function:cubic-bezier(.4,0,1,1)}.xwk-header{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;column-gap:8px;padding:8px 18px;background:${theme.headerBackground};border-bottom:1px solid ${theme.border}}.xwk-title{font-size:${titleFontSize};font-weight:600;letter-spacing:0;text-align:center;color:${theme.foreground};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-close,.xwk-back{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:transparent;border:0;border-radius:999px;box-shadow:none;box-sizing:border-box;color:${theme.muted};cursor:pointer;display:inline-flex;font:inherit;height:44px;justify-content:center;margin:0;min-height:0;outline:none;overflow:hidden;padding:0;touch-action:manipulation;transform:none;width:44px}.xwk-back{justify-self:start}.xwk-close{font-size:26px;font-weight:500;justify-self:end;line-height:1}.xwk-close:hover,.xwk-back:hover,.xwk-close:active,.xwk-back:active{background:transparent!important;box-shadow:none;color:${theme.foreground};transform:none}.xwk-close:focus-visible,.xwk-back:focus-visible,.xwk-wallet:focus-visible,.xwk-action:focus-visible,.xwk-qr-theme-action:focus-visible{outline:2px solid ${theme.accent};outline-offset:2px;text-decoration:none}.xwk-body{-webkit-overflow-scrolling:touch;box-sizing:border-box;max-height:min(620px,calc(100dvh - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));overscroll-behavior:contain;overflow:auto;padding:12px 22px 18px}.xwk-list,.xwk-connect,.xwk-qr{display:none}.xwk-overlay[data-xwk-view="list"] .xwk-list{display:block}.xwk-overlay[data-xwk-view="connect"] .xwk-connect{display:block}.xwk-overlay[data-xwk-view="qr"] .xwk-qr{display:block}.xwk-grid{display:grid;grid-template-columns:${gridColumns};gap:7px}.xwk-wallet{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:${theme.surface};border:0;border-radius:${theme.walletRadius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:flex;flex-direction:${walletDirection};font:inherit;gap:12px;justify-content:${layout === "list" ? "flex-start" : "center"};line-height:1.2;margin:0;min-height:${walletMinHeight};min-width:0;outline:none;overflow:hidden;padding:${layout === "list" ? "12px 12px" : "12px 10px"};text-align:${textAlign};touch-action:manipulation;transform:none;transition:background-color .16s ease;width:100%}.xwk-wallet:hover{background:${theme.surfaceHover};box-shadow:none;transform:none}.xwk-wallet:active{background:${theme.surfaceHover};transform:none}.xwk-wallet img:not(.xwk-mini-icon),.xwk-icon-fallback{border-radius:${theme.walletRadius};flex:0 0 auto;height:${iconSize};object-fit:contain;overflow:hidden;width:${iconSize}}.xwk-icon-fallback{align-items:center;background:${theme.accent};color:${theme.accentText};display:inline-flex;font-weight:700;justify-content:center}.xwk-wallet-group{margin-top:0;min-height:${walletMinHeight}}.xwk-wallet-group .xwk-wallet-info{align-items:center;display:${layout === "list" ? "flex" : "grid"};gap:${layout === "list" ? "10px" : "2px"}}.xwk-wallet-group .xwk-name{flex:1 1 auto}.xwk-wallet-group .xwk-group{display:${layout === "list" ? "none" : groupDisplay}}.xwk-group-placeholder{visibility:hidden}.xwk-wallet-info{display:grid;gap:2px;min-width:0;width:100%}.xwk-name{color:${walletNameColor};display:block;font-size:${layout === "list" ? nameFontSize : gridNameFontSize};font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-group{color:${theme.muted};display:${groupDisplay};font-size:${groupFontSize};font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-group-icons{align-items:center;display:${layout === "list" ? "inline-flex" : "none"};flex:0 0 auto;gap:4px;justify-content:flex-end;margin-left:auto;min-width:0}.xwk-mini-icon,.xwk-mini-fallback,.xwk-mini-more{align-items:center;border:1px solid ${miniIconBorder};border-radius:10px;box-sizing:border-box;display:inline-flex;flex:0 0 auto;height:32px;justify-content:center;object-fit:cover;overflow:hidden;width:32px}.xwk-mini-fallback,.xwk-mini-more{background:${theme.background};color:${theme.muted};font-size:12px;font-weight:600}.xwk-mini-more{border-radius:999px;width:auto;min-width:32px;padding:0 8px}.xwk-wallet-badges{align-items:center;display:inline-flex;flex:0 0 auto;gap:6px;justify-content:flex-end;margin-left:auto;min-width:0}.xwk-wallet-badge{align-items:center;background:${badgeBackground};border:1px solid ${badgeBorder};border-radius:999px;color:${badgeColor};display:inline-flex;flex:0 0 auto;font-size:11px;font-weight:500;gap:6px;line-height:1;min-height:24px;padding:0 10px;visibility:hidden}.xwk-wallet-badge:before{background:${badgeDot};border-radius:999px;content:"";height:6px;width:6px}.xwk-wallet-badge.xwk-installed,.xwk-wallet-badge.xwk-recommended,.xwk-wallet-badge.xwk-recent{visibility:visible}.xwk-wallet-badge.xwk-recommended,.xwk-wallet-badge.xwk-recent{background:${recommendedBadgeBackground};border-color:${recommendedBadgeBorder};color:${theme.accent}}.xwk-wallet-badge.xwk-recommended:before,.xwk-wallet-badge.xwk-recent:before{background:currentColor}.xwk-status{color:${theme.accent};font-size:12px;margin-top:8px;min-height:0;max-width:100%;overflow-wrap:anywhere}.xwk-status.xwk-error,.xwk-error-text{color:${theme.error}}.xwk-status.xwk-error{background:${theme.surface};border:1px solid ${theme.border};border-radius:10px;box-sizing:border-box;line-height:1.35;padding:9px 10px}.xwk-hidden{display:none}.xwk-back.xwk-hidden{display:inline-flex;pointer-events:none;visibility:hidden}.xwk-connect{text-align:center;padding:30px 0 16px}.xwk-spinner{display:grid;margin:0 auto 16px;place-items:center;position:relative;width:104px;height:104px}.xwk-spinner:before{animation:xwk-spin 1s linear infinite;border:3px solid transparent;border-top-color:${spinnerPrimary};border-right-color:${spinnerSecondary};border-radius:50%;content:"";height:96px;position:absolute;width:96px}.xwk-connect-icon img,.xwk-connect-icon .xwk-icon-fallback{border-radius:${theme.walletRadius};height:66px;object-fit:contain;overflow:hidden;width:66px}.xwk-connect-name{display:block;font-size:${nameFontSize};font-weight:600;margin-top:4px}.xwk-connect-status{color:${theme.muted};font-size:${bodyFontSize};font-weight:400;line-height:1.45;margin:14px auto 0;max-width:420px}.xwk-qr{text-align:center}.xwk-qr-title{color:${theme.foreground};font-size:${titleFontSize};font-weight:500;margin:0 0 14px}.xwk-qr-card{background:${theme.surface};border:1px solid ${theme.border};border-radius:14px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;margin:0 auto 10px;min-height:386px;padding:12px;width:min(332px,100%)}.xwk-qr-code-wrap{position:relative;flex:0 0 auto;margin:0 auto 10px;width:100%}.xwk-qr-code{aspect-ratio:1/1;background:transparent;border:0;border-radius:10px;box-sizing:border-box;color:${theme.muted};display:grid;min-height:0;padding:0;place-items:center;width:100%}.xwk-qr-code-light{background:${QR_LIGHT};padding:8px}.xwk-qr-theme-action{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:${theme.background};border:1px solid ${actionBorder};border-radius:999px;box-shadow:none;box-sizing:border-box;color:${theme.muted};cursor:pointer;display:inline-flex;height:34px;justify-content:center;margin:0;min-height:0;opacity:0;outline:none;padding:0;pointer-events:none;position:absolute;right:8px;top:8px;touch-action:manipulation;transform:none;transition:opacity .14s ease,background-color .16s ease,border-color .16s ease,color .16s ease;width:34px}.xwk-qr-code-wrap:hover .xwk-qr-theme-action,.xwk-qr-code-wrap:focus-within .xwk-qr-theme-action,.xwk-qr-theme-action:focus-visible{opacity:1;pointer-events:auto}.xwk-qr-theme-action:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;color:${theme.foreground};transform:none}.xwk-qr-theme-action svg{height:17px;width:17px}.xwk-qr-code canvas,.xwk-qr-code img,.xwk-qr-code svg{aspect-ratio:1/1;display:block;height:auto;max-width:100%;width:100%}.xwk-qr-loading{align-items:center;color:${qrLoadingColor};display:inline-flex;font-size:13px;gap:8px}.xwk-qr-message{align-items:center;color:${theme.muted};display:grid;font-size:${bodyFontSize};gap:7px;line-height:1.35;max-width:260px;text-align:center}.xwk-qr-message strong{color:${theme.foreground};font-size:${nameFontSize};font-weight:600}.xwk-qr-message span{display:block;max-width:100%;overflow-wrap:anywhere}.xwk-qr-loading-spinner{animation:xwk-spin 1s linear infinite;border:2px solid ${spinnerSecondary};border-top-color:${spinnerPrimary};border-radius:999px;display:inline-block;height:18px;width:18px}.xwk-qr-help{color:${theme.muted};font-size:${bodyFontSize};font-weight:400;line-height:1.35;margin:10px auto 0;max-width:420px;min-height:22px;white-space:nowrap}.xwk-qr-fallback{color:${theme.muted};font-size:11px;line-height:1.5;overflow-wrap:anywhere}.xwk-actions{display:grid;gap:10px;grid-template-columns:1fr 1fr;margin-top:14px}.xwk-qr-card-actions{display:grid;flex:0 0 auto;gap:10px;grid-template-columns:1fr;min-height:46px}.xwk-qr-card-actions-dual{grid-template-columns:repeat(auto-fit,minmax(0,1fr))}.xwk-qr-card-actions-placeholder{visibility:hidden}.xwk-action{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:${theme.surface};border:1px solid ${actionBorder};border-radius:${theme.walletRadius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:inline-flex;font:inherit;font-size:${bodyFontSize};font-weight:560;gap:8px;justify-content:center;line-height:1.2;margin:0;min-height:46px;min-width:0;outline:none;overflow:hidden;padding:0 12px;text-decoration:none;touch-action:manipulation;transform:none;transition:background-color .16s ease,border-color .16s ease;white-space:nowrap;width:100%}.xwk-copy-inside{background:${theme.surface};border-color:${actionBorder};color:${theme.foreground};font-size:${bodyFontSize};width:100%}.xwk-action:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;text-decoration:none;transform:none}.xwk-action:active{background:${theme.surfaceHover};box-shadow:none;opacity:1;text-decoration:none;transform:none}.xwk-copy-inside:hover{background:${theme.surfaceHover};box-shadow:none;text-decoration:none}.xwk-action-primary{background:${theme.surface};border-color:${actionBorder};color:${theme.foreground}}.xwk-action-primary:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;color:${theme.foreground};text-decoration:none}.xwk-action svg{flex:0 0 auto;opacity:.58}.xwk-copied-icon{--xwk-success-icon-foreground:${theme.background};color:${theme.success};opacity:1!important}.xwk-action:disabled{cursor:default;opacity:.76}.xwk-retrying .xwk-refresh-icon{animation:xwk-spin .7s linear infinite}.xwk-footer{border-top:0;color:${theme.muted};font-size:11px;font-weight:400;padding:12px 16px 14px;text-align:center}@keyframes xwk-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.xwk-overlay,.xwk-modal,.xwk-wallet,.xwk-action,.xwk-close,.xwk-back,.xwk-qr-theme-action{transition-duration:1ms!important;animation-duration:1ms!important}.xwk-spinner:before,.xwk-qr-loading-spinner{animation:none}}@media(max-width:640px){.xwk-overlay{padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left));place-items:end center}.xwk-modal{border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:calc(100dvh - 24px - env(safe-area-inset-top));transform:translateY(100%);width:100%}.xwk-overlay[data-xwk-state="open"] .xwk-modal{transform:translateY(0);transition-duration:.32s;transition-timing-function:cubic-bezier(.32,.72,0,1)}.xwk-overlay[data-xwk-state="closing"] .xwk-modal{transform:translateY(100%);transition-duration:.24s;transition-timing-function:cubic-bezier(.4,0,1,1)}.xwk-header{grid-template-columns:44px minmax(0,1fr) 44px;column-gap:8px;padding:10px 16px}.xwk-body{max-height:calc(100dvh - 112px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:14px 16px 16px}.xwk-grid{grid-template-columns:${layout === "icon" ? "repeat(3,minmax(0,1fr))" : "1fr"}}.xwk-wallet-badges{gap:4px}.xwk-wallet-badge{font-size:10px;min-height:22px;padding:0 8px}.xwk-actions{grid-template-columns:1fr}.xwk-qr-card{min-height:358px;padding:12px;width:min(304px,100%)}.xwk-qr-code-wrap{width:100%}.xwk-action{font-size:clamp(12px,3.55vw,${bodyFontSize});gap:6px;padding:0 10px}.xwk-action svg{height:17px;width:17px;flex:0 0 auto}.xwk-qr-card-actions-dual{grid-template-columns:1fr}.xwk-qr-help{font-size:clamp(12px,3.45vw,${bodyFontSize});min-height:38px;white-space:normal}}@media(max-width:360px){.xwk-qr-card{min-height:354px;width:min(284px,100%)}}@media(max-height:560px){.xwk-body{max-height:calc(100dvh - 96px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:10px 16px}.xwk-connect{padding:18px 0 10px}.xwk-spinner{height:82px;margin-bottom:12px;width:82px}.xwk-spinner:before{height:76px;width:76px}.xwk-connect-icon img,.xwk-connect-icon .xwk-icon-fallback{border-radius:${theme.walletRadius};height:54px;width:54px}.xwk-qr-card{min-height:320px;width:min(260px,100%)}.xwk-qr-title{margin-bottom:10px}.xwk-qr-help{margin-top:8px}.xwk-footer{padding:8px 16px 10px}}`;
+        const styles = `.xwk-interaction{display:grid;gap:12px}
+.xwk-interaction[data-step="email"],.xwk-interaction[data-step="code"]{max-width:360px;margin:0 auto;padding:6px 0 2px}.xwk-interaction[data-step="code"]{gap:9px;padding-block:0}
+.xwk-interaction-description{margin:0;line-height:1.5;color:${theme.muted};overflow-wrap:anywhere}
+.xwk-modal.xwk-interaction-shell{display:grid;grid-template-rows:auto minmax(0,1fr) auto;block-size:400px}@media(max-width:640px){.xwk-overlay .xwk-modal.xwk-interaction-shell{height:400px!important}}
+.xwk-interaction-shell>.xwk-body{display:grid;align-content:safe center;max-height:none;min-height:0;padding-block:14px}
+.xwk-interaction-shell>.xwk-interaction-body:has([data-step="review"]){align-content:start}.xwk-interaction-shell>.xwk-interaction-body:has([data-step="code"]){padding-block:8px}
+.xwk-interaction-shell>.xwk-body>form{width:100%;box-sizing:border-box}
+.xwk-interaction-shell>.xwk-body>.xwk-interaction-error{width:100%}
+.xwk-interaction-body>.xwk-interaction-error,.xwk-field-error{box-sizing:border-box;block-size:1.35em;margin:0;overflow:auto;font-size:.9em;font-weight:400;line-height:1.25;overflow-wrap:anywhere;color:${theme.error}}.xwk-interaction-body>.xwk-interaction-error{margin:4px auto 0;max-width:360px;text-align:center}
+.xwk-interaction-body>.xwk-interaction-error:empty{pointer-events:none}.xwk-field-control{position:relative;display:block}
+.xwk-field-status{position:absolute;inset-inline-end:12px;top:50%;transform:translateY(-50%);pointer-events:none;z-index:2}
+.xwk-field-status svg{display:none;width:17px;height:17px}
+.xwk-field-control[data-status="valid"] .xwk-field-valid{display:block;color:${theme.success}}
+.xwk-field-control[data-status="invalid"] .xwk-field-invalid{display:block;color:${theme.error}}
+.xwk-interaction .xwk-field-control>input{padding-inline-end:38px}
+.xwk-field-control[data-status="invalid"] .xwk-code-cells>span,.xwk-interaction .xwk-field-control[data-status="invalid"]>input{border-color:${theme.error}}
+.xwk-field-control:has(.xwk-code-control) .xwk-field-status{top:6px;inset-inline-end:5px;transform:none}
+.xwk-field-control:has(.xwk-code-control) .xwk-field-status svg{width:12px;height:12px}
+.xwk-interaction-field{display:grid;gap:4px;font-weight:600}
+.xwk-interaction input{box-sizing:border-box;width:100%;min-height:48px;background:${theme.background};color:${theme.foreground};border:1px solid ${theme.border};border-radius:${theme.walletRadius};padding:11px 14px;font:inherit;font-size:max(16px,1em);font-weight:400}
+.xwk-interaction input::placeholder{color:${theme.muted}}
+.xwk-interaction input:focus,.xwk-interaction button:focus-visible{outline:none}.xwk-interaction input:hover,.xwk-interaction input:focus{background:color-mix(in srgb,${theme.background},${theme.foreground} 5%)}.xwk-interaction button:focus-visible{background:color-mix(in srgb,${theme.surface},${theme.foreground} 8%)}
+.xwk-code-control{position:relative;display:block}
+.xwk-interaction .xwk-code-control input{position:absolute;inset:0;height:100%;z-index:1;opacity:0;cursor:text}
+.xwk-code-cells{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:clamp(5px,2vw,10px)}
+.xwk-code-cells>span{position:relative;display:grid;place-items:center;min-height:clamp(60px,15vw,65px);border:1px solid color-mix(in srgb,${theme.border},${theme.foreground} 17%);border-radius:${theme.walletRadius};background:${theme.surface};background:linear-gradient(175deg,color-mix(in srgb,${theme.surface},${theme.background} 64%),${theme.surface});box-shadow:inset 0 1px 0 color-mix(in srgb,${theme.foreground} 7%,transparent),0 2px 3px color-mix(in srgb,${theme.foreground} 8%,transparent);color:${theme.foreground};font-size:28px;font-weight:650;font-variant-numeric:tabular-nums;transition:background-color .16s,box-shadow .16s}
+.xwk-code-cells>span:empty::before{content:"";width:7px;height:2px;border-radius:2px;background:${theme.muted};opacity:.48}
+.xwk-code-control:focus-within .xwk-code-cells>span[data-caret]{background:color-mix(in srgb,${theme.surface},${theme.accent} 8%);box-shadow:inset 0 1px 2px color-mix(in srgb,${theme.foreground} 9%,transparent),0 2px 3px color-mix(in srgb,${theme.foreground} 7%,transparent)}
+.xwk-code-control:focus-within [data-caret]:empty::before{visibility:hidden}
+.xwk-code-control:focus-within [data-caret]::after{content:"";position:absolute;inset-block:30%;inset-inline-start:calc(50% - 1px);width:2px;border-radius:2px;background:${theme.accent};animation:xwk-caret-blink 1.1s step-end infinite}
+.xwk-code-control:focus-within [data-caret]:not(:empty)::after{inset-inline-start:auto;inset-inline-end:18%}
+.xwk-code-control:focus-within .xwk-code-cells>span[data-selection]{background:${theme.surfaceHover}}
+@keyframes xwk-caret-blink{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.xwk-code-control:focus-within [data-caret]::after{animation:none}.xwk-code-cells>span{transition:none}}
+.xwk-interaction-title{display:flex;min-width:0;justify-content:center;align-items:center;gap:8px}
+.xwk-interaction-title img{width:22px;height:22px;border-radius:5px;flex:none}
+.xwk-interaction-title span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.xwk-interaction-actions{display:grid;gap:12px}.xwk-interaction[data-step="code"] .xwk-interaction-actions{gap:10px}.xwk-interaction[data-step="code"] .xwk-action{min-height:44px}.xwk-interaction-actions .xwk-action{min-height:46px}
+.xwk-interaction .xwk-interaction-actions .xwk-action-primary{background:${theme.foreground};border-color:transparent;color:${theme.background};font-weight:650}
+.xwk-interaction .xwk-interaction-actions .xwk-action-primary svg{color:inherit;--xwk-success-icon-foreground:${theme.foreground}}
+.xwk-interaction .xwk-interaction-actions .xwk-action-primary:hover,.xwk-interaction .xwk-interaction-actions .xwk-action-primary:focus-visible{background:color-mix(in srgb,${theme.foreground},${theme.background} 9%)}.xwk-interaction-actions .xwk-action svg{width:16px;height:16px;flex:0 0 16px}.xwk-interaction .xwk-action:hover,.xwk-interaction .xwk-wallet:hover{background:color-mix(in srgb,${theme.surface},${theme.foreground} 5%)}
+.xwk-interaction .xwk-interaction-actions [data-xwk-secondary]{border-color:${theme.border};border-color:color-mix(in srgb,${theme.border},${theme.foreground} 16%);background:${theme.background};color:${theme.foreground};font-weight:600}
+.xwk-interaction .xwk-interaction-actions [data-xwk-secondary] svg{color:inherit}
+.xwk-interaction .xwk-interaction-actions [data-xwk-secondary]:hover,.xwk-interaction .xwk-interaction-actions [data-xwk-secondary]:focus-visible{background:${theme.surface}}
+.xwk-interaction .xwk-action[aria-busy=true] svg{display:none}.xwk-interaction .xwk-action[aria-busy=true]::before{content:"";width:12px;height:12px;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;animation:xwk-interaction-spin .8s linear infinite}
+@keyframes xwk-interaction-spin{to{transform:rotate(1turn)}}
+@media(prefers-reduced-motion:reduce){.xwk-interaction .xwk-action[aria-busy=true] svg{display:none}.xwk-interaction .xwk-action[aria-busy=true]::before{animation:none}}
+.xwk-interaction [data-xwk-choice]{min-height:54px;gap:12px;padding:8px 14px}
+.xwk-interaction [data-xwk-choice] img,.xwk-interaction [data-xwk-choice] .xwk-icon-fallback{width:32px;height:32px}
+.xwk-interaction [data-xwk-choice]::after{content:"";width:6px;height:6px;border-block-start:1.5px solid currentColor;border-inline-end:1.5px solid currentColor;transform:rotate(45deg);color:${theme.muted};margin-inline-start:auto;margin-inline-end:4px;flex:none}
+.xwk-interaction-details{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px 12px;margin:0;padding:12px;border:1px solid ${theme.border};border-radius:${theme.walletRadius}}
+.xwk-interaction-details dt{color:${theme.muted}}
+.xwk-interaction-details dd{margin:0;overflow-wrap:anywhere}.xwk-overlay{position:fixed;inset:0;background:${theme.overlay};-webkit-backdrop-filter:${overlayBlur};backdrop-filter:${overlayBlur};display:grid;overscroll-behavior:contain;place-items:center;z-index:var(--xwk-layer-modal,2147483000);font-family:${theme.fontFamily};font-size:${bodyFontSize};opacity:0;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));transition:opacity .2s ease-out}.xwk-overlay[data-xwk-state="open"]{opacity:1}.xwk-overlay[data-xwk-state="closing"]{opacity:0;transition-duration:.18s;transition-timing-function:cubic-bezier(.4,0,1,1)}.xwk-modal{box-sizing:border-box;display:block;width:min(${width},100%);max-height:calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));background:${theme.background};border:1px solid ${theme.border};border-radius:${theme.radius};box-shadow:${theme.shadow};color:${theme.foreground};opacity:0;overflow:hidden;transform:translateY(8px) scale(.97);transform-origin:center bottom;transition:opacity .24s cubic-bezier(.22,1,.36,1),transform .24s cubic-bezier(.22,1,.36,1)}.xwk-overlay[data-xwk-state="open"] .xwk-modal{opacity:1;transform:translateY(0) scale(1)}.xwk-overlay[data-xwk-state="closing"] .xwk-modal{opacity:0;transform:translateY(6px) scale(.985);transition-duration:.18s;transition-timing-function:cubic-bezier(.4,0,1,1)}.xwk-header{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;column-gap:8px;padding:8px 18px;background:${theme.headerBackground};border-bottom:1px solid ${theme.border}}.xwk-title{font-size:${titleFontSize};font-weight:600;letter-spacing:0;text-align:center;color:${theme.foreground};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-close,.xwk-back{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:transparent;border:0;border-radius:999px;box-shadow:none;box-sizing:border-box;color:${theme.muted};cursor:pointer;display:inline-flex;font:inherit;height:44px;justify-content:center;margin:0;min-height:0;outline:none;overflow:hidden;padding:0;touch-action:manipulation;transform:none;width:44px}.xwk-back{justify-self:start}.xwk-close{font-size:26px;font-weight:500;justify-self:end;line-height:1}.xwk-close:hover,.xwk-back:hover,.xwk-close:active,.xwk-back:active{background:transparent!important;box-shadow:none;color:${theme.foreground};transform:none}.xwk-close:focus-visible,.xwk-back:focus-visible,.xwk-wallet:focus-visible,.xwk-action:focus-visible,.xwk-qr-theme-action:focus-visible{outline:2px solid ${theme.accent};outline-offset:2px;text-decoration:none}.xwk-body{-webkit-overflow-scrolling:touch;box-sizing:border-box;max-height:min(620px,calc(100dvh - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));overscroll-behavior:contain;overflow:auto;padding:12px 22px 18px}.xwk-list,.xwk-connect,.xwk-qr{display:none}.xwk-overlay[data-xwk-view="list"] .xwk-list{display:block}.xwk-overlay[data-xwk-view="connect"] .xwk-connect{display:block}.xwk-overlay[data-xwk-view="qr"] .xwk-qr{display:block}.xwk-grid{display:grid;grid-template-columns:${gridColumns};gap:7px}.xwk-wallet{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:${theme.surface};border:0;border-radius:${theme.walletRadius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:flex;flex-direction:${walletDirection};font:inherit;gap:12px;justify-content:${layout === "list" ? "flex-start" : "center"};line-height:1.2;margin:0;min-height:${walletMinHeight};min-width:0;outline:none;overflow:hidden;padding:${layout === "list" ? "12px 12px" : "12px 10px"};text-align:${textAlign};touch-action:manipulation;transform:none;transition:background-color .16s ease;width:100%}.xwk-wallet:hover{background:${theme.surfaceHover};box-shadow:none;transform:none}.xwk-wallet:active{background:${theme.surfaceHover};transform:none}.xwk-wallet img:not(.xwk-mini-icon),.xwk-icon-fallback{border-radius:${theme.walletRadius};flex:0 0 auto;height:${iconSize};object-fit:contain;overflow:hidden;width:${iconSize}}.xwk-icon-fallback{align-items:center;background:${theme.accent};color:${theme.accentText};display:inline-flex;font-weight:700;justify-content:center}.xwk-wallet-group{margin-top:0;min-height:${walletMinHeight}}.xwk-wallet-group .xwk-wallet-info{align-items:center;display:${layout === "list" ? "flex" : "grid"};gap:${layout === "list" ? "10px" : "2px"}}.xwk-wallet-group .xwk-name{flex:1 1 auto}.xwk-wallet-group .xwk-group{display:${layout === "list" ? "none" : groupDisplay}}.xwk-group-placeholder{visibility:hidden}.xwk-wallet-info{display:grid;gap:2px;min-width:0;width:100%}.xwk-name{color:${walletNameColor};display:block;font-size:${layout === "list" ? nameFontSize : gridNameFontSize};font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-group{color:${theme.muted};display:${groupDisplay};font-size:${groupFontSize};font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xwk-group-icons{align-items:center;display:${layout === "list" ? "inline-flex" : "none"};flex:0 0 auto;gap:4px;justify-content:flex-end;margin-left:auto;min-width:0}.xwk-mini-icon,.xwk-mini-fallback,.xwk-mini-more{align-items:center;border:1px solid ${miniIconBorder};border-radius:10px;box-sizing:border-box;display:inline-flex;flex:0 0 auto;height:32px;justify-content:center;object-fit:cover;overflow:hidden;width:32px}.xwk-mini-fallback,.xwk-mini-more{background:${theme.background};color:${theme.muted};font-size:12px;font-weight:600}.xwk-mini-more{border-radius:999px;width:auto;min-width:32px;padding:0 8px}.xwk-wallet-badges{align-items:center;display:inline-flex;flex:0 0 auto;gap:6px;justify-content:flex-end;margin-left:auto;min-width:0}.xwk-wallet-badge{align-items:center;background:${badgeBackground};border:1px solid ${badgeBorder};border-radius:999px;color:${badgeColor};display:inline-flex;flex:0 0 auto;font-size:11px;font-weight:500;gap:6px;line-height:1;min-height:24px;padding:0 10px;visibility:hidden}.xwk-wallet-badge:before{background:${badgeDot};border-radius:999px;content:"";height:6px;width:6px}.xwk-wallet-badge.xwk-installed,.xwk-wallet-badge.xwk-recommended,.xwk-wallet-badge.xwk-recent{visibility:visible}.xwk-wallet-badge.xwk-recommended,.xwk-wallet-badge.xwk-recent{background:${recommendedBadgeBackground};border-color:${recommendedBadgeBorder};color:${theme.accent}}.xwk-wallet-badge.xwk-recommended:before,.xwk-wallet-badge.xwk-recent:before{background:currentColor}.xwk-status{color:${theme.accent};font-size:12px;margin-top:8px;min-height:0;max-width:100%;overflow-wrap:anywhere}.xwk-status.xwk-error,.xwk-error-text{color:${theme.error}}.xwk-status.xwk-error{background:${theme.surface};border:1px solid ${theme.border};border-radius:10px;box-sizing:border-box;line-height:1.35;padding:9px 10px}.xwk-hidden{display:none}.xwk-back.xwk-hidden{display:inline-flex;pointer-events:none;visibility:hidden}.xwk-connect{text-align:center;padding:30px 0 16px}.xwk-spinner{display:grid;margin:0 auto 16px;place-items:center;position:relative;width:104px;height:104px}.xwk-spinner:before{animation:xwk-spin 1s linear infinite;border:3px solid transparent;border-top-color:${spinnerPrimary};border-right-color:${spinnerSecondary};border-radius:50%;content:"";height:96px;position:absolute;width:96px}.xwk-connect-icon img,.xwk-connect-icon .xwk-icon-fallback{border-radius:${theme.walletRadius};height:66px;object-fit:contain;overflow:hidden;width:66px}.xwk-connect-name{display:block;font-size:${nameFontSize};font-weight:600;margin-top:4px}.xwk-connect-status{color:${theme.muted};font-size:${bodyFontSize};font-weight:400;line-height:1.45;margin:14px auto 0;max-width:420px}.xwk-qr{text-align:center}.xwk-qr-title{color:${theme.foreground};font-size:${titleFontSize};font-weight:500;margin:0 0 14px}.xwk-qr-card{background:${theme.surface};border:1px solid ${theme.border};border-radius:14px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;margin:0 auto 10px;min-height:386px;padding:12px;width:min(332px,100%)}.xwk-qr-code-wrap{position:relative;flex:0 0 auto;margin:0 auto 10px;width:100%}.xwk-qr-code{aspect-ratio:1/1;background:transparent;border:0;border-radius:10px;box-sizing:border-box;color:${theme.muted};display:grid;min-height:0;padding:0;place-items:center;width:100%}.xwk-qr-code-light{background:${QR_LIGHT};padding:8px}.xwk-qr-theme-action{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:${theme.background};border:1px solid ${actionBorder};border-radius:999px;box-shadow:none;box-sizing:border-box;color:${theme.muted};cursor:pointer;display:inline-flex;height:34px;justify-content:center;margin:0;min-height:0;opacity:0;outline:none;padding:0;pointer-events:none;position:absolute;right:8px;top:8px;touch-action:manipulation;transform:none;transition:opacity .14s ease,background-color .16s ease,border-color .16s ease,color .16s ease;width:34px}.xwk-qr-code-wrap:hover .xwk-qr-theme-action,.xwk-qr-code-wrap:focus-within .xwk-qr-theme-action,.xwk-qr-theme-action:focus-visible{opacity:1;pointer-events:auto}.xwk-qr-theme-action:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;color:${theme.foreground};transform:none}.xwk-qr-theme-action svg{height:17px;width:17px}.xwk-qr-code canvas,.xwk-qr-code img,.xwk-qr-code svg{aspect-ratio:1/1;display:block;height:auto;max-width:100%;width:100%}.xwk-qr-loading{align-items:center;color:${qrLoadingColor};display:inline-flex;font-size:13px;gap:8px}.xwk-qr-message{align-items:center;color:${theme.muted};display:grid;font-size:${bodyFontSize};gap:7px;line-height:1.35;max-width:260px;text-align:center}.xwk-qr-message strong{color:${theme.foreground};font-size:${nameFontSize};font-weight:600}.xwk-qr-message span{display:block;max-width:100%;overflow-wrap:anywhere}.xwk-qr-loading-spinner{animation:xwk-spin 1s linear infinite;border:2px solid ${spinnerSecondary};border-top-color:${spinnerPrimary};border-radius:999px;display:inline-block;height:18px;width:18px}.xwk-qr-help{color:${theme.muted};font-size:${bodyFontSize};font-weight:400;line-height:1.35;margin:10px auto 0;max-width:420px;min-height:22px;white-space:nowrap}.xwk-qr-fallback{color:${theme.muted};font-size:11px;line-height:1.5;overflow-wrap:anywhere}.xwk-actions{display:grid;gap:10px;grid-template-columns:1fr 1fr;margin-top:14px}.xwk-qr-card-actions{display:grid;flex:0 0 auto;gap:10px;grid-template-columns:1fr;min-height:46px}.xwk-qr-card-actions-dual{grid-template-columns:repeat(auto-fit,minmax(0,1fr))}.xwk-qr-card-actions-placeholder{visibility:hidden}.xwk-action{-webkit-appearance:none;-webkit-tap-highlight-color:transparent;align-items:center;appearance:none;background:${theme.surface};border:1px solid ${actionBorder};border-radius:${theme.walletRadius};box-shadow:none;box-sizing:border-box;color:${theme.foreground};cursor:pointer;display:inline-flex;font:inherit;font-size:${bodyFontSize};font-weight:560;gap:8px;justify-content:center;line-height:1.2;margin:0;min-height:46px;min-width:0;outline:none;overflow:hidden;padding:0 12px;text-decoration:none;touch-action:manipulation;transform:none;transition:background-color .16s ease,border-color .16s ease;white-space:nowrap;width:100%}.xwk-copy-inside{background:${theme.surface};border-color:${actionBorder};color:${theme.foreground};font-size:${bodyFontSize};width:100%}.xwk-action:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;text-decoration:none;transform:none}.xwk-action:active{background:${theme.surfaceHover};box-shadow:none;opacity:1;text-decoration:none;transform:none}.xwk-copy-inside:hover{background:${theme.surfaceHover};box-shadow:none;text-decoration:none}.xwk-action-primary{background:${theme.surface};border-color:${actionBorder};color:${theme.foreground}}.xwk-action-primary:hover{background:${theme.surfaceHover};border-color:${actionBorder};box-shadow:none;color:${theme.foreground};text-decoration:none}.xwk-action svg{flex:0 0 auto;opacity:.58}.xwk-copied-icon{--xwk-success-icon-foreground:${theme.background};color:${theme.success};opacity:1!important}.xwk-action:disabled{cursor:default;opacity:.76}.xwk-retrying .xwk-refresh-icon{animation:xwk-spin .7s linear infinite}.xwk-footer{border-top:0;color:${theme.muted};font-size:11px;font-weight:400;padding:12px 16px 14px;text-align:center}@keyframes xwk-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.xwk-overlay,.xwk-modal,.xwk-wallet,.xwk-action,.xwk-close,.xwk-back,.xwk-qr-theme-action{transition-duration:1ms!important;animation-duration:1ms!important}.xwk-spinner:before,.xwk-qr-loading-spinner{animation:none}}@media(max-width:640px){.xwk-overlay{padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left));place-items:end center}.xwk-modal{border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:calc(100dvh - 24px - env(safe-area-inset-top));transform:translateY(100%);width:100%}.xwk-overlay[data-xwk-state="open"] .xwk-modal{transform:translateY(0);transition-duration:.32s;transition-timing-function:cubic-bezier(.32,.72,0,1)}.xwk-overlay[data-xwk-state="closing"] .xwk-modal{transform:translateY(100%);transition-duration:.24s;transition-timing-function:cubic-bezier(.4,0,1,1)}.xwk-header{grid-template-columns:44px minmax(0,1fr) 44px;column-gap:8px;padding:10px 16px}.xwk-body{max-height:calc(100dvh - 112px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:14px 16px 16px}.xwk-grid{grid-template-columns:${layout === "icon" ? "repeat(3,minmax(0,1fr))" : "1fr"}}.xwk-wallet-badges{gap:4px}.xwk-wallet-badge{font-size:10px;min-height:22px;padding:0 8px}.xwk-actions{grid-template-columns:1fr}.xwk-qr-card{min-height:358px;padding:12px;width:min(304px,100%)}.xwk-qr-code-wrap{width:100%}.xwk-action{font-size:clamp(12px,3.55vw,${bodyFontSize});gap:6px;padding:0 10px}.xwk-action svg{height:17px;width:17px;flex:0 0 auto}.xwk-qr-card-actions-dual{grid-template-columns:1fr}.xwk-qr-help{font-size:clamp(12px,3.45vw,${bodyFontSize});min-height:38px;white-space:normal}}@media(max-width:360px){.xwk-qr-card{min-height:354px;width:min(284px,100%)}}@media(max-height:560px){.xwk-body{max-height:calc(100dvh - 96px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:10px 16px}.xwk-connect{padding:18px 0 10px}.xwk-spinner{height:82px;margin-bottom:12px;width:82px}.xwk-spinner:before{height:76px;width:76px}.xwk-connect-icon img,.xwk-connect-icon .xwk-icon-fallback{border-radius:${theme.walletRadius};height:54px;width:54px}.xwk-qr-card{min-height:320px;width:min(260px,100%)}.xwk-qr-title{margin-bottom:10px}.xwk-qr-help{margin-top:8px}.xwk-footer{padding:8px 16px 10px}}`;
         this.cachedStyleKey = styleKey;
         const footerStyles = `.xwk-footer{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:center;gap:0 5px;line-height:1.4}.xwk-footer-brand,.xwk-footer-network{min-width:0;max-width:100%;overflow-wrap:anywhere}.xwk-footer-network-test{color:${this.resolveThemeMode() === "dark" ? "#fbbf24" : "#92400e"}}`;
         const cardMobileStyles = layout === "card" ? "@media(max-width:640px){.xwk-layout-card .xwk-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}" : "";
@@ -1106,7 +1402,10 @@ class WalletPickerView {
         const showGroup = this.options.showWalletGroup === true && layout !== "icon";
         const secondary = showGroup ? `<span class="xwk-group">${this.escapeHtml(this.getWalletSecondaryLabel(wallet))}</span>` : "";
         const badge = this.renderWalletBadges(wallet, layout);
-        return `<button class="xwk-wallet" data-wallet-id="${this.escapeHtml(wallet.id)}">${icon}<span class="xwk-wallet-info"><span class="xwk-name">${this.escapeHtml(wallet.name)}</span>${secondary}</span>${badge}</button>`;
+        return this.renderWalletRow(icon, wallet.name, `data-wallet-id="${this.escapeHtml(wallet.id)}"`, secondary, badge);
+    }
+    private renderWalletRow(icon: string, name: string, attributes: string, secondary = "", badge = "") {
+        return `<button type="button" class="xwk-wallet" ${attributes}>${icon}<span class="xwk-wallet-info"><span class="xwk-name">${this.escapeHtml(name)}</span>${secondary}</span>${badge}</button>`;
     }
     private renderWalletBadges(wallet: WalletMetadata, layout: WalletUiLayout) {
         if (layout !== "list")
@@ -1169,6 +1468,9 @@ class WalletPickerView {
         if (icon)
             return `<img class="xwk-mini-icon" src="${this.escapeHtml(icon)}" alt="">`;
         return `<span class="xwk-mini-icon xwk-mini-fallback">${this.escapeHtml(wallet.name.slice(0, 1).toUpperCase())}</span>`;
+    }
+    private sendIcon() {
+        return '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4 20-7ZM22 2 11 13" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     }
     private backIcon() {
         return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;

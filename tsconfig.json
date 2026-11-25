@@ -11,6 +11,7 @@
     { "path": "./packages/adapters/ghostsig" },
     { "path": "./packages/adapters/xyra" },
     { "path": "./packages/adapters/clasp" },
+    { "path": "./packages/adapters/privy" },
     { "path": "./packages/adapters/xrpl-snap" },
     { "path": "./packages/adapters/ledger" },
     { "path": "./packages/adapters/otsu" },

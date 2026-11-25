@@ -7,7 +7,7 @@ const root = resolve("website");
 const directory = resolve(root, "docs/adapters");
 const headings = ["Installation", "Connect", "Networks", "Capabilities", "Options", "Transactions", "Authentication", "Sessions and Disconnect", "Integration Notes", "Troubleshooting", "Related Guides"];
 const operations = ["Connect", "Disconnect", "Session restore", "`signTransaction()`", "`signAndSubmit()`", "`signMessage()`", "`signIn()`", "`switchNetwork()`", "Payment / NFT transactions", "QR / deep link"];
-const signOnly = new Set(["xaman", "gemwallet", "joey-wallet", "ghostsig", "xyra", "ledger", "walletconnect", "clasp"]);
+const signOnly = new Set(["xaman", "gemwallet", "joey-wallet", "ghostsig", "xyra", "ledger", "walletconnect", "clasp", "privy"]);
 
 for (const name of readdirSync(directory).filter(name => name.endsWith(".md") && name !== "overview.md")) {
   test(`adapter guide contract: ${name}`, () => {

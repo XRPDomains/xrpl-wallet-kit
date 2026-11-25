@@ -343,7 +343,21 @@ export interface SwitchNetworkResult {
   raw?: unknown;
 }
 
+export interface WalletInteraction {
+  kind?: "method" | "email" | "code" | "review";
+  title: string;
+  description?: string;
+  choices?: readonly { id: string; label: string; icon?: string; select: () => void }[];
+  fields?: readonly { name: string; label: string; type: string; autocomplete?: string; inputMode?: string; placeholder?: string; codeLength?: number }[];
+  details?: readonly { name: string; label: string; value: string }[];
+  submitLabel?: string;
+  submit?: (values: Record<string, string>) => Promise<void>;
+  secondaryAction?: { label: string; run: () => Promise<void> };
+  cancel: () => void;
+}
+
 export interface WalletAdapter {
+  onInteraction?: (listener: (interaction: WalletInteraction | null) => void) => () => void;
   adapterApiVersion?: WalletAdapterApiVersion;
   metadata: WalletMetadata;
   capabilities: WalletCapabilities;

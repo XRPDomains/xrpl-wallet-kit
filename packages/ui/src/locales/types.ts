@@ -13,6 +13,21 @@ export type WalletUiLocale =
   | (string & {});
 
 export interface WalletUiMessages {
+  walletInteraction?: {
+    emailHint?: string;
+    invalidEmail?: string; invalidCode?: string;
+    chooseMethod: string;
+    emailTitle: string;
+    email: string;
+    sendCode: string;
+    codeHint?: string;
+    codeTitle: string;
+    code: string;
+    verifyCode: string;
+    resendCode: string;
+    reviewTitle: string;
+    approve: string;
+  };
   connectWallet: string;
   connect: string;
   connected: string;

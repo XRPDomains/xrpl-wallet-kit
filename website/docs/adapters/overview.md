@@ -14,6 +14,7 @@ An adapter connects Kit's standard manager API to a wallet provider. DApps use t
 | [GhostSig](/docs/adapters/ghostsig) | `ghostsig` | `@xrpl-wallet-kit/adapter-ghostsig` | Hosted popup |
 | [Xyra](/docs/adapters/xyra) | `xyra` | `@xrpl-wallet-kit/adapter-xyra` | Hosted popup |
 | [Clasp](/docs/adapters/clasp) | `clasp` | `@xrpl-wallet-kit/adapter-clasp` | Hosted passkey popup; opt-in |
+| [Privy](/docs/adapters/privy) | `privy` | `@xrpl-wallet-kit/adapter-privy` | Embedded wallet with email or OAuth; opt-in |
 | [Ledger](/docs/adapters/ledger) | `ledger` | `@xrpl-wallet-kit/adapter-ledger` | Hardware device |
 | [XRPL Snap](/docs/adapters/xrpl-snap) | `xrplsnap` | `@xrpl-wallet-kit/adapter-xrpl-snap` | MetaMask Snap |
 | [WalletConnect](/docs/adapters/walletconnect) | `walletconnect` | `@xrpl-wallet-kit/adapter-walletconnect` | Multi-wallet protocol |

@@ -72,6 +72,7 @@ for (const entryPath of [
   "packages/vue/dist/index.js",
   "packages/next/dist/index.js",
   "packages/adapters/ghostsig/dist/index.js",
+  "packages/adapters/privy/dist/index.js",
   "packages/adapters/clasp/dist/index.js"
 ]) {
   await import(pathToFileURL(resolve(root, entryPath)).href);

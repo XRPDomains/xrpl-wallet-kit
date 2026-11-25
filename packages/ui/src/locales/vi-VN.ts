@@ -2,6 +2,14 @@ import { enUSMessages } from "./en-US";
 import type { WalletUiMessages } from "./types";
 
 export const viVNMessages: WalletUiMessages = {
+  walletInteraction: {
+    emailHint: "Nhận mã qua email để mở ví ngay tại đây, không cần cài app hay dùng cụm từ khôi phục.",
+    invalidEmail: "Nhập địa chỉ email hợp lệ.", invalidCode: "Nhập đầy đủ mã xác nhận.",
+    codeHint: "Kiểm tra email để lấy mã.",
+    chooseMethod: "Chọn cách đăng nhập", emailTitle: "Đăng nhập bằng email", email: "Địa chỉ email", sendCode: "Gửi mã",
+    codeTitle: "Nhập mã xác nhận", code: "Mã xác nhận", verifyCode: "Xác nhận mã", resendCode: "Gửi lại mã",
+    reviewTitle: "Kiểm tra giao dịch", approve: "Phê duyệt"
+  },
   ...enUSMessages,
   connectWallet: "Kết nối ví",
   connect: "Kết nối",

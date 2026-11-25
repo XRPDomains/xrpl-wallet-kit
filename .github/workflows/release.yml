@@ -53,6 +53,7 @@ jobs:
           npm publish --workspace @xrpl-wallet-kit/xahau --access public
           npm publish --workspace @xrpl-wallet-kit/adapter-crossmark --access public
           npm publish --workspace @xrpl-wallet-kit/adapter-clasp --access public
+          npm publish --workspace @xrpl-wallet-kit/adapter-privy --access public
           npm publish --workspace @xrpl-wallet-kit/adapter-dropfi --access public
           npm publish --workspace @xrpl-wallet-kit/adapter-ghostsig --access public
           npm publish --workspace @xrpl-wallet-kit/adapter-gemwallet --access public

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privy XRPL Testnet validation</title>
+</head>
+<body>
+  <main>
+    <h1>Privy XRPL Testnet validation</h1>
+    <p id="session" role="status">Checking configuration...</p>
+    <xrpl-wallet-connector id="connector" hidden></xrpl-wallet-connector>
+    <button id="logout" disabled>Log out</button>
+    <button id="fund" disabled>Fund this wallet using the Testnet faucet</button>
+    <form id="payment">
+      <fieldset id="operations" disabled>
+        <legend>Testnet XRP payment</legend>
+        <label>Amount (XRP) <input id="amount" inputmode="decimal" value="0.001" required></label>
+        <label>Funded Testnet destination <input id="destination" required autocomplete="off"></label>
+        <button id="sign" type="submit">Sign only</button>
+        <button id="send" type="submit">Sign and submit on Testnet</button>
+      </fieldset>
+    </form>
+    <pre id="result" role="status"></pre>
+  </main>
+  <script type="module" src="/main.js"></script>
+</body>
+</html>
