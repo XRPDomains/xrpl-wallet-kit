@@ -1332,6 +1332,15 @@ class WalletPickerView {
 .xwk-code-control:focus-within [data-caret]::after{content:"";position:absolute;inset-block:30%;inset-inline-start:calc(50% - 1px);width:2px;border-radius:2px;background:${theme.accent};animation:xwk-caret-blink 1.1s step-end infinite}
 .xwk-code-control:focus-within [data-caret]:not(:empty)::after{inset-inline-start:auto;inset-inline-end:18%}
 .xwk-code-control:focus-within .xwk-code-cells>span[data-selection]{background:${theme.surfaceHover}}
+${this.resolveThemeMode() === "dark" ? `
+.xwk-code-cells>span{background:${theme.surface};background:linear-gradient(175deg,color-mix(in srgb,${theme.surface},${theme.foreground} 11%),color-mix(in srgb,${theme.surface},${theme.foreground} 4%));box-shadow:inset 0 1px 0 color-mix(in srgb,${theme.foreground} 13%,transparent),0 2px 4px color-mix(in srgb,${theme.background} 80%,transparent)}
+.xwk-field-control:not([data-status="invalid"]) .xwk-code-cells>span{border-color:color-mix(in srgb,${theme.border},${theme.foreground} 30%)}
+.xwk-code-cells>span:empty::before{opacity:.8}
+.xwk-code-control:focus-within .xwk-code-cells>span[data-caret]{background:color-mix(in srgb,${theme.surface},${theme.accent} 16%);box-shadow:inset 0 1px 0 color-mix(in srgb,${theme.foreground} 15%,transparent)}
+.xwk-field-control:not([data-status="invalid"]) .xwk-code-control:focus-within .xwk-code-cells>span[data-caret]{border-color:color-mix(in srgb,${theme.accent},${theme.foreground} 58%)}
+.xwk-code-control:focus-within [data-caret]::after{background:color-mix(in srgb,${theme.accent},${theme.foreground} 60%)}
+.xwk-code-control:focus-within .xwk-code-cells>span[data-selection]{background:color-mix(in srgb,${theme.surfaceHover},${theme.foreground} 14%)}
+` : ""}
 @keyframes xwk-caret-blink{50%{opacity:0}}
 @media(prefers-reduced-motion:reduce){.xwk-code-control:focus-within [data-caret]::after{animation:none}.xwk-code-cells>span{transition:none}}
 .xwk-interaction-title{display:flex;min-width:0;justify-content:center;align-items:center;gap:8px}
