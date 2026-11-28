@@ -1,5 +1,5 @@
 import { createServer, loadEnv, normalizePath } from "vite";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -152,7 +152,10 @@ function addNativeSignInServer(server) {
 
 const server = await createServer({
   root: "examples/vanilla",
-  cacheDir: resolve(tmpdir(), "xrpl-wallet-kit-vite"),
+  cacheDir: resolve(tmpdir(), "xrpl-wallet-kit-vite", createHash("sha256").update(process.cwd()).digest("hex").slice(0, 12)),
+  optimizeDeps: {
+    exclude: ["@kyrawallet/sdk"]
+  },
   envDir: process.cwd(),
   define: defineEnv,
   resolve: {

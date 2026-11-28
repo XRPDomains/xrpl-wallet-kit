@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { extname } from "node:path";
+import { gunzipSync } from "node:zlib";
 
 const explicitFiles = process.argv.slice(2);
 const files = explicitFiles.length
@@ -21,9 +22,19 @@ const failures = [];
 for (const file of files) {
   if (!existsSync(file)) continue;
   const bytes = readFileSync(file);
-  const text = bytes.toString("utf8");
   const extension = extname(file).toLowerCase();
 
+  if (extension === ".tgz") {
+    try {
+      const archive = gunzipSync(bytes);
+      if (archive.toString("ascii", 257, 262) !== "ustar") throw new Error("missing tar header");
+    } catch (error) {
+      failures.push(`${file}: invalid compressed tar archive (${error.message})`);
+    }
+    continue;
+  }
+
+  const text = bytes.toString("utf8");
   if (bytes.subarray(Math.max(0, bytes.length - 64)).includes(0)) {
     failures.push(`${file}: null bytes found near file end`);
     continue;

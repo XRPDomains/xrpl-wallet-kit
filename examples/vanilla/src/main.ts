@@ -14,6 +14,7 @@ if (!("Buffer" in globalThis)) {
 }
 
 const PREVIEW_CONFIG = {
+  kyraWalletOrigin: import.meta.env.VITE_KYRA_WALLET_ORIGIN?.trim() ?? "",
   privyAppId: import.meta.env.VITE_PRIVY_APP_ID?.trim() ?? "",
   privyClientId: import.meta.env.VITE_PRIVY_CLIENT_ID?.trim() || undefined,
   xamanClientId: import.meta.env.VITE_XAMAN_CLIENT_ID ?? "",
@@ -428,6 +429,11 @@ async function bootstrap(run = bootstrapRun) {
     }));
   }
 
+  if (PREVIEW_CONFIG.kyraWalletOrigin && networkSelect.value !== "devnet") {
+    const { kyra } = await import("../../../packages/adapters/kyra/src");
+    adapters.push(kyra({ walletOrigin: PREVIEW_CONFIG.kyraWalletOrigin }));
+  }
+
   const protocolModule = chainSelect.value === "xahau" ? await import("../../../packages/xahau/src") : undefined;
   if (run !== bootstrapRun) return;
   const protocols = protocolModule ? [protocolModule.createXahauProtocol({ request: async (network, method, params, signal) => {
@@ -531,11 +537,13 @@ function renderSession() {
 function renderTransactionState() {
   const current = manager.getSession();
   const adapter = manager.getAdapter();
+  const walletManagesFees = adapter?.capabilities.details?.walletManagesFees;
+  maxFeeInput.closest("label")!.hidden = chainSelect.value !== "xahau" || Boolean(walletManagesFees);
   const submit = transactionMode.value === "sign-and-submit";
   const supported = supportsTransactionMode(adapter, submit);
   const canSign = Boolean(current && supported && !transactionPending);
   genericButton.disabled = !canSign;
-  uriButton.disabled = !canSign || chainSelect.value !== "xahau";
+  uriButton.disabled = !canSign || chainSelect.value !== "xahau" || Boolean(adapter?.capabilities.details?.supportedTransactionTypes && !adapter.capabilities.details.supportedTransactionTypes.includes(uriOperation.value));
   uriButton.textContent = uriOperation.value === "URITokenBuy"
     ? (submit ? "Accept sell offer" : "Sign offer acceptance")
     : (submit ? "Submit URIToken" : "Sign URIToken");
@@ -699,7 +707,11 @@ async function submitPayment() {
     destination
   };
 
-  await runTransaction(paymentResult, "payment", { txJson, walletPayload, methodHint: "payment" });
+  await runTransaction(paymentResult, "payment", {
+    txJson,
+    ...(manager.getSession()?.adapterId === "kyra" ? {} : { walletPayload }),
+    methodHint: "payment",
+  });
 }
 
 async function submitNftOffer() {
@@ -809,6 +821,9 @@ async function runTransaction(target: HTMLPreElement, name: string, request: Omi
 
 function createTransactionRequestPreview(request: PreviewTransactionRequest) {
   if (chainSelect.value === "xahau") {
+    if (manager.getAdapter()?.capabilities.details?.walletManagesFees) {
+      return { txJson: request.txJson, methodHint: "generic" as const, submit: request.submit };
+    }
     const maxFeeDrops = maxFeeInput.value.trim();
     if (!/^[1-9]\d*$/.test(maxFeeDrops)) {
       const message = "Enter a positive Xahau fee limit (drops).";

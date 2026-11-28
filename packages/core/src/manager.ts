@@ -732,6 +732,10 @@ export class WalletManager extends WalletEventEmitter {
     const caps = [this.config.preflight?.maxFeeDrops,
       request.preflight && request.preflight.maxFeeDrops, request.maxFeeDrops]
       .filter((cap): cap is string => cap !== undefined && cap !== false);
+    if (this.getAdapter()?.capabilities.details?.walletManagesFees) {
+      if (caps.length) throw new WalletKitError(WalletKitErrorCode.INVALID_REQUEST, "The active wallet sets its own fee and cannot enforce the app's fee limit.");
+      return request;
+    }
     if (!caps.length || caps.some(cap => typeof cap !== "string" || !/^[1-9][0-9]{0,17}$/.test(cap))) {
       throw new WalletKitError(WalletKitErrorCode.INVALID_REQUEST, "Set a positive fee limit (maxFeeDrops).");
     }

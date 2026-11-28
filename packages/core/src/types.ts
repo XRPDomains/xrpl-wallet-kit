@@ -63,6 +63,8 @@ export interface WalletCapabilityDetails {
   supportedTransactionTypes?: readonly string[];
   supportedMethods?: readonly string[];
   transactionModes?: readonly WalletTransactionMode[];
+  /** The wallet prepares fees for an intent and cannot enforce a dApp-supplied fee ceiling. */
+  walletManagesFees?: boolean;
 }
 
 export interface WalletMetadata {
